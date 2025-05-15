@@ -14,7 +14,6 @@ export interface AppUser {
   name: string;
   email: string;
   photoURL: string;
-  // New optional fields
   role: string;
   location: string;
   connections: number;
