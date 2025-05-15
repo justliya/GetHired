@@ -5,4 +5,5 @@ export type Page =
   | 'company'
   | 'applications'
   | 'networking'
-  | 'profile';
+  | 'profile'
+  | 'auth';
