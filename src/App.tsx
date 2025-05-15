@@ -52,6 +52,7 @@ function App() {
           toggleSidebar={toggleSidebar}
           isSidebarOpen={isSidebarOpen}
           currentPage={currentPage}
+          onNavigate={(page) => setCurrentPage(page)}
         />
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           <div className="max-w-7xl mx-auto animate-fade-in">
