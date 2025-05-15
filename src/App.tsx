@@ -1,17 +1,17 @@
-import { useState } from 'react';
-import Sidebar from './components/layout/SideBar';
-import Header from './components/layout/Header';
-import Dashboard from './pages/Dashboard';
-import JobDiscovery from './pages/JobDiscovery';
-import ResumeTailoring from './pages/ResumeTailoring';
-import CompanyResearch from './pages/CompanyResearch';
-import ApplicationTracker from './pages/ApplicationTracker';
-import Networking from './pages/Networking';
-
-type Page = 'dashboard' | 'jobs' | 'resume' | 'company' | 'applications' | 'networking';
+import { useState } from "react";
+import Sidebar from "./components/layout/Sidebar";
+import Header from "./components/layout/Header";
+import Dashboard from "./pages/Dashboard";
+import JobDiscovery from "./pages/JobDiscovery";
+import ResumeTailoring from "./pages/ResumeTailoring";
+import CompanyResearch from "./pages/CompanyResearch";
+import ApplicationTracker from "./pages/ApplicationTracker";
+import Networking from "./pages/Networking";
+import Profile from "./pages/Profile";
+import { type Page } from "./types";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const toggleSidebar = () => {
@@ -20,34 +20,37 @@ function App() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard onNavigate={setCurrentPage} />;
-      case 'jobs':
+      case "dashboard":
+        return <Dashboard onNavigate={(page) => setCurrentPage(page)} />;
+      case "jobs":
         return <JobDiscovery />;
-      case 'resume':
+      case "profile":
+        return <Profile />;
+      case "resume":
         return <ResumeTailoring />;
-      case 'company':
+      case "company":
         return <CompanyResearch />;
-      case 'applications':
+      case "applications":
         return <ApplicationTracker />;
-      case 'networking':
+
+      case "networking":
         return <Networking />;
       default:
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <Dashboard onNavigate={(page) => setCurrentPage(page)} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex">
-      <Sidebar 
-        isOpen={isSidebarOpen} 
-        currentPage={currentPage} 
-        onNavigate={setCurrentPage} 
+      <Sidebar
+        isOpen={isSidebarOpen}
+        currentPage={currentPage}
+        onNavigate={(page) => setCurrentPage(page)}
       />
       <div className="flex-1 flex flex-col transition-all duration-300">
-        <Header 
-          toggleSidebar={toggleSidebar} 
-          isSidebarOpen={isSidebarOpen} 
+        <Header
+          toggleSidebar={toggleSidebar}
+          isSidebarOpen={isSidebarOpen}
           currentPage={currentPage}
         />
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">

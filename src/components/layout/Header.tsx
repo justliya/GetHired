@@ -13,6 +13,7 @@ const pageNames: Record<string, string> = {
   resume: 'Resume Tailoring',
   company: 'Company Research',
   applications: 'Application Tracker',
+  interview: 'Interview Prep',
   networking: 'Networking',
 };
 
