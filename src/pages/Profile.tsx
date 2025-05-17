@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import { User, type AppUser } from "../contexts/UserContext";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -22,13 +21,20 @@ export default function Profile() {
   });
 
   useEffect(() => {
-    if (user) {
-      setForm(user);
-      const storedUrl = (user as any).resumeUrl;
-      if (storedUrl) setResumeUrl(storedUrl);
-      const storedPrefs = (user as any).preferences;
-      if (storedPrefs) setPrefs(storedPrefs);
-    }
+    if (!user) return;
+    const loadUserProfile = async () => {
+      const docRef = doc(db, "users", user.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        setForm({ ...user, ...data });
+        if (data.resumeUrl) setResumeUrl(data.resumeUrl);
+        if (data.preferences) setPrefs(data.preferences);
+      } else {
+        setForm(user);
+      }
+    };
+    loadUserProfile();
   }, [user]);
 
   if (loading) {
@@ -55,7 +61,7 @@ export default function Profile() {
   const handleSaveProfile = async () => {
     if (!form) return;
     try {
-      await setDoc(doc(db, "users", form.uid), form);
+      await setDoc(doc(db, "users", form.uid), form, { merge: true });
       setUser(form);
       setIsEditing(false);
       console.log("Profile saved successfully");
