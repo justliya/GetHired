@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
-
+import { getStorage } from "firebase/storage";
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -18,4 +18,4 @@ const auth = getAuth(app)
 const db = getFirestore(app);
 
 export { auth, db, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, doc, setDoc, getDoc };
-
+export const storage = getStorage(app);

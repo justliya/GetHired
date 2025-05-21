@@ -3,7 +3,7 @@ name = "GetHired"
 version = "0.1.0"
 description = "Job search automation ADK Agent. Designed to optimize and automate the job search process. It uses keywords from user and performs tailored job searches through google, and gathers all relevant listings, conduct research on the company, tailor resume, and prepare for application submission."
 authors = [
-    {name = "Aaliyah Johnson", "La'Kaleigh Harris", email = "neoaxiom@gmail.com"},
+    {name = "Aaliyah Johnson, La'Kaleigh Harris" , email = "neoaxiom@gmail.com"},
 ]
 license = ""
 readme = "README.md"
