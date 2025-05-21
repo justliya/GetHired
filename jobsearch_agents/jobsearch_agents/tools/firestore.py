@@ -1,6 +1,7 @@
 # firestore_service.py
 import firebase_admin
 from firebase_admin import credentials, firestore
+from google.adk.tools.tool_context import ToolContext
 
 class FirestoreService:
     def __init__(self, credentials_path=None):
@@ -12,7 +13,7 @@ class FirestoreService:
                 firebase_admin.initialize_app()
         self.db = firestore.client()
 
-    def get_user_job_preferences(self, user_id: str) -> dict | None:
+    def get_user_job_preferences(self, user_id: str,tool_context: ToolContext) -> dict | None:
         """Fetches job search preferences for a given user."""
         try:
             pref_ref = self.db.collection('users').document(user_id) \
