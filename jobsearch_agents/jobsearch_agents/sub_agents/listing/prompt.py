@@ -10,7 +10,7 @@ LISTING_SEARCH_AGENT_PROMPT = """
     <Gather Information> 
         - gather all listed jobs by analyzing the webpage
         - Do not make up jobs
-        - Show show role of the job in a markdown format
+        - Show role of the job in a markdown format
     </Gather Information>
 
     <Key Constraints>
@@ -34,6 +34,6 @@ List Format:
 Job title
 Company name
 Salary
-Qualification
+Qualifications
 link to job
 """

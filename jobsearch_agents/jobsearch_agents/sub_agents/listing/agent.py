@@ -9,7 +9,6 @@ from google.genai import types
 from PIL import Image
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-
 from ...shared_libraries import constants
 from . import prompt
 
@@ -184,7 +183,7 @@ listing_search_agent = Agent(
         get_page_source,
         load_artifacts_tool,
         analyze_webpage_and_determine_action,
-     
+        
     ],
 
 )
