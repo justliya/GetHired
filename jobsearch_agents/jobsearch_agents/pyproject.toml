@@ -6,8 +6,7 @@ authors = [
     {name = "Aaliyah Johnson, La'Kaleigh Harris" , email = "neoaxiom@gmail.com"},
 ]
 license = ""
-readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "google-adk (>=0.0.2)",
     # "google-adk[eval] (>=0.0.2,<1.0.0)",
@@ -24,3 +23,7 @@ dependencies = [
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.packages]]
+include = "jobsearch_agents"
+from = ".."  # point to the parent directory where the package folder resides
