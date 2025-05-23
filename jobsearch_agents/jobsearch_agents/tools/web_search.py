@@ -1,7 +1,7 @@
 import time
 import warnings
 from typing import Any, Dict
-
+from google.adk.tools import FunctionTool
 from ..shared_libraries import constants
 import selenium
 from selenium.webdriver.chrome.options import Options
@@ -220,3 +220,24 @@ Page content:\n{page_source}
 Based on this, choose one action: COMPLETE_PAGE_SOURCE, SCROLL_DOWN, CLICK: <element_text>, ENTER_TEXT: <element_id>, TASK_COMPLETED, STUCK, or ASK_USER.
 """
     return {"status": "success", "action_plan": analysis_prompt}
+go_to_url_tool = FunctionTool(func=go_to_url)
+screenshot_tool = FunctionTool(func=take_screenshot)
+click_coords_tool = FunctionTool(func=click_at_coordinates)
+find_text_tool = FunctionTool(func=find_element_with_text)
+click_text_tool = FunctionTool(func=click_element_with_text)
+enter_text_tool = FunctionTool(func=enter_text_into_element)
+scroll_tool = FunctionTool(func=scroll_down_screen)
+page_source_tool = FunctionTool(func=get_page_source)
+analyze_web_tool = FunctionTool(func=analyze_webpage_and_determine_action)
+
+tools = [
+    go_to_url_tool,
+    screenshot_tool,
+    click_coords_tool,
+    find_text_tool,
+    click_text_tool,
+    enter_text_tool,
+    scroll_tool,
+    page_source_tool,
+    analyze_web_tool,
+]

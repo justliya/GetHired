@@ -1,49 +1,34 @@
+# sub_agents/listing/agent.py
 
-# listing_search_agent.py
-from google.adk.agents.llm_agent import Agent
-from google.adk.tools import FunctionTool
+from google.adk.agents import LlmAgent
 from ...shared_libraries import constants
 from . import prompt
-from ...tools.web_search import (
-    go_to_url,
-    take_screenshot,
-    click_at_coordinates,
-    find_element_with_text,
-    click_element_with_text,
-    enter_text_into_element,
-    scroll_down_screen,
-    get_page_source,
-    analyze_webpage_and_determine_action,
+from ...tools.web_search import tools as web_tools
+from ...tools.approval import approval_tool
+
+from google.adk.tools.agent_tool import AgentTool
+
+request_approval = LlmAgent(
+    name="RequestHumanApproval",
+    instruction=(
+        "Invoke the LongRunningFunctionTool to send job listings for human review. "
+        "Wait for approval before proceeding."
+    ),
+    tools=[approval_tool],
+    output_key="approval_response"
 )
 
-# Instantiate tools for listing search
-go_to_url_tool = FunctionTool(func=go_to_url)
-screenshot_tool = FunctionTool(func=take_screenshot)
-click_coords_tool = FunctionTool(func=click_at_coordinates)
-find_text_tool = FunctionTool(func=find_element_with_text)
-click_text_tool = FunctionTool(func=click_element_with_text)
-enter_text_tool = FunctionTool(func=enter_text_into_element)
-scroll_tool = FunctionTool(func=scroll_down_screen)
-page_source_tool = FunctionTool(func=get_page_source)
-analyze_web_tool = FunctionTool(func=analyze_webpage_and_determine_action)
-
-tools = [
-    go_to_url_tool,
-    screenshot_tool,
-    click_coords_tool,
-    find_text_tool,
-    click_text_tool,
-    enter_text_tool,
-    scroll_tool,
-    page_source_tool,
-    analyze_web_tool,
-]
-
-listing_search_agent = Agent(
+listing_search_agent = LlmAgent(
     model=constants.MODEL,
     name="listing_search_agent",
-    description="Search and retrieve job listings based on user preferences via web browsing",
+    description=(
+        "Search and retrieve job listings based on user preferences via web browsing, "
+        "then allow a human to select which listings to research further."
+    ),
     instruction=prompt.LISTING_SEARCH_AGENT_PROMPT,
     output_key="job_listings",
-    tools=tools,
+    tools=[
+        *web_tools,
+        AgentTool(agent=request_approval, skip_summarization=True)
+    ]
 )
