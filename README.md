@@ -1,54 +1,78 @@
-# React + TypeScript + Vite
+# GetHired
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-Currently, two official plugins are available:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Frontend Setup and Installation
 
-## Expanding the ESLint configuration
+# Clone this repository.
+git clone https://github.com/justliya/GetHired.git
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+npm install
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+# .env
+VITE_FIREBASE_API_KEY=<YOUR_PROJECT>
+VITE_FIREBASE_AUTH_DOMAIN=<YOUR_PROJECT>
+VITE_FIREBASE_PROJECT_ID=<YOUR_PROJECT>
+VITE_FIREBASE_STORAGE_BUCKET=<YOUR_PROJECT>
+VITE_FIREBASE_MESSAGING_SENDER_ID=<YOUR_PROJECT>
+VITE_FIREBASE_APP_ID=<YOUR_PROJECT>
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+npm run dev
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+Backend Setup and Installation
+
+
+Prerequisites:
+
+Python 3.11+
+Poetry
+For dependency management and packaging. Please follow the instructions on the official Poetry website for installation.
+Create a project on Google Cloud Platform
+Set IAM Permissions to 'VERTEX AI user'
+
+Configuration:
+
+Env file setup
+
+GOOGLE_GENAI_USE_VERTEXAI=True
+# IMPORTANT: Setting this flag to 1 will disable web driver
+DISABLE_WEB_DRIVER=1
+GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT>
+GOOGLE_CLOUD_LOCATION= us-central1
+
+
+Authenticate with your Google Cloud account:
+
+gcloud auth application-default login
+
+
+Installation:
+
+Create & activate virtual environment¶
+
+python -m venv .venv
+
+# Mac / Linux
+source .venv/bin/activate
+
+# Windows CMD:
+.venv\Scripts\activate.bat
+
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+
+Install ADK¶
+
+pip install google-adk
+
+cd jobsearch_agents
+
+Running the Agent
+
+adk web
+
+
+This should open a new chrome window through web-driver. If it doesn't, please make sure DISABLE_WEB_DRIVER=0 in the .env file.
+
+
