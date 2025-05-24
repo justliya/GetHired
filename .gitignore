@@ -23,4 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 *env
-*__pycache__/
+
+__pycache__/
+.python-version
+/docs
