@@ -1,307 +1,324 @@
-import React, { useState } from 'react';
-import { Building2, Search, Users, BarChart as ChartBar, MapPin, Globe, DollarSign, Award, RefreshCw } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import  { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { 
+  Building2, Globe, FileText, ExternalLink, 
+  CheckCircle, XCircle, Briefcase, User, 
+  Clock, DollarSign
+} from 'lucide-react';
+import { mockJobListings, mockCompanyResearch } from '../data/mockData';
 
-const CompanyResearch: React.FC = () => {
+const CompanyResearch = () => {
+  const { jobId } = useParams<{ jobId: string }>();
+  const [isResearching, setIsResearching] = useState(jobId === 'new');
   const [companyName, setCompanyName] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [companyInfo, setCompanyInfo] = useState<null | {
-    name: string;
-    logo: string;
-    industry: string;
-    size: string;
-    headquarters: string;
-    founded: string;
-    website: string;
-    revenue: string;
-    rating: number;
-    reviews: {
-      overall: number;
-      workLife: number;
-      compensation: number;
-      culture: number;
-      career: number;
-    };
-    pros: string[];
-    cons: string[];
-    keyPeople: {
-      name: string;
-      position: string;
-    }[];
-  }>(null);
-
-  const handleSearch = () => {
-    if (!companyName.trim()) return;
+  const [jobTitle, setJobTitle] = useState('');
+  
+  // Find job data if not new
+  const job = jobId !== 'new' 
+    ? mockJobListings.find(j => j.id === jobId) 
+    : null;
     
-    setIsSearching(true);
+  // Find research data if exists
+  const researchData = jobId !== 'new'
+    ? mockCompanyResearch.find(r => r.jobId === jobId)
+    : null;
     
-    // Simulate search delay
+  const startResearch = () => {
+    // In a real app, this would trigger the AI agent to start researching
+    setIsResearching(true);
+    // Simulate a delay for research
     setTimeout(() => {
-      setCompanyInfo({
-        name: "TechCorp Inc.",
-        logo: "https://placehold.co/100x100?text=TC",
-        industry: "Information Technology",
-        size: "1,000-5,000 employees",
-        headquarters: "San Francisco, CA",
-        founded: "2010",
-        website: "www.techcorp-example.com",
-        revenue: "$100M - $500M",
-        rating: 4.2,
-        reviews: {
-          overall: 4.2,
-          workLife: 3.8,
-          compensation: 4.5,
-          culture: 4.0,
-          career: 3.9,
-        },
-        pros: [
-          "Competitive salary and benefits",
-          "Good work-life balance",
-          "Strong engineering culture",
-          "Remote work options"
-        ],
-        cons: [
-          "Limited career advancement in some departments",
-          "Decision-making can be slow",
-          "High pressure during release cycles"
-        ],
-        keyPeople: [
-          { name: "Jane Smith", position: "CEO" },
-          { name: "John Doe", position: "CTO" },
-          { name: "Alice Johnson", position: "VP of Engineering" }
-        ]
-      });
-      setIsSearching(false);
-    }, 1500);
-  };
-
-  // Function to render star rating
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    
-    for (let i = 1; i <= 5; i++) {
-      if (i <= fullStars) {
-        stars.push(<span key={i} className="text-warning-500">★</span>);
-      } else if (i === fullStars + 1 && hasHalfStar) {
-        stars.push(<span key={i} className="text-warning-500">★</span>);
-      } else {
-        stars.push(<span key={i} className="text-gray-300">★</span>);
-      }
-    }
-    
-    return stars;
+      setIsResearching(false);
+    }, 3000);
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Card>
-        <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Building2 size={18} className="text-gray-500" />
+    <div className="max-w-5xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Company Research</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">
+            {job 
+              ? `Researching ${job.company} for ${job.title} position` 
+              : 'Research a new company'}
+          </p>
+        </div>
+      </div>
+
+      {jobId === 'new' && !researchData ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Research a New Company
+          </h2>
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Company Name
+              </label>
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="E.g., Google, Microsoft, etc."
+              />
             </div>
-            <input
-              type="text"
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Enter company name..."
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Job Title
+              </label>
+              <input
+                type="text"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="E.g., Software Engineer, Product Manager, etc."
+              />
+            </div>
           </div>
-          <Button
-            variant="primary"
-            disabled={!companyName.trim() || isSearching}
-            onClick={handleSearch}
+          <button
+            onClick={startResearch}
+            disabled={!companyName || isResearching}
+            className={`inline-flex items-center px-4 py-2 rounded-md transition-colors duration-200 ${
+              !companyName || isResearching
+                ? 'bg-gray-300 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
           >
-            {isSearching ? (
+            {isResearching ? (
               <>
-                <RefreshCw size={18} className="mr-2 animate-spin" />
-                Searching...
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Researching...
               </>
             ) : (
               <>
-                <Search size={18} className="mr-2" />
-                Research Company
+                <Building2 className="w-5 h-5 mr-2" />
+                Start Research
               </>
             )}
-          </Button>
+          </button>
         </div>
-      </Card>
-
-      {companyInfo && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up">
-          <Card className="md:col-span-3">
-            <div className="flex flex-col md:flex-row md:items-center">
-              <div className="flex-shrink-0 p-2 bg-gray-100 rounded-lg w-16 h-16 flex items-center justify-center">
-                <img 
-                  src={companyInfo.logo} 
-                  alt={`${companyInfo.name} logo`} 
-                  className="max-w-full max-h-full"
-                />
-              </div>
-              <div className="mt-4 md:mt-0 md:ml-6">
-                <h2 className="text-2xl font-bold text-gray-900">{companyInfo.name}</h2>
-                <div className="flex items-center mt-1">
-                  <div className="flex mr-2">
-                    {renderStars(companyInfo.rating)}
+      ) : (
+        <div className="space-y-6">
+          {/* Company Overview */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center">
+                  <div className="rounded-full p-3 bg-blue-100 dark:bg-blue-900 mr-4">
+                    <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <span className="text-sm text-gray-600">{companyInfo.rating} out of 5</span>
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {job?.company || researchData?.companyName || 'Company Overview'}
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400">{job?.title || 'Position Details'}</p>
+                  </div>
                 </div>
+                {researchData?.officialWebsite && (
+                  <a 
+                    href={researchData.officialWebsite} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <Globe className="w-5 h-5 mr-1" />
+                    Website
+                    <ExternalLink className="w-4 h-4 ml-1" />
+                  </a>
+                )}
               </div>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <div className="flex items-start">
-                <Users size={18} className="mr-2 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-gray-500">Company Size</p>
-                  <p className="text-sm font-medium">{companyInfo.size}</p>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="col-span-2">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Job Details</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Position</h4>
+                      <div className="flex items-center text-gray-900 dark:text-white">
+                        <Briefcase className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
+                        {job?.title || 'Position Title'}
+                      </div>
+                    </div>
+                    
+                    {job?.location && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</h4>
+                        <div className="flex items-center text-gray-900 dark:text-white">
+                          <User className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
+                          {job.location}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {job?.datePosted && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Posted</h4>
+                        <div className="flex items-center text-gray-900 dark:text-white">
+                          <Clock className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
+                          {job.datePosted}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {job?.salary && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Salary</h4>
+                        <div className="flex items-center text-gray-900 dark:text-white">
+                          <DollarSign className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
+                          {job.salary}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-start">
-                <ChartBar size={18} className="mr-2 text-gray-500 flex-shrink-0 mt-0.5" />
+                
                 <div>
-                  <p className="text-xs text-gray-500">Industry</p>
-                  <p className="text-sm font-medium">{companyInfo.industry}</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <MapPin size={18} className="mr-2 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-gray-500">Headquarters</p>
-                  <p className="text-sm font-medium">{companyInfo.headquarters}</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <Globe size={18} className="mr-2 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-gray-500">Website</p>
-                  <p className="text-sm font-medium">{companyInfo.website}</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <Award size={18} className="mr-2 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-gray-500">Founded</p>
-                  <p className="text-sm font-medium">{companyInfo.founded}</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <DollarSign size={18} className="mr-2 text-gray-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs text-gray-500">Revenue</p>
-                  <p className="text-sm font-medium">{companyInfo.revenue}</p>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Quick Actions</h3>
+                  <div className="space-y-2">
+                    <a 
+                      href={job?.url || '#'} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block w-full text-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors duration-200"
+                    >
+                      View Job Listing
+                    </a>
+                    <a 
+                      href={researchData?.glassdoorLink || '#'}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block w-full text-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      View on Glassdoor
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
           
-          <Card title="Employee Reviews" className="md:col-span-2">
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-gray-600">Overall:</span>
-                <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                  <div 
-                    className="h-2 bg-primary-600 rounded-full" 
-                    style={{ width: `${(companyInfo.reviews.overall / 5) * 100}%` }}
-                  ></div>
+          {/* Job Responsibilities */}
+          {researchData?.responsibilities && researchData.responsibilities.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                <div className="flex items-center">
+                  <FileText className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
+                  Responsibilities
                 </div>
-                <span className="ml-2 text-sm font-medium">{companyInfo.reviews.overall}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-gray-600">Work/Life Balance:</span>
-                <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                  <div 
-                    className="h-2 bg-primary-600 rounded-full" 
-                    style={{ width: `${(companyInfo.reviews.workLife / 5) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="ml-2 text-sm font-medium">{companyInfo.reviews.workLife}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-gray-600">Compensation:</span>
-                <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                  <div 
-                    className="h-2 bg-primary-600 rounded-full" 
-                    style={{ width: `${(companyInfo.reviews.compensation / 5) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="ml-2 text-sm font-medium">{companyInfo.reviews.compensation}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-gray-600">Culture:</span>
-                <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                  <div 
-                    className="h-2 bg-primary-600 rounded-full" 
-                    style={{ width: `${(companyInfo.reviews.culture / 5) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="ml-2 text-sm font-medium">{companyInfo.reviews.culture}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-32 text-sm text-gray-600">Career Growth:</span>
-                <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                  <div 
-                    className="h-2 bg-primary-600 rounded-full" 
-                    style={{ width: `${(companyInfo.reviews.career / 5) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="ml-2 text-sm font-medium">{companyInfo.reviews.career}</span>
-              </div>
+              </h3>
+              <ul className="space-y-2">
+                {researchData.responsibilities.map((responsibility, index) => (
+                  <li key={index} className="flex items-start">
+                    <span className="text-blue-600 dark:text-blue-400 mr-2">•</span>
+                    <span className="text-gray-700 dark:text-gray-300">{responsibility}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              <div>
-                <h4 className="text-sm font-semibold text-green-600 mb-2">Pros</h4>
-                <ul className="space-y-2">
-                  {companyInfo.pros.map((pro, index) => (
-                    <li key={index} className="text-sm text-gray-700 flex items-start">
-                      <span className="text-success-500 mr-2">+</span>
-                      {pro}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-red-600 mb-2">Cons</h4>
-                <ul className="space-y-2">
-                  {companyInfo.cons.map((con, index) => (
-                    <li key={index} className="text-sm text-gray-700 flex items-start">
-                      <span className="text-error-500 mr-2">-</span>
-                      {con}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </Card>
+          )}
           
-          <Card title="Key People">
-            <div className="space-y-4">
-              {companyInfo.keyPeople.map((person, index) => (
-                <div key={index} className="flex items-center">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                    <span className="text-gray-600 font-medium">
-                      {person.name.split(' ').map(n => n[0]).join('')}
-                    </span>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-800">{person.name}</p>
-                    <p className="text-xs text-gray-500">{person.position}</p>
-                  </div>
+          {/* Benefits */}
+          {researchData?.benefits && researchData.benefits.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                <div className="flex items-center">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
+                  Benefits
                 </div>
-              ))}
+              </h3>
+              <ul className="space-y-2">
+                {researchData.benefits.map((benefit, index) => (
+                  <li key={index} className="flex items-start">
+                    <span className="text-green-600 dark:text-green-400 mr-2">•</span>
+                    <span className="text-gray-700 dark:text-gray-300">{benefit}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <Button variant="outline" size="sm" className="w-full">
-                View More People on LinkedIn
-              </Button>
+          )}
+          
+          {/* Pros and Cons */}
+          {(researchData?.pros.length || researchData?.cons.length) && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Employee Reviews</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Pros */}
+                <div>
+                  <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
+                    Pros
+                  </h4>
+                  {researchData?.pros.length ? (
+                    <ul className="space-y-2">
+                      {researchData.pros.map((pro, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="text-green-600 dark:text-green-400 mr-2">•</span>
+                          <span className="text-gray-700 dark:text-gray-300">{pro}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 italic">No pros found</p>
+                  )}
+                </div>
+                
+                {/* Cons */}
+                <div>
+                  <h4 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
+                    <XCircle className="w-5 h-5 mr-2 text-red-600 dark:text-red-400" />
+                    Cons
+                  </h4>
+                  {researchData?.cons.length ? (
+                    <ul className="space-y-2">
+                      {researchData.cons.map((con, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="text-red-600 dark:text-red-400 mr-2">•</span>
+                          <span className="text-gray-700 dark:text-gray-300">{con}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 italic">No cons found</p>
+                  )}
+                </div>
+              </div>
+              
+              {researchData?.glassdoorLink && (
+                <div className="mt-4 text-right">
+                  <a 
+                    href={researchData.glassdoorLink}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    View more reviews on Glassdoor
+                    <ExternalLink className="w-4 h-4 ml-1" />
+                  </a>
+                </div>
+              )}
             </div>
-          </Card>
+          )}
+          
+          {/* Notes */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Research Notes</h3>
+            <textarea
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white h-32 resize-none"
+              placeholder="Add your personal notes about this company here..."
+              defaultValue={researchData?.notes || ''}
+            ></textarea>
+            <div className="mt-4 flex justify-end">
+              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200">
+                Save Notes
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
