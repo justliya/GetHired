@@ -9,6 +9,8 @@ from .sub_agents.listing.agent import listing_search_agent
 
 from .sub_agents.research.agent import company_research_agent
 
+from .sub_agents.resume.agent import resume_pipeline_agent
+
 from . import prompt
 MODEL = "gemini-2.0-flash-exp"
 
@@ -18,8 +20,8 @@ root_agent = Agent(
     description=constants.DESCRIPTION,
     instruction=prompt.ROOT_PROMPT,
     sub_agents=[
-        listing_search_agent,
-        company_research_agent,
-      
+        #listing_search_agent,
+        resume_pipeline_agent,
+        #company_research_agent,
     ],
 )

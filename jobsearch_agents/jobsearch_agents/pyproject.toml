@@ -3,12 +3,12 @@ name = "GetHired"
 version = "0.1.0"
 description = "Job search automation ADK Agent. Designed to optimize and automate the job search process. It uses keywords from user and performs tailored job searches through google, and gathers all relevant listings, conduct research on the company, tailor resume, and prepare for application submission."
 authors = [
-    {name = "Aaliyah Johnson, La'Kaleigh Harris" , email = "neoaxiom@gmail.com"},
+    {name = "Aaliyah Johnson, La'Kaleigh Harris",  email = "neoaxiom@gmail.com"},
 ]
 license = ""
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "google-adk (>=0.0.2)",
+    "google-adk (>=1.0.0,<2.0.0)",
     # "google-adk[eval] (>=0.0.2,<1.0.0)",
     "google-genai (>=1.5.0,<2.0.0)",
     "selenium (>=4.30.0,<5.0.0)",
@@ -17,7 +17,8 @@ dependencies = [
     "absl-py (>=2.2.2,<3.0.0)",
     "google-cloud-aiplatform[agent-engines] @ git+https://github.com/googleapis/python-aiplatform.git@copybara_738852226",
     "pytest (>=8.3.5,<9.0.0)",
-    "pillow (>=11.1.0,<12.0.0)"
+    "pillow (>=11.1.0,<12.0.0)",
+    "python-docx (>=1.1.2,<2.0.0)"
 ]
 
 [build-system]

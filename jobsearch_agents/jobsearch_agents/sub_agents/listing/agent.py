@@ -18,7 +18,8 @@ if not constants.DISABLE_WEB_DRIVER:
     options = Options()
     options.add_argument("--window-size=1920x1080")
     options.add_argument("--verbose")
-    options.add_argument("user-data-dir=/tmp/selenium")
+    options.add_argument("--enable-logging")
+    options.add_argument("user-data-dir=C:/temp/chrome-selenium-profile")
 
     driver = selenium.webdriver.Chrome(options=options)
 

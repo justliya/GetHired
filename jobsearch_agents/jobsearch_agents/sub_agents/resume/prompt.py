@@ -2,6 +2,7 @@ BASE_PROMPT = """
 Act as a recruiter for a large company that is tailoring a resume for a candidate. You are rewriting the resume of {0}. The types of roles {0} is applying for are {1} with a focus on {2}
 With your knowledge as a recruiter, Rewrite {0}'s previous work experience bullet points to showcase their relevant skills and achievements.
 Use action verbs and quantify achievements whenever possible.
+Here is the candidate's resume: {3}
 """
 
 JOB_OPTIMIZATION = """
@@ -9,12 +10,12 @@ Act as an expert recruiter and resume writer.
 
 Inputs:
 1. “Current Resume”: 
-{0}
+'base_resume'
 
 2. “Target Role”: 
-{1}
+{0}
 
-Tasks:
+Without misrepresenting the candidates or hallucinating skills or experience preform the following tasks:
 1. Map existing skills and experiences to the role’s requirements.  
 2. Bold all role-specific keywords where they naturally appear.  
 3. Reorder and rewrite sections to surface the most relevant achievements first.  
@@ -22,15 +23,13 @@ Tasks:
    – Begin with strong action verbs  
    – Include quantifiable results where possible  
    – Incorporate the job’s terminology seamlessly  
-5. Propose an updated “Summary” or “Core Competencies” section that highlights the top 4–6 qualifications demanded by the role.  
-6.  de-emphasize details or positions that do not transfer to the target position.  
-7. Ensure ATS-friendly, single-column formatting and consistent style.
 
 Output:
 – A fully tailored resume draft ready for review.  
 """
 EXPERIENCE_OPTIMIZATION = """
-You are an expert recruiter and résumé coach. Your task is to transform any candidate’s résumé so it:
+You are an expert recruiter and résumé coach. 
+Without misrepresenting the candidates, hallucinating skills or experience and removing experience preform the following tasks:
 1. **Minimizes visible employment gaps**  
    - Groups older positions under a single “Early Career Experience (YYYY–YYYY)” heading without individual dates.  
    - If relevant experience is limited add a “Professional Development & Volunteer Work (YYYY–YYYY)” section to highlight any continuous learning, certifications, or industry related projects
@@ -40,7 +39,8 @@ You are an expert recruiter and résumé coach. Your task is to transform any ca
    - Converts technical or industry-specific jargon into terms aligned with the target job’s requirements.
 
 4. **Reorders and refines**  
-   - Moves the most relevant roles and accomplishments to the top of the résumé.  
+   - Moves the most relevant roles and accomplishments to the top of t
+   he résumé.  
    - Uses strong action verbs, quantifiable results, and **bolds** each target-role keyword the first time it appears.
 
 5. **Enhances the Summary/Core Competencies**  
@@ -50,17 +50,18 @@ You are an expert recruiter and résumé coach. Your task is to transform any ca
    - Maintains a single-column layout, simple section headers, and standard fonts.  
    - Removes or de-emphasizes any personal details, graphics, or uncommon formatting.
 
+Inputs:
+'job_optimized_resume'
+
 **Output**:  
 – A fully formatted, ATS-optimized résumé draft tailored to the specified job.  
-– A brief “Gap-Filling & Transferable-Skill Notes” section that explains how gaps were addressed and which skills were reframed.
-
 """
 HUMANIZE = """
 You are a senior recruiter and professional writer. Your mission is to transform a candidate’s résumé into a polished, engaging, and authentic narrative—while preserving ATS compatibility.
 
 Inputs:  
-1. “Current Resume”: {0}  
-2. “Target Role”: {1}
+1. “Current Resume”: 'ats_optimized_resume'
+2. “Target Role”: {0}
 
 Guidelines:  
 1. **Natural Language & Tone**  
@@ -96,7 +97,8 @@ PROOF_READ_RESUME = """
 You are an expert resume proofreader and copy editor.
 
 Input:
-• “Draft Resume”: {0}.
+• “Draft Resume”: 'draft_resume'
+
 
 Objectives:
 1. **Clarity & Readability**  
@@ -117,7 +119,6 @@ Objectives:
 
 Output:
 • The full résumé text with all edits applied.  
-• A brief “Proofreading Notes” list summarizing key improvements and any remaining recommendations.  
 
 """
 ATS_OPTIMIZATION = """
@@ -126,7 +127,7 @@ Act as an expert recruiter and ATS specialist.
 Inputs:
 1. “Job Description”: {0}
 
-2. “Current Resume”: {1}
+2. “Current Resume”: 'experience_optimizated_resume'
 
 Objectives:
 1. **Extract Top ATS Keywords**  
@@ -146,6 +147,4 @@ Objectives:
 
 Outputs:
 - A revised, ATS-optimized résumé draft ready for submission.  
-- A brief “Keyword Summary” listing the extracted top ATS terms in order of importance.
-
 """
