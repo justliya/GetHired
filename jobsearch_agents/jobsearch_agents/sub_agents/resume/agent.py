@@ -1,30 +1,11 @@
 from google.adk.agents.llm_agent import Agent
 from google.adk.agents import SequentialAgent
-from google.adk.tools.load_artifacts_tool import load_artifacts_tool
-from google.adk.tools.tool_context import ToolContext
+from google.adk.sessions import InMemorySessionService , session
 
-from docx import Document
 from . import prompt
-import io
-SECTION_HEADERS = {
-    'summary': ['summary', 'objective', 'about me'],
-    'experience': ['experience', 'work history', 'professional experience'],
-    'skills': ['skills', 'technologies', 'technical skills'],
-    'education': ['education', 'academic background'],
-    'certifications': ['certifications', 'licenses'],
-    'projects': ['projects', 'portfolio', 'selected projects']
-}
+from .resume_doc import load_resume_job_desc, create_formatted_resume
 
 
-def load_resume_job_desc():
-    doc = Document('docs/LaKaleigh_Harris_Resume.docx')
-    doc_content = [p.text.strip() for p in doc.paragraphs]
-    with open('docs/job_post.txt', 'r', encoding='utf-8') as f:
-        job_content = f.read()
-    return doc_content, job_content
-def load_template_doc():
-    doc = Document()
-    
 resume, job_spec = load_resume_job_desc()
 
 base_resume_cleanup =  Agent(
@@ -32,7 +13,6 @@ base_resume_cleanup =  Agent(
     name="base_resume_cleanup",
     instruction = prompt.BASE_PROMPT.format("Lakaleigh","Software Engineer", "AI", resume),
     output_key="base_resume",
-    tools=[load_resume_job_desc]
     )
 
 job_optimization_agent =  Agent(
@@ -69,6 +49,14 @@ proof_reader_agent =  Agent(
     instruction = prompt.PROOF_READ_RESUME,
     output_key='final_resume'
     )
+doc_creator_agent =  Agent(
+    model="gemini-2.0-flash",
+    name="humanize_resume_agent",
+    instruction = prompt.TEMPLATE_DOCUMENT_CRREATION,
+    tools=[
+        create_formatted_resume
+    ]
+    )
 
 resume_pipeline_agent = SequentialAgent(
     name='ResumeTailorAgent',
@@ -79,6 +67,7 @@ resume_pipeline_agent = SequentialAgent(
         experience_optimization_agent,
         ats_optimization_agent,
         humanize_resume_agent,
-        proof_reader_agent
+        proof_reader_agent,
+        doc_creator_agent,
         ],
 )

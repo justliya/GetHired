@@ -3,6 +3,7 @@ Act as a recruiter for a large company that is tailoring a resume for a candidat
 With your knowledge as a recruiter, Rewrite {0}'s previous work experience bullet points to showcase their relevant skills and achievements.
 Use action verbs and quantify achievements whenever possible.
 Here is the candidate's resume: {3}
+Pass the results for job optimization
 """
 
 JOB_OPTIMIZATION = """
@@ -25,7 +26,9 @@ Without misrepresenting the candidates or hallucinating skills or experience pre
    – Incorporate the job’s terminology seamlessly  
 
 Output:
-– A fully tailored resume draft ready for review.  
+– A fully tailored resume draft ready for review.
+
+Pass the results for experience optimization  
 """
 EXPERIENCE_OPTIMIZATION = """
 You are an expert recruiter and résumé coach. 
@@ -90,7 +93,7 @@ Guidelines:
 
 Output:  
 - A fully humanized, ATS-friendly résumé draft tailored to the Target Role.  
-- A brief note explaining where and why each primary keyword was incorporated.  
+When finised hand it off for proof reading
 
 """
 PROOF_READ_RESUME = """
@@ -119,7 +122,7 @@ Objectives:
 
 Output:
 • The full résumé text with all edits applied.  
-
+Hand the final draft to create a formatted Document
 """
 ATS_OPTIMIZATION = """
 Act as an expert recruiter and ATS specialist.
@@ -147,4 +150,11 @@ Objectives:
 
 Outputs:
 - A revised, ATS-optimized résumé draft ready for submission.  
+
+Next hand off this version of the resume for Humanization
+"""
+
+TEMPLATE_DOCUMENT_CRREATION = """
+Act as an expert recruiter and Microsoft word power users
+and create a formatted document with the final draft of the resume: 'final_resume'
 """
