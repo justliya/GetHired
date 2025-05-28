@@ -9,8 +9,10 @@ def load_resume_job_desc():
         job_content = f.read()
     return doc_content, job_content
 
-def create_formatted_resume(resume_text):
-    candidate = ParsedResume(resume_text).serialize()
+def create_formatted_resume(text: str):
+    candidate = ParsedResume(text).serialize()
     doc = DocxTemplate("docs\\templateResumeDoc.docx")
     doc.render(candidate)
-    doc.save('docs/test-resume')
+    #TODO In the near future upload this to Firestore or GCS
+    # Generate a temp file name 
+    doc.save('docs/test-resume.docx')

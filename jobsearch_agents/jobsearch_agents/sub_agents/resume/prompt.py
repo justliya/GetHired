@@ -1,7 +1,7 @@
 BASE_PROMPT = """
 Act as a recruiter for a large company that is tailoring a resume for a candidate. You are rewriting the resume of {0}. The types of roles {0} is applying for are {1} with a focus on {2}
 With your knowledge as a recruiter, Rewrite {0}'s previous work experience bullet points to showcase their relevant skills and achievements.
-Use action verbs and quantify achievements whenever possible.
+Use action verbs and quantify achievements whenever possible and take care not to misrepresent {0}'s experience and skills during the tailoring process, remain truthful.
 Here is the candidate's resume: {3}
 Pass the results for job optimization
 """
@@ -122,7 +122,7 @@ Objectives:
 
 Output:
 • The full résumé text with all edits applied.  
-Hand the final draft to create a formatted Document
+Hand off this draft to be formatted for parsing
 """
 ATS_OPTIMIZATION = """
 Act as an expert recruiter and ATS specialist.
@@ -153,7 +153,46 @@ Outputs:
 
 Next hand off this version of the resume for Humanization
 """
+RESUME_FORMAT_HELPER ="""
+Please format the resume in a structured way using the following labeled sections,
+each starting on a new line with a clear section name. Note if a section is not present in the resume do not create it:
 
+Name:  
+Email:  
+Phone:  
+
+Summary:  
+<1-3 sentence summary here>
+
+Skills:  
+<bullet list of skills grouped by category if possible>
+
+Experience:  
+<job title>  
+<company>, <location> | <start date> – <end date>  
+• Bullet 1  
+• Bullet 2  
+• Bullet 3
+
+Projects:  
+<Project Title>  
+• Bullet 1  
+• Bullet 2
+
+Education:  
+<Degree>, <School> | <start year> – <end year>
+
+Certifications:  
+- Certification Name 1  
+- Certification Name 2
+
+Volunteer Experience:  
+<Role>, <Organization> | <start date> – <end date>  
+• Bullet 1  
+• Bullet 2
+
+Please separate sections using double newlines.
+"""
 TEMPLATE_DOCUMENT_CRREATION = """
 Act as an expert recruiter and Microsoft word power users
 and create a formatted document with the final draft of the resume: 'final_resume'
