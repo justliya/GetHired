@@ -1,6 +1,6 @@
 // src/App.tsx
 import { useState, useEffect } from "react";
-import Sidebar from "./components/layout/Sidebar";
+import Sidebar from "./components/layout/SideBar"
 import Header from "./components/layout/Header";
 import Dashboard from "./pages/Dashboard";
 import JobDiscovery from "./pages/JobDiscovery";
@@ -13,11 +13,14 @@ import Auth from "./pages/Auth";
 import { type Page } from "./types";
 
 import { auth, onAuthStateChanged } from "./firebase";
+import UserPreferencesModal from "./components/ui/UserPreferencesModal";
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("auth");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
+  // New state for user preferences modal
+  const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
+  const [hasShownUserPrefs, setHasShownUserPrefs] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -29,6 +32,22 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+  
+  // When dashboard loads for the first time, show the modal
+  useEffect(() => {
+    if (currentPage === "dashboard" && !hasShownUserPrefs) {
+      setShowUserPrefs(true);
+    }
+  }, [currentPage]);
+
+  const handleCloseUserPrefs = () => {
+    setShowUserPrefs(false);
+    setHasShownUserPrefs(true);
+  };
+
+  const handleUserPrefsSubmit = () => {
+    handleCloseUserPrefs();
+  };
 
   const toggleSidebar = () => {
     setIsSidebarOpen((open) => !open);
@@ -77,20 +96,20 @@ function App() {
           />
         )}
 
-        <main
-          className={`flex-1 overflow-y-auto ${
-            currentPage !== "auth" ? "p-4 md:p-6" : ""
-          }`}
-        >
-          <div
-            className={`${
-              currentPage !== "auth" ? "max-w-7xl mx-auto animate-fade-in" : ""
-            }`}
-          >
+        <main className={`flex-1 overflow-y-auto ${currentPage !== "auth" ? "p-4 md:p-6" : ""}`}>
+          <div className={`${currentPage !== "auth" ? "max-w-7xl mx-auto animate-fade-in" : ""}`}>
             {renderPage()}
           </div>
         </main>
       </div>
+      {/* New modal for user preferences */}
+      {currentPage === "dashboard" && (
+        <UserPreferencesModal
+          show={showUserPrefs}
+          onHide={handleCloseUserPrefs}
+          onSubmit={handleUserPrefsSubmit}
+        />
+      )}
     </div>
   );
 }
