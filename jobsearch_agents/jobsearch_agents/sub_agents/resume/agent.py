@@ -1,6 +1,5 @@
 from google.adk.agents.llm_agent import Agent
 from google.adk.agents import SequentialAgent
-from google.adk.sessions import InMemorySessionService , session
 
 from . import prompt
 from .resume_doc import load_resume_job_desc, create_formatted_resume

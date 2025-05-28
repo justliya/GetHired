@@ -1,3 +1,4 @@
+# pylint: disable=relative-beyond-top-level
 # sub_agents/listing/agent.py
 
 from google.adk.agents import LlmAgent

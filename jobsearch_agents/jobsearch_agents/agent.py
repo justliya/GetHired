@@ -22,8 +22,8 @@ root_agent = Agent(
     description=constants.DESCRIPTION,
     instruction=prompt.ROOT_PROMPT,
     sub_agents=[
-        #listing_search_agent,
+        listing_search_agent,
         resume_pipeline_agent,
-        #company_research_agent,
+        company_research_agent,
     ],
 )
