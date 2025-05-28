@@ -51,7 +51,7 @@ proof_reader_agent =  Agent(
 doc_creator_agent =  Agent(
     model="gemini-2.0-flash",
     name="humanize_resume_agent",
-    instruction = prompt.TEMPLATE_DOCUMENT_CRREATION,
+    instruction = prompt.TEMPLATE_DOCUMENT_CREATION,
     tools=[
         create_formatted_resume
     ]
