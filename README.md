@@ -65,12 +65,12 @@
    git clone https://github.com/justliya/GetHired.git
    cd GetHired
 
-	2.	Install dependencies
+Install dependencies
 
 npm install
 
 
-	3.	Configure environment variables
+Configure environment variables
 Create a .env file in the root directory:
 
 VITE_FIREBASE_API_KEY=<YOUR_PROJECT>
@@ -80,8 +80,7 @@ VITE_FIREBASE_STORAGE_BUCKET=<YOUR_PROJECT>
 VITE_FIREBASE_MESSAGING_SENDER_ID=<YOUR_PROJECT>
 VITE_FIREBASE_APP_ID=<YOUR_PROJECT>
 
-
-	4.	Run the development server
+Run the development server
 
 npm run dev
 
@@ -98,7 +97,7 @@ Prerequisites
 	•	IAM Permission: Vertex AI User
 
 Configuration
-	1.	Set environment variables
+Set environment variables
 Create a .env file in the backend root:
 
 GOOGLE_GENAI_USE_VERTEXAI=True
@@ -106,38 +105,38 @@ GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT>
 GOOGLE_CLOUD_LOCATION=us-central1
 
 
-	2.	Authenticate with Google Cloud
+Authenticate with Google Cloud
 
 gcloud auth application-default login
 
 
 
 Installation Steps
-	1.	Create and activate a virtual environment
+Create and activate a virtual environment
 
 python -m venv .venv
 
-	•	Mac/Linux:
+Mac/Linux:
 
 source .venv/bin/activate
 
 
-	•	Windows CMD:
+Windows CMD:
 
 .venv\Scripts\activate.bat
 
 
-	•	Windows PowerShell:
+Windows PowerShell:
 
 .venv\Scripts\Activate.ps1
 
 
-	2.	Navigate to the backend directory
+Navigate to the backend directory
 
 cd jobsearch_agents
 
 
-	3.	Install dependencies
+Install dependencies
 
 poetry install
 
