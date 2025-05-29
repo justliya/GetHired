@@ -40,10 +40,17 @@ jobs:
         - name: Install dependencies
           working-directory: jobsearch_agents
           run: |
-            poetry install --no-interaction
-            poetry env info
-            poetry run which adk || echo "ADK not found in PATH"
-            echo "ADK_CMD='poetry run adk'" >> $GITHUB_ENV
+            poetry install --no-interaction --no-ansi --no-root
+            if ! poetry run which adk; then
+            ADK_CMD=$(poetry run which adk)
+            if [ -z "$ADK_CMD" ]; then
+              echo "Error: ADK command not found in PATH"
+              exit 1
+            fi
+            echo "ADK_CMD=$ADK_CMD" >> $GITHUB_ENV
+              exit 1
+            fi
+            echo "ADK_CMD='$(poetry run which adk || echo "ADK not found in PATH")" >> $GITHUB_ENV
 
         - id: 'auth'
           uses: 'google-github-actions/auth@v2'
