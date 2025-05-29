@@ -1,9 +1,11 @@
+
 # sub_agents/listing/agent.py
 
 from google.adk.agents import LlmAgent
 from ...shared_libraries import constants
 from . import prompt
-from ...tools.web_search import tools as web_tools
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
 from ...tools.approval import approval_tool
 
 from google.adk.tools.agent_tool import AgentTool
@@ -28,7 +30,11 @@ listing_search_agent = LlmAgent(
     instruction=prompt.LISTING_SEARCH_AGENT_PROMPT,
     output_key="job_listings",
     tools=[
-        *web_tools,
+        MCPToolset(
+            connection_params=StreamableHTTPServerParams(
+                url='https://gethired-mcp.onrender.com/jobsearch-mcp',
+            )
+        ),
         AgentTool(agent=request_approval, skip_summarization=True)
     ]
 )
