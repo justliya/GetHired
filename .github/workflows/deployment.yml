@@ -42,7 +42,7 @@ jobs:
           run: |
             poetry install --no-interaction
             echo "ADK='$(pwd)/.venv/bin/adk'" >> $GITHUB_ENV
-            ls /home/runner/work/GetHired/GetHired/jobsearch_agents/.venv
+            ls /home/runner/work/GetHired/GetHired/jobsearch_agents/.venv/bin
 
         - id: 'auth'
           uses: 'google-github-actions/auth@v2'
