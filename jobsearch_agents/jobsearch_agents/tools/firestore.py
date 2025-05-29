@@ -27,3 +27,6 @@ class FirestoreService:
         except Exception as e:
             print(f"Error fetching preferences for user {user_id}: {e}")
             return None
+
+    def upload_resume(self, user_id: str,tool_context: ToolContext):
+        pass
