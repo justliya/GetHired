@@ -1,18 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { User } from '../../contexts/UserContext';
 import ChipInput from './ChipInput';
-import ButtonGroup from './ButtonGroup';
-import Collapsible from './Collapsible';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getFirestore, doc, collection, writeBatch } from 'firebase/firestore';
-import type { Resume, JobPreferences, SalaryRange } from '../../models/UserData';
+import type { JobPreferences, SalaryRange, SearchSchedule } from '../../models/UserData';
+import ScheduleConfig from './ScheduleConfig';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Exec';
-type SchedulePreset = 'Daily' | 'Weekly' | 'Monthly' | 'Custom';
 
-// New interface for step 1 preferences
 interface PreferencesData extends Omit<JobPreferences, 'titles'> {
     roles: string[]; // alias for titles
     locations: string[];
@@ -22,555 +16,630 @@ interface PreferencesData extends Omit<JobPreferences, 'titles'> {
     seniority: Seniority;
     salaryRange: SalaryRange;
     other: string;
-    // Schedule fields
-    scheduleEnabled: boolean;
-    schedulePreset: SchedulePreset;
-    customSchedule: string;
-    // Filter fields
     includeKeywords: string[];
     excludeKeywords: string[];
+    searchSchedule: SearchSchedule;
 }
 
-// Updated form data type 
 interface FormDataType {
-	resumeFile: File | null;
-	currentRole: string;
-	preferences: PreferencesData;
+    resumeFile: File | null;
+    currentRole: string;
+    preferences: PreferencesData;
 }
 
 interface UserPreferencesModalProps {
-	show: boolean;
-	onHide: () => void;
-	onSubmit: (data: FormDataType) => void;
+    show: boolean;
+    onHide: () => void;
+    onSubmit: (data: FormDataType) => void;
 }
 
-// Update step labels including Filter step
-const stepLabels = ['Upload', 'Preferences (Part 1)', 'Preferences (Part 2)', 'Filter', 'Schedule', 'Review'];
+// Update step labels
+const stepLabels = ['Upload', 'Preferences 1', 'Preferences 2', 'Filter', 'Schedule', 'Review'];
+
+const stepDescriptions = {
+    upload: {
+        title: "Upload Resume",
+        description: "Start by uploading your resume. This will help us tailor job recommendations to your experience and skills."
+    },
+    basicPrefs: {
+        title: "Basic Preferences",
+        description: "Tell us about the roles and locations you're interested in. This helps us find the most relevant opportunities."
+    },
+    advancedPrefs: {
+        title: "Advanced Preferences",
+        description: "Specify your desired skills, job type, and compensation expectations to further refine your job search."
+    },
+    filters: {
+        title: "Search Filters",
+        description: "Fine-tune your search by adding specific keywords to include or exclude from job listings."
+    },
+    schedule: {
+        title: "Search Schedule",
+        description: "Configure when and how often you'd like us to search for new job opportunities."
+    }
+};
 
 const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHide, onSubmit }) => {
-    const { user } = User();
-	const [currentStep, setCurrentStep] = useState<number>(0);
-	const [formData, setFormData] = useState<FormDataType>({
-		resumeFile: null,
-		currentRole: '',
-		preferences: {
-			roles: [],
-			locations: [],
-			companies: [],
-			skills: [],
-			jobType: 'Full-time',
-			seniority: 'Junior',
-			salaryRange: { min: 0, max: 100000 },
-			other: '',
-			// Initialize schedule fields
-			scheduleEnabled: false,
-			schedulePreset: 'Daily',
-			customSchedule: '',
-			// Initialize filter fields
-			includeKeywords: [],
-			excludeKeywords: [],
-		},
-	});
+    const [currentStep, setCurrentStep] = useState<number>(0);
+    const [formData, setFormData] = useState<FormDataType>({
+        resumeFile: null,
+        currentRole: '',
+        preferences: {
+            roles: [],
+            locations: [],
+            companies: [],
+            skills: [],
+            jobType: 'Full-time',
+            seniority: 'Mid',
+            salaryRange: { min: 0, max: 200000 },
+            other: '',
+            includeKeywords: [],
+            excludeKeywords: [],
+            searchSchedule: {
+                enabled: false,
+                frequency: 'Daily',
+                customSchedule: '09:00',
+                notificationType: 'Email',
+                quietHours: {
+                    start: '22:00',
+                    end: '08:00'
+                },
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            }
+        }
+    });
 
-	// Refs for auto-focus
-	const step1Ref = useRef<HTMLInputElement>(null);
-	const step2Ref = useRef<HTMLSelectElement>(null);
-	const stepScheduleRef = useRef<HTMLInputElement>(null);
-	const step3Ref = useRef<HTMLInputElement>(null); // for Role step now
+    const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) {
+            setFormData(prev => ({
+                ...prev,
+                resumeFile: e.target.files![0]
+            }));
+        }
+    };
 
-	useEffect(() => {
-		if (currentStep === 0 && step1Ref.current) {
-			step1Ref.current.focus();
-		}
-		if (currentStep === 1 && step2Ref.current) {
-			step2Ref.current.focus();
-		}
-		if (currentStep === 3 && stepScheduleRef.current) {
-			stepScheduleRef.current.focus();
-		}
-		if (currentStep === 4 && step3Ref.current) {
-			step3Ref.current.focus();
-		}
-	}, [currentStep]);
-	const handleNext = () => {
-		if (currentStep < 5) setCurrentStep(prev => prev + 1); // Updated to include Filter step
-	};
+    const handleScheduleChange = (searchSchedule: SearchSchedule) => {
+        setFormData(prev => ({
+            ...prev,
+            preferences: {
+                ...prev.preferences,
+                searchSchedule
+            }
+        }));
+    };
 
-	const handleBack = () => {
-		if (currentStep > 0) setCurrentStep(prev => prev - 1);
-	};
+    // Render functions
+    const renderUploadStep = () => (
+        <div className="space-y-6">
+            <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {stepDescriptions.upload.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                    {stepDescriptions.upload.description}
+                </p>
+            </div>
+            <div className="flex items-center justify-center w-full">
+                <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg className="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        </svg>
+                        <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                            <span className="font-semibold">Click to upload</span> or drag and drop
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">PDF, DOCX, or TXT</p>
+                    </div>
+                    <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.docx,.txt"
+                        onChange={handleFileUpload}
+                    />
+                </label>
+            </div>
+            {formData.resumeFile && (
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {formData.resumeFile.name}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, resumeFile: null }))}
+                        className="text-red-600 hover:text-red-800 dark:hover:text-red-400"
+                    >
+                        Remove
+                    </button>
+                </div>
+            )}
+        </div>
+    );
 
-	const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (file) {
-			const fileExt = file.name.split('.').pop()?.toLowerCase();
-			if (!['pdf', 'docx', 'txt'].includes(fileExt || '')) {
-				alert('Please upload a PDF, DOCX, or TXT file');
-				return;
-			}
-			setFormData(prev => ({
-				...prev,
-				resumeFile: file,
-			}));
-		}
-	};
+    const renderBasicPreferencesStep = () => (
+        <div className="space-y-6">
+            <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {stepDescriptions.basicPrefs.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                    {stepDescriptions.basicPrefs.description}
+                </p>
+            </div>
+            
+            <div className="space-y-4">
+                <ChipInput
+                    label="Job Roles"
+                    placeholder="Add job roles..."
+                    value={formData.preferences.roles}
+                    onChange={(roles) => setFormData(prev => ({
+                        ...prev,
+                        preferences: { ...prev.preferences, roles }
+                    }))}
+                />
+                
+                <ChipInput
+                    label="Locations"
+                    placeholder="Add locations..."
+                    value={formData.preferences.locations}
+                    onChange={(locations) => setFormData(prev => ({
+                        ...prev,
+                        preferences: { ...prev.preferences, locations }
+                    }))}
+                />
+                
+                <ChipInput
+                    label="Target Companies"
+                    placeholder="Add companies..."
+                    value={formData.preferences.companies}
+                    onChange={(companies) => setFormData(prev => ({
+                        ...prev,
+                        preferences: { ...prev.preferences, companies }
+                    }))}
+                />
+            </div>
+        </div>
+    );
 
-	const removeFile = () => {
-		setFormData(prev => ({ ...prev, resumeFile: null }));
-	};
+    const renderAdvancedPreferencesStep = () => (
+        <div className="space-y-6">
+            <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {stepDescriptions.advancedPrefs.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                    {stepDescriptions.advancedPrefs.description}
+                </p>
+            </div>
+            
+            <div className="space-y-6">
+                <ChipInput
+                    label="Required Skills"
+                    placeholder="Add skills..."
+                    value={formData.preferences.skills}
+                    onChange={(skills) => setFormData(prev => ({
+                        ...prev,
+                        preferences: { ...prev.preferences, skills }
+                    }))}
+                />
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Job Type
+                        </label>
+                        <select
+                            value={formData.preferences.jobType}
+                            onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                preferences: { ...prev.preferences, jobType: e.target.value as JobType }
+                            }))}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500"
+                        >
+                            <option value="Full-time">Full-time</option>
+                            <option value="Part-time">Part-time</option>
+                            <option value="Contract">Contract</option>
+                            <option value="Intern">Intern</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Seniority Level
+                        </label>
+                        <select
+                            value={formData.preferences.seniority}
+                            onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                preferences: { ...prev.preferences, seniority: e.target.value as Seniority }
+                            }))}
+                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500"
+                        >
+                            <option value="Junior">Junior</option>
+                            <option value="Mid">Mid-Level</option>
+                            <option value="Senior">Senior</option>
+                            <option value="Exec">Executive</option>
+                        </select>
+                    </div>
+                </div>
 
+                <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Salary Range (USD)
+                    </label>
+                    <div className="flex items-center space-x-4">
+                        <div className="w-1/2">
+                            <input
+                                type="number"
+                                value={formData.preferences.salaryRange.min}
+                                onChange={(e) => setFormData(prev => ({
+                                    ...prev,
+                                    preferences: {
+                                        ...prev.preferences,
+                                        salaryRange: {
+                                            ...prev.preferences.salaryRange,
+                                            min: parseInt(e.target.value) || 0
+                                        }
+                                    }
+                                }))}
+                                min="0"
+                                step="1000"
+                                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500"
+                            />
+                            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Min</span>
+                        </div>
+                        <div className="w-1/2">
+                            <input
+                                type="number"
+                                value={formData.preferences.salaryRange.max}
+                                onChange={(e) => setFormData(prev => ({
+                                    ...prev,
+                                    preferences: {
+                                        ...prev.preferences,
+                                        salaryRange: {
+                                            ...prev.preferences.salaryRange,
+                                            max: parseInt(e.target.value) || 0
+                                        }
+                                    }
+                                }))}
+                                min="0"
+                                step="1000"
+                                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500"
+                            />
+                            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Max</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 
-	// Update isStepValid: step 1 (Preferences Part 1) requires at least one role; others remain unchanged.
-	const isStepValid = () => {
-		if (currentStep === 0) return !!formData.resumeFile;
-		if (currentStep === 1) return formData.preferences.roles.length > 0;
-		if (currentStep === 3) {
-			// Schedule step validation: if scheduleEnabled and preset is 'Custom', customSchedule must be non-empty.
-			if (!formData.preferences.scheduleEnabled) return true;
-			if (formData.preferences.schedulePreset === 'Custom') {
-				return formData.preferences.customSchedule.trim() !== '';
-			}
-			return true;
-		}
-		return true; // Remove role step validation
-	};
+    const renderFiltersStep = () => (
+        <div className="space-y-6">
+            <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {stepDescriptions.filters.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                    {stepDescriptions.filters.description}
+                </p>
+            </div>
+            
+            <div className="space-y-4">
+                <ChipInput
+                    label="Include Keywords"
+                    placeholder="Add keywords to include..."
+                    value={formData.preferences.includeKeywords}
+                    onChange={(includeKeywords) => setFormData(prev => ({
+                        ...prev,
+                        preferences: { ...prev.preferences, includeKeywords }
+                    }))}
+                />
+                
+                <ChipInput
+                    label="Exclude Keywords"
+                    placeholder="Add keywords to exclude..."
+                    value={formData.preferences.excludeKeywords}
+                    onChange={(excludeKeywords) => setFormData(prev => ({
+                        ...prev,
+                        preferences: { ...prev.preferences, excludeKeywords }
+                    }))}
+                />
+            </div>
+        </div>
+    );
 
-	const renderStepContent = () => {
-		switch (currentStep) {
-			case 0:
-				return (
-					<div className="space-y-4 bg-transparent">
-						<div>
-							<label className="block text-gray-700 mb-1">Upload Resume</label>
-							<input
-								type="file"
-								ref={step1Ref}
-								onChange={handleFileChange}
-								accept=".pdf,.docx,.txt"
-								className="bg-gray-50 border border-gray-300 rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-							/>
-						</div>
-						{formData.resumeFile && (
-							<div className="mt-2 flex items-center">
-								<span className="font-semibold text-gray-900">{formData.resumeFile.name}</span>
-								<button
-									onClick={removeFile}
-									className="ml-2 bg-white hover:bg-gray-50 text-indigo-600 border border-indigo-600 rounded-lg px-5 py-2 transition"
-								>
-									Remove
-								</button>
-							</div>
-						)}
-					</div>
-				);
-			case 1:
-				return (
-					<div className="grid grid-cols-1 gap-4 bg-transparent">
-						<div className="text-2xl font-semibold text-gray-900">
-							Preferences (Part 1)
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Desired Roles</label>
-							<ChipInput
-								value={formData.preferences.roles}
-								onChange={(chips: string[]) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, roles: chips },
-									}))
-								}
-								placeholder="Enter roles"
-								className="border-0 dark:border-0 rounded p-3 focus:ring-indigo-500 w-full"
-							/>
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Preferred Locations</label>
-							<ChipInput
-								value={formData.preferences.locations}
-								onChange={(chips: string[]) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, locations: chips },
-									}))
-								}
-								placeholder="Enter locations"
-								className="border-0 dark:border-0 rounded p-3 focus:ring-indigo-500 w-full"
-							/>
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Preferred Companies</label>
-							<ChipInput
-								value={formData.preferences.companies}
-								onChange={(chips: string[]) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, companies: chips },
-									}))
-								}
-								placeholder="Search companies"
-								className="border-0 dark:border-0 rounded p-3 focus:ring-indigo-500 w-full"
-							/>
-						</div>
-					</div>
-				);
-			case 2:
-				return (
-					<div className="grid grid-cols-1 gap-4 bg-transparent">
-						<div className="text-2xl font-semibold text-gray-900">
-							Preferences (Part 2)
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">
-								Jobs Containing These Skill Sets
-							</label>
-							<ChipInput
-								value={formData.preferences.skills}
-								onChange={(chips: string[]) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, skills: chips },
-									}))
-								}
-								placeholder="Enter skills"
-								className="border-0 dark:border-0 rounded p-3 focus:ring-indigo-500 w-full"
-							/>
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Job Type</label>
-							<ButtonGroup
-								options={['Full-time', 'Part-time', 'Contract', 'Intern']}
-								selected={formData.preferences.jobType}								onChange={(selected) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, jobType: selected as JobType },
-									}))
-								}
-							/>
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">
-								Experience Level
-							</label>
-							<ButtonGroup
-								options={['Junior', 'Mid', 'Senior', 'Exec']}
-								selected={formData.preferences.seniority}								onChange={(selected) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, seniority: selected as Seniority },
-									}))
-								}
-							/>
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Desired Salary</label>
-							<input 
-								type="range"
-								min="0"
-								max="500000"
-								value={formData.preferences.salaryRange.max}
-								onChange={(e) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, salaryRange: { min: 0, max: Number(e.target.value) } }
-									}))
-								}
-								className="border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-indigo-500 w-full"
-							/>
-							<div className="flex justify-between text-sm text-gray-600">
-								<span>$0</span>
-								<span>${formData.preferences.salaryRange.max}</span>
-							</div>
-						</div>
-					</div>
-				);
-			case 3:
-				return (
-					<div className="grid grid-cols-1 gap-4 bg-transparent">
-						<div className="text-2xl font-semibold text-gray-900">
-							Filter Settings
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Include Keywords</label>
-							<ChipInput
-								value={formData.preferences.includeKeywords}
-								onChange={(chips: string[]) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, includeKeywords: chips },
-									}))
-								}
-								placeholder="Add keywords to include (e.g. 'remote', 'startup')"
-								className="border-0 dark:border-0 rounded p-3 focus:ring-indigo-500 w-full"
-							/>
-							<p className="mt-1 text-sm text-gray-500">
-								Listings must contain these keywords
-							</p>
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Exclude Keywords</label>
-							<ChipInput
-								value={formData.preferences.excludeKeywords}
-								onChange={(chips: string[]) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, excludeKeywords: chips },
-									}))
-								}
-								placeholder="Add keywords to exclude (e.g. '24/7 on call')"
-								className="border-0 dark:border-0 rounded p-3 focus:ring-indigo-500 w-full"
-							/>
-							<p className="mt-1 text-sm text-gray-500">
-								Listings containing these keywords will be filtered out
-							</p>
-						</div>
-					</div>
-				);
-			case 4:
-				return (
-					<div className="mb-4 space-y-4 bg-transparent">
-						<div className="text-2xl font-semibold text-gray-900">
-							Schedule
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">Schedule Preset</label>							<ButtonGroup
-								options={['Daily', 'Weekly', 'Monthly', 'Custom']}
-								selected={formData.preferences.schedulePreset}
-								onChange={(selected) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, schedulePreset: selected as SchedulePreset },
-									}))
-								}
-							/>
-						</div>
-						<div>
-							<label className="block text-gray-700 mb-1">
-								Custom Schedule (if applicable)
-							</label>
-							<input
-								type="text"
-								value={formData.preferences.customSchedule}
-								onChange={(e) =>
-									setFormData(prev => ({
-										...prev,
-										preferences: { ...prev.preferences, customSchedule: e.target.value },
-									}))
-								}
-								disabled={formData.preferences.schedulePreset !== 'Custom'}
-								className="border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-indigo-500 w-full"
-								placeholder="e.g. 'Mon-Fri 9am-5pm'"
-							/>
-							<p className="mt-1 text-sm text-gray-500">
-								Specify your availability if not following the preset
-							</p>
-						</div>
-					</div>
-				);
-			case 5:
-				return (
-					<div className="bg-transparent">
-						<div className="text-2xl font-semibold text-gray-900">
-							Review Your Preferences
-						</div>
-						<div className="mt-4">
-							<h3 className="text-lg font-semibold text-gray-800">
-								Resume File
-							</h3>
-							<p className="text-gray-600">
-								{formData.resumeFile ? formData.resumeFile.name : 'No file uploaded'}
-							</p>
-						</div>
-						<div className="mt-4">
-							<h3 className="text-lg font-semibold text-gray-800">
-								Current Role
-							</h3>
-							<p className="text-gray-600">{formData.currentRole}</p>
-						</div>
-						<div className="mt-4">
-							<h3 className="text-lg font-semibold text-gray-800">
-								Job Preferences
-							</h3>
-							<p className="text-gray-600">
-								Roles: {formData.preferences.roles.join(', ')}
-							</p>
-							<p className="text-gray-600">
-								Locations: {formData.preferences.locations.join(', ')}
-							</p>
-							<p className="text-gray-600">
-								Companies: {formData.preferences.companies.join(', ')}
-							</p>
-							<p className="text-gray-600">
-								Skills: {formData.preferences.skills.join(', ')}
-							</p>
-							<p className="text-gray-600">
-								Job Type: {formData.preferences.jobType}
-							</p>
-							<p className="text-gray-600">
-								Seniority: {formData.preferences.seniority}
-							</p>
-							<p className="text-gray-600">
-								Salary Range: ${formData.preferences.salaryRange.min} - ${formData.preferences.salaryRange.max}
-							</p>
-						</div>
-						<div className="mt-4">
-							<h3 className="text-lg font-semibold text-gray-800">
-								Filter Settings
-							</h3>
-							<p className="text-gray-600">
-								Include Keywords: {formData.preferences.includeKeywords.join(', ')}
-							</p>
-							<p className="text-gray-600">
-								Exclude Keywords: {formData.preferences.excludeKeywords.join(', ')}
-							</p>
-						</div>
-						<div className="mt-4">
-							<h3 className="text-lg font-semibold text-gray-800">
-								Schedule
-							</h3>
-							<p className="text-gray-600">
-								Preset: {formData.preferences.schedulePreset}
-							</p>
-							{formData.preferences.schedulePreset === 'Custom' && (
-								<p className="text-gray-600">
-									Custom Schedule: {formData.preferences.customSchedule}
-								</p>
-							)}
-						</div>
-					</div>
-				);
-			default:
-				return null;
-		}
-	};
-	const handleSubmit = async () => {
-		if (!isStepValid() || !user) return;
+    const renderScheduleStep = () => (
+        <div className="space-y-6">
+            <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {stepDescriptions.schedule.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                    {stepDescriptions.schedule.description}
+                </p>
+            </div>
+            
+            <ScheduleConfig
+                schedule={formData.preferences.searchSchedule}
+                onChange={handleScheduleChange}
+            />
+        </div>
+    );
 
-		const db = getFirestore();
-		const batch = writeBatch(db);
+    const renderReviewStep = () => {
+        const formatSalary = (amount: number) => 
+            new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
 
-		// Upload resume to Firebase Storage if provided
-		if (formData.resumeFile) {
-			const storage = getStorage();
-			const fileName = `${Date.now()}-${formData.resumeFile.name}`;
-			const fileRef = ref(storage, `resumes/${user.uid}/${fileName}`);
-			await uploadBytes(fileRef, formData.resumeFile);
-			const fileUrl = await getDownloadURL(fileRef);
-			
-			// Add to resumes subcollection
-			const newResumeRef = doc(collection(db, 'users', user.uid, 'resumes'));
-			const resumeData: Omit<Resume, 'id'> = {
-				fileUrl,
-				createdAt: new Date(),
-				metadata: formData.currentRole || 'Primary Resume'
-			};
-			batch.set(newResumeRef, resumeData);
-		}
+        const formatTime = (time: string) => {
+            const [hours, minutes] = time.split(':').map(Number);
+            const period = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+            return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+        };
 
-		// Prepare job preferences update
-		const jobPreferences: JobPreferences = {
-			titles: formData.preferences.roles,
-			locations: formData.preferences.locations,
-			salaryRange: {
-				min: formData.preferences.salaryRange.min,
-				max: formData.preferences.salaryRange.max
-			},
-			jobType: formData.preferences.jobType,
-			seniority: formData.preferences.seniority,
-			other: formData.preferences.other,
-			includeKeywords: formData.preferences.includeKeywords,
-			excludeKeywords: formData.preferences.excludeKeywords,
-			scheduleEnabled: formData.preferences.scheduleEnabled,
-			schedulePreset: formData.preferences.schedulePreset,
-			customSchedule: formData.preferences.customSchedule,
-		};
+        const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+            <h4 className="font-medium text-gray-900 dark:text-white mb-2">{children}</h4>
+        );
 
-		// Update only job preferences - preserve other user data
-		const userRef = doc(db, 'users', user.uid);
-		batch.update(userRef, { jobPreferences });
+        const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+            <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">{value}</span>
+            </div>
+        );
 
-		// Commit all changes atomically
-		try {
-			await batch.commit();
-			onSubmit(formData);
-			onHide();
-		} catch (error) {
-			console.error('Error saving preferences:', error);
-			alert('Error saving preferences. Please try again.');
-		}
-	};
+        return (
+            <div className="space-y-6">
+                <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        Review Your Preferences
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300">
+                        Please review all your preferences before finalizing.
+                    </p>
+                </div>
+                
+                <div className="space-y-6">
+                    {/* Resume Section */}
+                    <div>
+                        <SectionTitle>Resume</SectionTitle>
+                        <DetailRow 
+                            label="Uploaded Resume"
+                            value={formData.resumeFile?.name || 'No resume uploaded'}
+                        />
+                    </div>
 
-	const renderFooter = () => (
-		<div className="flex justify-between items-center p-4 sm:p-6 border-t border-gray-200">
-			<button
-				onClick={handleBack}
-				disabled={currentStep === 0}
-				className={`bg-white hover:bg-gray-50 text-indigo-600 border border-indigo-600 rounded-lg px-5 py-2 transition ${
-					currentStep === 0 ? 'opacity-50 cursor-not-allowed' : ''
-				}`}
-			>
-				Back
-			</button>
-			<button
-				onClick={async () => {
-					if (currentStep === stepLabels.length - 1) {
-						await handleSubmit();
-					} else {
-						handleNext();
-					}
-				}}
-				disabled={!isStepValid()}
-				className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg px-5 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
-			>
-				{currentStep === stepLabels.length - 1 ? 'Submit' : 'Next'}
-			</button>
-		</div>
-	);
+                    {/* Basic Preferences Section */}
+                    <div>
+                        <SectionTitle>Basic Preferences</SectionTitle>
+                        <div className="space-y-2">
+                            <DetailRow 
+                                label="Job Roles"
+                                value={formData.preferences.roles.length > 0 
+                                    ? formData.preferences.roles.join(', ')
+                                    : 'None specified'}
+                            />
+                            <DetailRow 
+                                label="Locations"
+                                value={formData.preferences.locations.length > 0 
+                                    ? formData.preferences.locations.join(', ')
+                                    : 'None specified'}
+                            />
+                            <DetailRow 
+                                label="Target Companies"
+                                value={formData.preferences.companies.length > 0 
+                                    ? formData.preferences.companies.join(', ')
+                                    : 'None specified'}
+                            />
+                        </div>
+                    </div>
 
-	if (!show) return null;
+                    {/* Advanced Preferences Section */}
+                    <div>
+                        <SectionTitle>Advanced Preferences</SectionTitle>
+                        <div className="space-y-2">
+                            <DetailRow 
+                                label="Required Skills"
+                                value={formData.preferences.skills.length > 0 
+                                    ? formData.preferences.skills.join(', ')
+                                    : 'None specified'}
+                            />
+                            <DetailRow 
+                                label="Job Type"
+                                value={formData.preferences.jobType}
+                            />
+                            <DetailRow 
+                                label="Seniority Level"
+                                value={formData.preferences.seniority}
+                            />
+                            <DetailRow 
+                                label="Salary Range"
+                                value={`${formatSalary(formData.preferences.salaryRange.min)} - ${formatSalary(formData.preferences.salaryRange.max)}`}
+                            />
+                        </div>
+                    </div>
 
-	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/20">
-			<div className="relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl w-full max-w-4xl mx-4 my-6 flex flex-col max-h-[90vh]">
-				{/* Header */}
-				<div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200">
-					<h2 className="text-xl font-semibold text-gray-900">User Preferences</h2>
-					<button 
-						onClick={onHide}
-						className="text-gray-500 hover:text-gray-700 text-3xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100"
-					>
-						&times;
-					</button>
-				</div>
+                    {/* Search Filters Section */}
+                    <div>
+                        <SectionTitle>Search Filters</SectionTitle>
+                        <div className="space-y-2">
+                            <DetailRow 
+                                label="Include Keywords"
+                                value={formData.preferences.includeKeywords.length > 0 
+                                    ? formData.preferences.includeKeywords.join(', ')
+                                    : 'None specified'}
+                            />
+                            <DetailRow 
+                                label="Exclude Keywords"
+                                value={formData.preferences.excludeKeywords.length > 0 
+                                    ? formData.preferences.excludeKeywords.join(', ')
+                                    : 'None specified'}
+                            />
+                        </div>
+                    </div>
 
-				{/* Progress Indicator */}
-				<div className="flex space-x-2 p-4 border-b border-gray-200 overflow-x-auto">
-					{stepLabels.map((label, index) => (
-						<button
-							key={index}
-							onClick={() => setCurrentStep(index)}
-							className={`px-6 py-3 rounded-full text-sm font-medium transition-colors duration-200 whitespace-nowrap flex-shrink-0 min-w-[120px] flex items-center justify-center ${
-								index === currentStep
-									? 'bg-indigo-600 text-white'
-									: 'bg-gray-100/50 text-gray-600 hover:bg-gray-200/50'
-							}`}
-						>
-							{label}
-						</button>
-					))}
-				</div>
+                    {/* Schedule Section */}
+                    <div>
+                        <SectionTitle>Search Schedule</SectionTitle>
+                        <div className="space-y-2">
+                            <DetailRow 
+                                label="Status"
+                                value={formData.preferences.searchSchedule.enabled ? 'Enabled' : 'Disabled'}
+                            />
+                            {formData.preferences.searchSchedule.enabled && (
+                                <>
+                                    <DetailRow 
+                                        label="Frequency"
+                                        value={formData.preferences.searchSchedule.frequency}
+                                    />
+                                    <DetailRow 
+                                        label="Time"
+                                        value={formatTime(formData.preferences.searchSchedule.customSchedule || '09:00')}
+                                    />
+                                    <DetailRow 
+                                        label="Notification Type"
+                                        value={formData.preferences.searchSchedule.notificationType}
+                                    />
+                                    {formData.preferences.searchSchedule.quietHours && (
+                                        <DetailRow 
+                                            label="Quiet Hours"
+                                            value={`${formatTime(formData.preferences.searchSchedule.quietHours.start)} - ${formatTime(formData.preferences.searchSchedule.quietHours.end)}`}
+                                        />
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
-				{/* Content */}
-				<div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-transparent">
-					<div className="grid grid-cols-1 gap-4">
-						{renderStepContent()}
-					</div>
-				</div>
+    const renderStepContent = () => {
+        switch (currentStep) {
+            case 0:
+                return renderUploadStep();
+            case 1:
+                return renderBasicPreferencesStep();
+            case 2:
+                return renderAdvancedPreferencesStep();
+            case 3:
+                return renderFiltersStep();
+            case 4:
+                return renderScheduleStep();
+            case 5:
+                return renderReviewStep();
+            default:
+                return null;
+        }
+    };
 
-				{/* Footer */}
-				{renderFooter()}
-			</div>
-		</div>
-	);
+    const renderStepIndicator = () => (
+        <div className="flex items-center justify-center mb-8">
+            <nav className="flex items-center space-x-2" aria-label="Progress">
+                {stepLabels.map((label, index) => (
+                    <button
+                        key={label}
+                        onClick={() => setCurrentStep(index)}
+                        className={`relative flex items-center ${
+                            index <= currentStep ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'
+                        } ${index === currentStep ? 'font-semibold' : ''}`}
+                    >
+                        <span className="absolute -bottom-[20px] text-xs whitespace-nowrap">
+                            {label}
+                        </span>
+                        <span className={`w-8 h-8 flex items-center justify-center rounded-full border-2 ${
+                            index < currentStep 
+                                ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400' 
+                                : index === currentStep
+                                ? 'border-indigo-600 dark:border-indigo-400'
+                                : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                            {index < currentStep ? (
+                                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            ) : (
+                                <span className={index === currentStep ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'}>
+                                    {index + 1}
+                                </span>
+                            )}
+                        </span>
+                        {index < stepLabels.length - 1 && (
+                            <div className={`h-0.5 w-10 mx-2 ${
+                                index < currentStep ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-gray-300 dark:bg-gray-600'
+                            }`} />
+                        )}
+                    </button>
+                ))}
+            </nav>
+        </div>
+    );
+
+    const handleNext = () => {
+        if (currentStep < stepLabels.length - 1) {
+            setCurrentStep(prev => prev + 1);
+        } else {
+            onSubmit(formData);
+        }
+    };
+
+    const handleBack = () => {
+        if (currentStep > 0) {
+            setCurrentStep(prev => prev - 1);
+        }
+    };
+
+    if (!show) return null;
+
+    return (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+            <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
+                {/* Close button */}
+                <div className="absolute top-0 right-0 pt-4 pr-4">
+                    <button
+                        onClick={onHide}
+                        className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <span className="sr-only">Close</span>
+                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Progress indicator */}
+                {renderStepIndicator()}
+
+                {/* Content */}
+                <div className="mt-8 max-h-[calc(100vh-16rem)] overflow-y-auto">
+                    {renderStepContent()}
+                </div>
+
+                {/* Navigation */}
+                <div className="mt-8 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                    {currentStep > 0 && (
+                        <button
+                            type="button"
+                            onClick={handleBack}
+                            className="w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                        >
+                            Back
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={handleNext}
+                        className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:text-sm ${
+                            currentStep === 0 ? 'sm:col-start-2' : ''
+                        }`}
+                    >
+                        {currentStep === stepLabels.length - 1 ? 'Finish' : 'Next'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export default UserPreferencesModal;

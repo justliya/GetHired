@@ -10,6 +10,23 @@ export interface SalaryRange {
   max: number;
 }
 
+export type SearchFrequency = 'Daily' | 'Weekly' | 'Monthly' | 'Custom';
+export type NotificationType = 'Email' | 'Push' | 'Both' | 'None';
+
+export interface SearchSchedule {
+  enabled: boolean;
+  frequency: SearchFrequency;
+  customSchedule?: string; // For custom CRON-like schedules
+  notificationType: NotificationType;
+  quietHours?: {
+    start: string; // 24hr format "HH:MM"
+    end: string;
+  };
+  timezone: string;
+  lastSearched?: Date;
+  nextScheduledSearch?: Date;
+}
+
 // 3. Job Preferences model
 export interface JobPreferences {
   titles: string[];
@@ -20,9 +37,7 @@ export interface JobPreferences {
   other?: string;
   includeKeywords?: string[];
   excludeKeywords?: string[];
-  scheduleEnabled?: boolean;
-  schedulePreset?: 'Daily' | 'Weekly' | 'Monthly' | 'Custom';
-  customSchedule?: string;
+  searchSchedule: SearchSchedule;
 }
 
 export interface UserData {
