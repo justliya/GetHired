@@ -70,4 +70,5 @@ jobs:
             --app_name=$APP_NAME \
             --trace_to_cloud \
             --verbosity=error \
+
             $AGENT_PATH
