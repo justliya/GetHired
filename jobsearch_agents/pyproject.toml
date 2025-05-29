@@ -5,9 +5,9 @@ description = "Job search automation ADK Agent. Designed to optimize and automat
 authors = [
     "Aaliyah Johnson, La'Kaleigh Harris <neoaxiom@gmail.com>"
 ]
-readme = "README.md"
+readme = "../README.md"
 packages = [
-    { include = "jobsearch_agents" }
+    { include = "jobsearch_agents/jobsearch_agents" }
 ]
 
 [tool.poetry.dependencies]
