@@ -41,8 +41,9 @@ jobs:
           working-directory: jobsearch_agents
           run: |
             poetry install --no-interaction
-            echo "ADK='$(pwd)/.venv/bin/adk'" >> $GITHUB_ENV
-            ls /home/runner/work/GetHired/GetHired/jobsearch_agents/.venv/bin
+            poetry env info
+            poetry run which adk || echo "ADK not found in PATH"
+            echo "ADK_CMD='poetry run adk'" >> $GITHUB_ENV
 
         - id: 'auth'
           uses: 'google-github-actions/auth@v2'
@@ -52,13 +53,14 @@ jobs:
             cleanup_credentials: true
         
         - name: Deploy to Cloud Run
+          working-directory: jobsearch_agents
           env:
             AGENT_PATH: 'jobsearch_agents'
             SERVICE_NAME: 'gethired-agents'
             APP_NAME: 'gethired'
             GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           run: | 
-            $ADK deploy cloud_run \
+            $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
