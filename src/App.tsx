@@ -11,6 +11,7 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import { auth, onAuthStateChanged } from './firebase';
+import { updateUserPreferences } from './services/firebaseService';
 import UserPreferencesModal from "./components/ui/UserPreferencesModal";
 
 function App() {
@@ -51,11 +52,24 @@ function App() {
             <Route path="/profile" element={<Profile />} />
           </Routes>          <UserPreferencesModal 
             show={showUserPrefs} 
-            onHide={() => setShowUserPrefs(false)}
-            onSubmit={(formData) => {
-              console.log('Saving user preferences:', formData);
-              // TODO: Save preferences to backend/database
-              setShowUserPrefs(false);
+            onHide={() => setShowUserPrefs(false)}            onSubmit={async (formData) => {
+              console.log('🚀 App.tsx - Modal onSubmit called with data:', formData);
+              try {
+                const userId = auth.currentUser?.uid;
+                console.log('📱 App.tsx - Current user ID:', userId);
+                if (!userId) {
+                  throw new Error('No authenticated user');
+                }
+                console.log('🔄 App.tsx - Calling updateUserPreferences...');
+                const result = await updateUserPreferences(userId, {
+                  ...formData.preferences,
+                  titles: formData.preferences.roles,
+                });
+                console.log('✅ App.tsx - updateUserPreferences result:', result);
+                setShowUserPrefs(false);
+              } catch (error) {
+                console.error('❌ App.tsx - Error saving preferences:', error);
+              }
             }}
           />
         </Layout>

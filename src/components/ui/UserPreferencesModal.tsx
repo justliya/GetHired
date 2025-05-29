@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
+import { User } from '../../context/UserContext';
 import ChipInput from './ChipInput';
+import RangeSlider from './RangeSlider';
 import type { JobPreferences, SalaryRange, SearchSchedule } from '../../models/UserData';
 import ScheduleConfig from './ScheduleConfig';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Exec';
@@ -71,7 +75,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
             skills: [],
             jobType: 'Full-time',
             seniority: 'Mid',
-            salaryRange: { min: 0, max: 200000 },
+            salaryRange: { min: 0, max: 2000000 },
             other: '',
             includeKeywords: [],
             excludeKeywords: [],
@@ -87,7 +91,48 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
             }
         }
-    });
+    });    const { user, setUser } = User();    useEffect(() => {
+        const fetchData = async () => {
+            if (user?.uid) {
+                const preferencesRef = doc(db, 'users', user.uid, 'preferences', 'jobSearch');
+                const docSnap = await getDoc(preferencesRef);
+                
+                if (docSnap.exists()) {
+                    const preferences = docSnap.data() as JobPreferences;
+                    setFormData(prev => ({
+                        ...prev,
+                        preferences: {
+                            ...prev.preferences,
+                            roles: preferences.titles || [],
+                            locations: preferences.locations || [],
+                            salaryRange: {
+                                min: preferences.salaryRange?.min || 0,
+                                max: preferences.salaryRange?.max || 2000000
+                            },
+                            jobType: preferences.jobType || 'Full-time',
+                            seniority: preferences.seniority || 'Mid',
+                            other: preferences.other || '',
+                            includeKeywords: preferences.includeKeywords || [],
+                            excludeKeywords: preferences.excludeKeywords || [],
+                            searchSchedule: preferences.searchSchedule || {
+                                enabled: false,
+                                frequency: 'Daily',
+                                customSchedule: '09:00',
+                                notificationType: 'Email',
+                                quietHours: {
+                                    start: '22:00',
+                                    end: '08:00'
+                                },
+                                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                            }
+                        }
+                    }));
+                }
+            }
+        };
+
+        fetchData();
+    }, [user?.uid]);
 
     const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
@@ -106,6 +151,39 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                 searchSchedule
             }
         }));
+    };    const handleSubmit = async () => {
+        console.log('🚀 UserPreferencesModal - handleSubmit called');
+        try {
+            if (!user?.uid) {
+                console.error('❌ UserPreferencesModal - No user ID found');
+                return;
+            }
+            console.log('👤 UserPreferencesModal - User ID:', user.uid);
+            console.log('📦 UserPreferencesModal - Form data to submit:', formData);
+            
+            // Let the parent component handle the Firestore update
+            await onSubmit(formData);
+            console.log('✅ UserPreferencesModal - onSubmit completed successfully');
+            
+            // Update the user context after successful submission
+            setUser(prev => {
+                if (!prev) {
+                    console.warn('⚠️ UserPreferencesModal - No previous user state found');
+                    return prev;
+                }
+                console.log('🔄 UserPreferencesModal - Updating user context');
+                return {
+                    ...prev,
+                    preferences: {
+                        ...formData.preferences,
+                        titles: formData.preferences.roles
+                    }
+                };
+            });
+        } catch (error) {
+            console.error('❌ UserPreferencesModal - Error in handleSubmit:', error);
+            throw error;
+        }
     };
 
     // Render functions
@@ -266,48 +344,24 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Salary Range (USD)
                     </label>
-                    <div className="flex items-center space-x-4">
-                        <div className="w-1/2">
-                            <input
-                                type="number"
-                                value={formData.preferences.salaryRange.min}
-                                onChange={(e) => setFormData(prev => ({
-                                    ...prev,
-                                    preferences: {
-                                        ...prev.preferences,
-                                        salaryRange: {
-                                            ...prev.preferences.salaryRange,
-                                            min: parseInt(e.target.value) || 0
-                                        }
-                                    }
-                                }))}
-                                min="0"
-                                step="1000"
-                                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500"
-                            />
-                            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Min</span>
-                        </div>
-                        <div className="w-1/2">
-                            <input
-                                type="number"
-                                value={formData.preferences.salaryRange.max}
-                                onChange={(e) => setFormData(prev => ({
-                                    ...prev,
-                                    preferences: {
-                                        ...prev.preferences,
-                                        salaryRange: {
-                                            ...prev.preferences.salaryRange,
-                                            max: parseInt(e.target.value) || 0
-                                        }
-                                    }
-                                }))}
-                                min="0"
-                                step="1000"
-                                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500"
-                            />
-                            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Max</span>
-                        </div>
-                    </div>
+                    <RangeSlider
+                        min={0}
+                        max={2000000}
+                        step={5000}
+                        value={formData.preferences.salaryRange}
+                        onChange={(value) => setFormData(prev => ({
+                            ...prev,
+                            preferences: {
+                                ...prev.preferences,
+                                salaryRange: value
+                            }
+                        }))}
+                        formatValue={(val) => new Intl.NumberFormat('en-US', { 
+                            style: 'currency', 
+                            currency: 'USD',
+                            maximumFractionDigits: 0 
+                        }).format(val)}
+                    />
                 </div>
             </div>
         </div>
@@ -580,7 +634,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
         if (currentStep < stepLabels.length - 1) {
             setCurrentStep(prev => prev + 1);
         } else {
-            onSubmit(formData);
+            handleSubmit();
         }
     };
 
