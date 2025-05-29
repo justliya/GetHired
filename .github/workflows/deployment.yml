@@ -38,9 +38,11 @@ jobs:
             virtualenvs-in-project: true
         
         - name: Install dependencies
-          working-directory: jobsearch_agents/jobsearch_agents
+          working-directory: jobsearch_agents
           run: |
-            poetry install --no-interaction 
+            poetry install --no-interaction
+            echo "alias adk='$(pwd)/.venv/bin/adk'" >> $GITHUB_ENV
+
         - id: 'auth'
           uses: 'google-github-actions/auth@v2'
           with:
