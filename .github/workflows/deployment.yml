@@ -40,24 +40,35 @@ jobs:
         - name: Install dependencies
           working-directory: jobsearch_agents
           run: |
-            poetry install --no-interaction 
+            poetry install --no-interaction --no-ansi --no-root
+            ADK_PATH=$(poetry run which adk)
+            if [ -z "$ADK_PATH" ]; then
+              echo "Error: ADK command not found in PATH"
+              exit 1
+            fi
+            echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
+
         - id: 'auth'
           uses: 'google-github-actions/auth@v2'
           with:
             credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
             export_environment_variables: true
+            cleanup_credentials: true
         
         - name: Deploy to Cloud Run
+          working-directory: jobsearch_agents
           env:
             AGENT_PATH: 'jobsearch_agents'
             SERVICE_NAME: 'gethired-agents'
             APP_NAME: 'gethired'
             GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           run: | 
-            adk deploy cloud_run \
+            yes y | $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
-            --allow-unauthenticated \
+            --trace_to_cloud \
+            --verbosity=error \
+
             $AGENT_PATH
