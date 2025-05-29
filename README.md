@@ -40,7 +40,6 @@
   - **Firestore** to persist data on job listings, resumes, user preferences, and research.
 - **Custom MCP Server**:
   - Manages tool orchestration and sub-agent coordination.
-  - Integrates scraping, prompt routing, and multi-agent collaboration.
 
 ---
 
