@@ -41,13 +41,14 @@ jobs:
           working-directory: jobsearch_agents
           run: |
             poetry install --no-interaction
-            echo "alias adk='$(pwd)/.venv/bin/adk'" >> $GITHUB_ENV
+            echo "ADK='$(pwd)/.venv/bin/adk'" >> $GITHUB_ENV
 
         - id: 'auth'
           uses: 'google-github-actions/auth@v2'
           with:
             credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
             export_environment_variables: true
+            cleanup_credentials: true
         
         - name: Deploy to Cloud Run
           env:
@@ -56,7 +57,7 @@ jobs:
             APP_NAME: 'gethired'
             GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           run: | 
-            adk deploy cloud_run \
+            $ADK deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
