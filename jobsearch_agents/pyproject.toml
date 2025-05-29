@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "GetHired"
+version = "0.1.0"
+description = "Job search automation ADK Agent. Designed to optimize and automate the job search process. It uses keywords from user and performs tailored job searches through google, and gathers all relevant listings, conduct research on the company, tailor resume, and prepare for application submission."
+authors = [
+    "Aaliyah Johnson, La'Kaleigh Harris <neoaxiom@gmail.com>"
+]
+readme = "../README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11"
+google-adk = "^1.0.0"
+google-genai = "^1.5.0"
+selenium = "^4.30.0"
+webdriver-manager = "^4.0.2"
+google-cloud-bigquery = "^3.31.0"
+absl-py = "^2.2.2"
+google-cloud-aiplatform = { git = "https://github.com/googleapis/python-aiplatform.git", rev = "copybara_738852226", extras = ["agent-engines"] }
+pytest = "^8.3.5"
+pillow = "^11.1.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
