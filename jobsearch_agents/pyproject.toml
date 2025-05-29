@@ -6,13 +6,11 @@ authors = [
     "Aaliyah Johnson, La'Kaleigh Harris <neoaxiom@gmail.com>"
 ]
 readme = "../README.md"
-packages = [
-    { include = "jobsearch_agents/jobsearch_agents" }
-]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.11"
-google-adk = "^0.0.2"
+google-adk = "^1.0.0"
 google-genai = "^1.5.0"
 selenium = "^4.30.0"
 webdriver-manager = "^4.0.2"
