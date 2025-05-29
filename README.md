@@ -4,7 +4,7 @@
 
 ---
 
-## 🧠 Intelligent Agent Overview
+## Intelligent Agent Overview
 
 ### 🕵️‍♀️ Job Discovery Agent
 - Searches top job boards (e.g., LinkedIn, Indeed) using user-defined keywords, location, and remote preferences.
@@ -65,87 +65,80 @@
    git clone https://github.com/justliya/GetHired.git
    cd GetHired
 
-Install dependencies
-
-npm install
-
-
-Configure environment variables
-Create a .env file in the root directory:
-
-VITE_FIREBASE_API_KEY=<YOUR_PROJECT>
-VITE_FIREBASE_AUTH_DOMAIN=<YOUR_PROJECT>
-VITE_FIREBASE_PROJECT_ID=<YOUR_PROJECT>
-VITE_FIREBASE_STORAGE_BUCKET=<YOUR_PROJECT>
-VITE_FIREBASE_MESSAGING_SENDER_ID=<YOUR_PROJECT>
-VITE_FIREBASE_APP_ID=<YOUR_PROJECT>
-
-Run the development server
-
-npm run dev
+2. **Install dependencies**
+    npm install
 
 
+3. **Configure environment variables**
 
-⸻
+- Create a .env file in the root directory:
 
-🧠 Backend Setup & Installation
+    	VITE_FIREBASE_API_KEY=<YOUR_PROJECT>
+    	VITE_FIREBASE_AUTH_DOMAIN=<YOUR_PROJECT>
+    	VITE_FIREBASE_PROJECT_ID=<YOUR_PROJECT>
+    	VITE_FIREBASE_STORAGE_BUCKET=<YOUR_PROJECT>
+    	VITE_FIREBASE_MESSAGING_SENDER_ID=<YOUR_PROJECT>
+    	VITE_FIREBASE_APP_ID=<YOUR_PROJECT>
 
-Prerequisites
+4. **Run the development server**
+
+		npm run dev
+
+
+## 🧠 Backend Setup & Installation
+
+### Prerequisites
 	•	Python 3.11+
 	•	Poetry for dependency management
 	•	A Google Cloud Platform (GCP) project
 	•	IAM Permission: Vertex AI User
 
-Configuration
+### Configuration
+
 Set environment variables
 Create a .env file in the backend root:
 
-GOOGLE_GENAI_USE_VERTEXAI=True
-GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT>
-GOOGLE_CLOUD_LOCATION=us-central1
+	GOOGLE_GENAI_USE_VERTEXAI=True
+	GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT>
+	GOOGLE_CLOUD_LOCATION=us-central1
+	
+
+## Authenticate with Google Cloud
+
+	gcloud auth application-default login
 
 
-Authenticate with Google Cloud
+## Create and activate a virtual environment
 
-gcloud auth application-default login
+	python -m venv .venv
 
+	Mac/Linux:
 
-
-Installation Steps
-Create and activate a virtual environment
-
-python -m venv .venv
-
-Mac/Linux:
-
-source .venv/bin/activate
+	source .venv/bin/activate
 
 
-Windows CMD:
+	Windows CMD:
 
-.venv\Scripts\activate.bat
-
-
-Windows PowerShell:
-
-.venv\Scripts\Activate.ps1
+	.venv\Scripts\activate.bat
 
 
-Navigate to the backend directory
+	Windows PowerShell:
 
-cd jobsearch_agents
-
-
-Install dependencies
-
-poetry install
+	.venv\Scripts\Activate.ps1
 
 
+## Navigate to the backend directory
 
-⸻
+	cd jobsearch_agents
 
-🔄 Running the Agent Server
+
+## Install dependencies
+
+	poetry install
+
+
+## Running the Agent Server
 
 Once setup is complete, start the agent system with:
 
-adk web
+	adk web
