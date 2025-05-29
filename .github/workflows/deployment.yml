@@ -1,0 +1,63 @@
+name: Deploy ADK Agents to Cloud Run
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'jobsearch_agents/**'
+      - '.github/workflows/deployment.yml'
+
+  workflow_dispatch:
+jobs:
+    deploy:
+        permissions:
+            contents: read
+            id-token: write
+        runs-on: ubuntu-latest
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+    
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.11'
+        
+        - name: Load cached Poetry installation
+          id: cached-poetry
+          uses: actions/cache@v4
+          with:
+            path: ~/.local  # the path depends on the OS
+            key: poetry-0  # increment to reset cache
+
+        - name: Install and configure Poetry
+          uses: snok/install-poetry@v1
+          with:
+            version: 1.5.1
+            virtualenvs-create: true
+            virtualenvs-in-project: true
+        
+        - name: Install dependencies
+          working-directory: jobsearch_agents/jobsearch_agents
+          run: |
+            poetry install --no-interaction 
+        - id: 'auth'
+          uses: 'google-github-actions/auth@v2'
+          with:
+            credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+            export_environment_variables: true
+        
+        - name: Deploy to Cloud Run
+          env:
+            AGENT_PATH: 'jobsearch_agents'
+            SERVICE_NAME: 'gethired-agents'
+            APP_NAME: 'gethired'
+            GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          run: | 
+            adk deploy cloud_run \
+            --project=$GOOGLE_CLOUD_PROJECT \
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --service_name=$SERVICE_NAME \
+            --app_name=$APP_NAME \
+            --allow-unauthenticated \
+            $AGENT_PATH
