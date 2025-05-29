@@ -63,10 +63,9 @@ jobs:
             APP_NAME: 'gethired'
             GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           run: | 
-            $ADK_CMD deploy cloud_run \
+            yes y | $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
-            --allow-unauthenticated \
             $AGENT_PATH
