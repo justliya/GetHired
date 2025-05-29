@@ -1,24 +1,11 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
-import { auth, db, onAuthStateChanged } from "../firebase";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { auth, db } from "../firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import type { Profile, JobPreferences, UserData } from "../models/UserData";
 
- 
-export interface AppUser {
+// Basic auth user interface
+export interface AppUser extends UserData {
   uid: string;
-  name: string;
-  email: string;
-  photoURL: string;
-  role: string;
-  location: string;
-  connections: number;
-  applications: number;
-  interviews: number;
 }
 
 interface UserContextValue {
@@ -33,39 +20,58 @@ const UserContext = createContext<UserContextValue>({
   loading: true,
 });
 
+const defaultJobPreferences: JobPreferences = {
+  titles: [],
+  locations: [],
+  salaryRange: { min: 0, max: 100000 },
+  jobType: "Full-time",
+  seniority: "Junior",
+  other: "",
+  includeKeywords: [],
+  excludeKeywords: [],
+  scheduleEnabled: false,
+  schedulePreset: "Daily",
+  customSchedule: "",
+};
+
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+    const unsub = auth.onAuthStateChanged(async (fbUser) => {
       if (fbUser) {
-        const ref = doc(db, "users", fbUser.uid);
-        const snap = await getDoc(ref);
+        const userRef = doc(db, "users", fbUser.uid);
+        const userSnap = await getDoc(userRef);
 
-        if (snap.exists()) {
-          setUser(snap.data() as AppUser);
+        if (userSnap.exists()) {
+          // Preserve existing data structure
+          setUser({ uid: fbUser.uid, ...userSnap.data() } as AppUser);
         } else {
-          // Fill in defaults for the new fields
-          const defaultProfile: AppUser = {
-            uid: fbUser.uid,
+          // Initialize new user with default structure
+          const defaultProfile: Profile = {
             name: fbUser.displayName || "",
             email: fbUser.email || "",
-            photoURL: fbUser.photoURL || "",
-            role: "",
-            location: "",
-            connections: 0,
-            applications: 0,
-            interviews: 0,
+            phone: "",
           };
-          await setDoc(ref, defaultProfile);
-          setUser(defaultProfile);
+
+          const userData: UserData = {
+            profile: defaultProfile,
+            jobPreferences: defaultJobPreferences,
+          };
+
+          // Save initial user data
+          await setDoc(userRef, userData);
+
+          // Set user in context
+          setUser({ uid: fbUser.uid, ...userData } as AppUser);
         }
       } else {
         setUser(null);
       }
       setLoading(false);
     });
+
     return () => unsub();
   }, []);
 
