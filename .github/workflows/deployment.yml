@@ -69,5 +69,5 @@ jobs:
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
             --trace_to_cloud \
-            --verbosity=debug \
+            --verbosity=error \
             $AGENT_PATH
