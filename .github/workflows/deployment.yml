@@ -72,10 +72,13 @@ jobs:
             SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
           run: | 
             yes y | $ADK_CMD deploy cloud_run \
-            --project=$GOOGLE_CLOUD_PROJECT \
-            --region=$GOOGLE_CLOUD_LOCATION \
-            --service_name=$SERVICE_NAME \
-            --app_name=$APP_NAME \
-            --trace_to_cloud \
-            --verbosity=error \
+
+              --project=$GOOGLE_CLOUD_PROJECT \
+              --region=$GOOGLE_CLOUD_LOCATION \
+              --service_name=$SERVICE_NAME \
+              --app_name=$APP_NAME \
+              --trace_to_cloud \
+              --verbosity=error \
+              --set-env-vars="FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,SERVICE_ACCOUNT_KEY_PATH=$SERVICE_ACCOUNT_KEY_PATH"
+
             $AGENT_PATH
