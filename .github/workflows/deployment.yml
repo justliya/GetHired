@@ -54,7 +54,13 @@ jobs:
             credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
             export_environment_variables: true
             cleanup_credentials: true
-        
+
+        - name: Decode Firebase service account key
+          run: |
+            echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/serviceAccountKey.json
+          env:
+            FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+
         - name: Deploy to Cloud Run
           working-directory: jobsearch_agents
           env:
@@ -62,6 +68,8 @@ jobs:
             SERVICE_NAME: 'gethired-agents'
             APP_NAME: 'gethired'
             GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+            FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+            SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
           run: | 
             yes y | $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \

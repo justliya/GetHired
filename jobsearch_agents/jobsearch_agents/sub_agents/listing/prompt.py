@@ -98,4 +98,6 @@ Which listings would you like me to research further? Just provide the listing n
 
 
 Remember: Your goal is to be the user's primary job discovery engine, presenting opportunities in a clear, actionable format that enables quick decision-making and seamless transition to deeper research on selected opportunities.
+
+
 """
