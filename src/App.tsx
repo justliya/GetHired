@@ -53,22 +53,21 @@ function App() {
           </Routes>          <UserPreferencesModal 
             show={showUserPrefs} 
             onHide={() => setShowUserPrefs(false)}            onSubmit={async (formData) => {
-              console.log('🚀 App.tsx - Modal onSubmit called with data:', formData);
               try {
                 const userId = auth.currentUser?.uid;
-                console.log('📱 App.tsx - Current user ID:', userId);
                 if (!userId) {
                   throw new Error('No authenticated user');
                 }
-                console.log('🔄 App.tsx - Calling updateUserPreferences...');
                 const result = await updateUserPreferences(userId, {
                   ...formData.preferences,
                   titles: formData.preferences.roles,
                 });
-                console.log('✅ App.tsx - updateUserPreferences result:', result);
+                if (!result.success) {
+                  throw new Error('Failed to update preferences');
+                }
                 setShowUserPrefs(false);
               } catch (error) {
-                console.error('❌ App.tsx - Error saving preferences:', error);
+                console.error('Failed to save preferences:', error);
               }
             }}
           />

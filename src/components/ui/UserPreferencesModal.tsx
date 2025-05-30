@@ -3,13 +3,21 @@ import type { ChangeEvent } from 'react';
 import { User } from '../../context/UserContext';
 import ChipInput from './ChipInput';
 import RangeSlider from './RangeSlider';
-import type { JobPreferences, SalaryRange, SearchSchedule } from '../../models/UserData';
+import type { 
+    JobPreferences, 
+    SalaryRange, 
+    SearchSchedule,
+    Resume,
+    SearchFrequency,
+    NotificationType 
+} from '../../models/UserData';
 import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { getUserResumes, uploadResume, updateUserPreferences } from '../../services/firebaseService';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
-type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Exec';
+type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead';
 
 interface PreferencesData extends Omit<JobPreferences, 'titles'> {
     roles: string[]; // alias for titles
@@ -63,8 +71,13 @@ const stepDescriptions = {
     }
 };
 
+interface ResumeData extends Resume {
+    id: string;
+}
+
 const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHide, onSubmit }) => {
     const [currentStep, setCurrentStep] = useState<number>(0);
+    const [resumes, setResumes] = useState<ResumeData[]>([]);
     const [formData, setFormData] = useState<FormDataType>({
         resumeFile: null,
         currentRole: '',
@@ -81,9 +94,9 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
             excludeKeywords: [],
             searchSchedule: {
                 enabled: false,
-                frequency: 'Daily',
+                frequency: 'Daily' as SearchFrequency,
                 customSchedule: '09:00',
-                notificationType: 'Email',
+                notificationType: 'Email' as NotificationType,
                 quietHours: {
                     start: '22:00',
                     end: '08:00'
@@ -91,7 +104,37 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
             }
         }
-    });    const { user, setUser } = User();    useEffect(() => {
+    });    const { user, setUser } = User();
+    const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+    const [resumeError, setResumeError] = useState<string | null>(null);
+
+    const handleScheduleChange = (scheduleUpdate: Partial<SearchSchedule>) => {
+        setFormData(prev => ({
+            ...prev,
+            preferences: {
+                ...prev.preferences,
+                searchSchedule: {
+                    ...prev.preferences.searchSchedule,
+                    ...scheduleUpdate
+                }
+            }
+        }));
+    };
+
+    const handleInputChange = (
+        field: keyof PreferencesData,
+        value: string | string[] | number | boolean
+    ) => {
+        setFormData(prev => ({
+            ...prev,
+            preferences: {
+                ...prev.preferences,
+                [field]: value
+            }
+        }));
+    };
+
+    useEffect(() => {
         const fetchData = async () => {
             if (user?.uid) {
                 const preferencesRef = doc(db, 'users', user.uid, 'preferences', 'jobSearch');
@@ -134,55 +177,107 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
         fetchData();
     }, [user?.uid]);
 
-    const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            setFormData(prev => ({
-                ...prev,
-                resumeFile: e.target.files![0]
-            }));
+    useEffect(() => {
+        const fetchResumes = async () => {
+            if (!user?.uid) return;
+            try {
+                const result = await getUserResumes(user.uid);
+                if (result.success && result.data) {
+                    setResumes(result.data.map((r: any) => ({ ...r, id: r.id })));
+                    if (result.data.length > 0 && !selectedResumeId) {
+                        setSelectedResumeId(result.data[0].id);
+                    }
+                } else {
+                    setResumeError('Could not fetch resumes.');
+                }
+            } catch {
+                setResumeError('Error fetching resumes.');
+            }
+        };
+        fetchResumes();
+        // eslint-disable-next-line
+    }, [user?.uid]);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!user?.uid || !e.target.files?.[0]) return;
+        setResumeError(null);
+        try {
+            const file = e.target.files[0];
+            const metadata = {
+                title: file.name,
+                uploadSource: 'manual' as const,
+                isOriginal: true,
+                keywords: formData.preferences.roles || [],
+            };
+            const result = await uploadResume(user.uid, file, metadata);
+            if (result.success && result.data) {
+                setResumes(prev => [...prev, { ...result.data }]);
+                setSelectedResumeId(result.data.id);
+                setFormData(prev => ({ ...prev, resumeFile: file }));
+            } else {
+                setResumeError('Failed to upload resume.');
+            }
+        } catch {
+            setResumeError('Error uploading resume.');
         }
     };
 
-    const handleScheduleChange = (searchSchedule: SearchSchedule) => {
-        setFormData(prev => ({
-            ...prev,
-            preferences: {
-                ...prev.preferences,
-                searchSchedule
-            }
-        }));
-    };    const handleSubmit = async () => {
-        console.log('🚀 UserPreferencesModal - handleSubmit called');
+    const handleSelectResume = (resumeId: string) => {
+        setSelectedResumeId(resumeId);
+        setFormData(prev => ({ ...prev, resumeFile: null }));
+    };
+
+    const handleSubmit = async () => {
         try {
             if (!user?.uid) {
-                console.error('❌ UserPreferencesModal - No user ID found');
+                setResumeError('No user ID found.');
                 return;
             }
-            console.log('👤 UserPreferencesModal - User ID:', user.uid);
-            console.log('📦 UserPreferencesModal - Form data to submit:', formData);
-            
-            // Let the parent component handle the Firestore update
-            await onSubmit(formData);
-            console.log('✅ UserPreferencesModal - onSubmit completed successfully');
-            
-            // Update the user context after successful submission
-            setUser(prev => {
-                if (!prev) {
-                    console.warn('⚠️ UserPreferencesModal - No previous user state found');
-                    return prev;
-                }
-                console.log('🔄 UserPreferencesModal - Updating user context');
-                return {
-                    ...prev,
-                    preferences: {
-                        ...formData.preferences,
-                        titles: formData.preferences.roles
-                    }
+            let selectedResume = resumes.find(r => r.id === selectedResumeId);
+            if (!selectedResume && formData.resumeFile) {
+                const metadata = {
+                    title: formData.resumeFile.name,
+                    uploadSource: 'manual' as const,
+                    isOriginal: true,
+                    keywords: formData.preferences.roles || [],
                 };
-            });
+                const result = await uploadResume(user.uid, formData.resumeFile, metadata);
+                if (result.success && result.data) {
+                    selectedResume = { ...result.data };
+                } else {
+                    setResumeError('Failed to upload resume on submit.');
+                    return;
+                }
+            }
+
+            // Map form data to JobPreferences interface
+            const preferencesToSave: JobPreferences = {
+                titles: formData.preferences.roles,
+                locations: formData.preferences.locations,
+                skills: formData.preferences.skills,
+                jobType: formData.preferences.jobType,
+                seniority: formData.preferences.seniority,
+                salaryRange: formData.preferences.salaryRange,
+                searchSchedule: formData.preferences.searchSchedule,
+                companies: formData.preferences.companies,
+                other: formData.preferences.other,
+                includeKeywords: formData.preferences.includeKeywords,
+                excludeKeywords: formData.preferences.excludeKeywords
+            };
+
+            // Use updateUserPreferences to save to Firebase
+            const result = await updateUserPreferences(user.uid, preferencesToSave);
+            if (result.success) {
+                // Update local user state with new preferences
+                setUser(prev => prev ? { ...prev, jobPreferences: preferencesToSave } : prev);
+                onSubmit({ ...formData });
+                onHide();
+            } else {
+                setResumeError('Failed to save preferences.');
+            }
         } catch (error) {
-            console.error('❌ UserPreferencesModal - Error in handleSubmit:', error);
-            throw error;
+            console.error('Error in handleSubmit:', error);
+            setResumeError('Error saving preferences.');
         }
     };
 
@@ -197,6 +292,42 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                     {stepDescriptions.upload.description}
                 </p>
             </div>
+            {/* Default Resume Section */}
+            {resumes.length > 0 && (
+                <div className="mb-4">
+                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">Default Resume</div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                        <div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                {/* Safely access the metadata */}
+                                {resumes[0]?.metadata?.title || resumes[0]?.fileUrl?.split('/').pop() || 'Untitled Resume'}
+                            </span>
+                            <a 
+                                href={resumes[0]?.fileUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="ml-2 text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+                            >
+                                View
+                            </a>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                className={`px-3 py-1 rounded font-medium transition-colors ${
+                                    selectedResumeId === resumes[0]?.id 
+                                    ? 'bg-indigo-600 text-white' 
+                                    : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                                onClick={() => handleSelectResume(resumes[0]?.id)}
+                            >
+                                {selectedResumeId === resumes[0]?.id ? 'Using Default' : 'Use Default'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Upload Section */}
             <div className="flex items-center justify-center w-full">
                 <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -230,6 +361,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                     </button>
                 </div>
             )}
+            {resumeError && <div className="text-red-600 text-sm mb-2">{resumeError}</div>}
         </div>
     );
 

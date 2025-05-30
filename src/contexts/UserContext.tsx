@@ -1,7 +1,15 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { auth, db } from "../firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import type { Profile, JobPreferences, UserData } from "../models/UserData";
+import type { 
+  Profile, 
+  JobPreferences, 
+  UserData, 
+  Application,
+  Resume,
+  JobListing,
+  JobSearch
+} from "../models/UserData";
 
 // Basic auth user interface
 export interface AppUser extends UserData {
@@ -23,6 +31,7 @@ const UserContext = createContext<UserContextValue>({
 const defaultJobPreferences: JobPreferences = {
   titles: [],
   locations: [],
+  skills: [],
   salaryRange: { min: 0, max: 100000 },
   jobType: "Full-time",
   seniority: "Junior",
@@ -33,6 +42,54 @@ const defaultJobPreferences: JobPreferences = {
   schedulePreset: "Daily",
   customSchedule: "",
 };
+
+const defaultApplications: Application[] = [
+  {
+    company: "TechCorp",
+    role: "Frontend Developer",
+    status: "applied",
+    resumeRef: "resume1",
+    notes: "Initial application submitted",
+    updatedAt: new Date().toISOString()
+  }
+];
+
+const defaultResumes: Resume[] = [
+  {
+    fileUrl: "https://example.com/default-resume.pdf",
+    createdAt: new Date().toISOString(),
+    type: "original",
+    metadata: {
+      title: "Initial Resume",
+      description: "General purpose resume",
+      keywords: ["JavaScript", "React", "TypeScript"],
+      uploadSource: "manual",
+      isOriginal: true
+    }
+  }
+];
+
+const defaultJobListings: JobListing[] = [
+  {
+    title: "Frontend Developer",
+    company: "TechCorp",
+    location: "Remote",
+    postedDate: new Date().toISOString(),
+    description: "Looking for a frontend developer with React experience",
+    url: "https://example.com/job1",
+    salary: "$100k-$150k",
+    employmentType: "Full-time"
+  }
+];
+
+const defaultJobSearches: JobSearch[] = [
+  {
+    preferences: defaultJobPreferences,
+    initiatedAt: new Date().toISOString(),
+    resultsCount: 0,
+    status: "completed"
+  }
+];
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -53,11 +110,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             name: fbUser.displayName || "",
             email: fbUser.email || "",
             phone: "",
+            createdAt: new Date().toISOString(),
           };
 
           const userData: UserData = {
             profile: defaultProfile,
             jobPreferences: defaultJobPreferences,
+            applications: defaultApplications,
+            resumes: defaultResumes,
+            jobListings: defaultJobListings,
+            jobSearches: defaultJobSearches,
           };
 
           // Save initial user data
