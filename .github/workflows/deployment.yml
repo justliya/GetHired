@@ -79,5 +79,4 @@ jobs:
             --app_name=$APP_NAME \
             --trace_to_cloud \
             --verbosity=error \
-            --set-env-vars="FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,SERVICE_ACCOUNT_KEY_PATH=$SERVICE_ACCOUNT_KEY_PATH" \
             $AGENT_PATH
