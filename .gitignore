@@ -25,3 +25,4 @@ dist-ssr
 *env
 *__pycache__/
 docs/
+serviceAccount*.json

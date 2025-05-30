@@ -2,6 +2,7 @@
 Job Search Optimization Agent
 
 """
+import os
 import asyncio
 import logging
 from dotenv import load_dotenv
@@ -9,9 +10,8 @@ from google.genai import types
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters, StreamableHTTPServerParams
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from .shared_libraries import constants
 from .sub_agents.listing.agent import listing_search_agent
 from .sub_agents.research.agent import company_research_agent
@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 load_dotenv(".env")
 
+service_path = os.environ.get("SERVICE_ACCOUNT_KEY_PATH")
+storage = os.environ.get("FIREBASE_STORAGE_BUCKET")
+
+
 # --- Main Agent Definition ---
 root_agent = LlmAgent(
     model="gemini-2.0-flash-001",
@@ -35,13 +39,32 @@ root_agent = LlmAgent(
         company_research_agent,
     ],
     tools=[
-        MCPToolset(
-            connection_params=StreamableHTTPServerParams(
-                url="https://gethired-mcp.onrender.com/jobsearch-mcp",
+        # Firebase MCP Server for storage and coordination
+            MCPToolset(
+                connection_params=StdioServerParameters(
+                    command='npx',
+                    args=[
+                       "-y",
+                       "@gannonh/firebase-mcp"
+                    ],
+                    env={
+                        "SERVICE_ACCOUNT_KEY_PATH": service_path,
+                        "FIREBASE_STORAGE_BUCKET": storage,
+                    }
+                ),
+                tool_filter=[
+                    'auth_get_user',
+                    'storage_get_file_info',
+                    'firestore_list_documents',
+                    'firestore_get_document',
+                   'firestore_list_collections',
+                   'firestore_query_collection_group',
+                ]
             ),
-        )
-    ],
-)
+        ]
+    )
+    
+
 
 
 # --- Main Execution Logic ---
@@ -107,6 +130,8 @@ async def interactive_job_search():
         print("- 'Find remote data science jobs'")
         print("- 'What does a software engineer make at Microsoft?'")
         print("- 'Search for entry-level positions in Chicago'")
+        print("- 'Research working at Google'")
+        print("- 'Get company reviews for Amazon'")
         print("-" * 50)
 
         while True:
@@ -118,7 +143,7 @@ async def interactive_job_search():
             if not user_input:
                 continue
 
-            print(f"\nSearching for: {user_input}")
+            print(f"\nProcessing: {user_input}")
             content = types.Content(role="user", parts=[types.Part(text=user_input)])
 
             try:
