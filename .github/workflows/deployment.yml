@@ -1,4 +1,5 @@
 name: Deploy ADK Agents to Cloud Run
+
 on:
   push:
     branches:
@@ -6,78 +7,77 @@ on:
     paths:
       - 'jobsearch_agents/**'
       - '.github/workflows/deployment.yml'
-
   workflow_dispatch:
+
 jobs:
-    deploy:
-        permissions:
-            contents: read
-            id-token: write
-        runs-on: ubuntu-latest
-        steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-    
-        - name: Set up Python
-          uses: actions/setup-python@v5
-          with:
-            python-version: '3.11'
-        
-        - name: Load cached Poetry installation
-          id: cached-poetry
-          uses: actions/cache@v4
-          with:
-            path: ~/.local  # the path depends on the OS
-            key: poetry-0  # increment to reset cache
+  deploy:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        - name: Install and configure Poetry
-          uses: snok/install-poetry@v1
-          with:
-            version: 1.5.1
-            virtualenvs-create: true
-            virtualenvs-in-project: true
-        
-        - name: Install dependencies
-          working-directory: jobsearch_agents
-          run: |
-            poetry install --no-interaction --no-ansi --no-root
-            ADK_PATH=$(poetry run which adk)
-            if [ -z "$ADK_PATH" ]; then
-              echo "Error: ADK command not found in PATH"
-              exit 1
-            fi
-            echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-        - id: 'auth'
-          uses: 'google-github-actions/auth@v2'
-          with:
-            credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-            export_environment_variables: true
-            cleanup_credentials: true
+      - name: Load cached Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v4
+        with:
+          path: ~/.local  # the path depends on the OS
+          key: poetry-0  # increment to reset cache
 
-        - name: Decode Firebase service account key
-          run: |
-            echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/serviceAccountKey.json
-          env:
-            FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.5.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-        - name: Deploy to Cloud Run
-          working-directory: jobsearch_agents
-          env:
-            AGENT_PATH: 'jobsearch_agents'
-            SERVICE_NAME: 'gethired-agents'
-            APP_NAME: 'gethired'
-            GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-            FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
-            SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
-          run: | 
-            yes y | $ADK_CMD deploy cloud_run \
-              --project=$GOOGLE_CLOUD_PROJECT \
-              --region=$GOOGLE_CLOUD_LOCATION \
-              --service_name=$SERVICE_NAME \
-              --app_name=$APP_NAME \
-              --trace_to_cloud \
-              --verbosity=error \
-              --set-env-vars="FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,SERVICE_ACCOUNT_KEY_PATH=$SERVICE_ACCOUNT_KEY_PATH"
+      - name: Install dependencies
+        working-directory: jobsearch_agents
+        run: |
+          poetry install --no-interaction --no-ansi --no-root
+          ADK_PATH=$(poetry run which adk)
+          if [ -z "$ADK_PATH" ]; then
+            echo "Error: ADK command not found in PATH"
+            exit 1
+          fi
+          echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
 
-              $AGENT_PATH
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          export_environment_variables: true
+          cleanup_credentials: true
+
+      - name: Decode Firebase service account key
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/serviceAccountKey.json
+        env:
+          FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+
+      - name: Deploy to Cloud Run
+        working-directory: jobsearch_agents
+        env:
+          AGENT_PATH: 'jobsearch_agents'
+          SERVICE_NAME: 'gethired-agents'
+          APP_NAME: 'gethired'
+          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+          SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
+        run: |
+          yes y | $ADK_CMD deploy cloud_run \
+            --project=$GOOGLE_CLOUD_PROJECT \
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --service_name=$SERVICE_NAME \
+            --app_name=$APP_NAME \
+            --trace_to_cloud \
+            --verbosity=error \
+            --set-env-vars="FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,SERVICE_ACCOUNT_KEY_PATH=$SERVICE_ACCOUNT_KEY_PATH" \
+            $AGENT_PATH
