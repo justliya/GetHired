@@ -1,4 +1,3 @@
-
 # sub_agents/listing/agent.py
 
 from google.adk.agents import LlmAgent
@@ -24,8 +23,8 @@ listing_search_agent = LlmAgent(
     model=constants.MODEL,
     name="listing_search_agent",
     description=(
-        "Search and retrieve job listings based on user preferences via web browsing, "
-        "then allow a human to select which listings to research further."
+        "Search and retrieve job listings based on user preferences , "
+        "then allow human selection of listings for further research."
     ),
     instruction=prompt.LISTING_SEARCH_AGENT_PROMPT,
     output_key="job_listings",
@@ -33,7 +32,16 @@ listing_search_agent = LlmAgent(
         MCPToolset(
             connection_params=StreamableHTTPServerParams(
                 url='https://gethired-mcp.onrender.com/jobsearch-mcp',
-            )
+            ),
+            tool_filter=[
+                # Job Discovery Tools
+                'search_jobs',
+                'search_jobs_by_company',
+                'get_job_details',
+                'search_glassdoor_jobs',
+                
+                
+            ]
         ),
         AgentTool(agent=request_approval, skip_summarization=True)
     ]
