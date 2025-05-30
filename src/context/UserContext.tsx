@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import { auth, db, onAuthStateChanged } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User as FirebaseUser, IdTokenResult } from 'firebase/auth';
+import type { JobPreferences } from '../models/UserData';
 
 // --- Profile-related types ---
 export interface ExperienceEntry {
@@ -36,7 +37,6 @@ export interface AppUser extends Omit<FirebaseUser, 'reload'> {
   connections: number;
   applications: number;
   interviews: number;
-
   title: string;
   bio: string;
   avatar: string;
@@ -44,6 +44,7 @@ export interface AppUser extends Omit<FirebaseUser, 'reload'> {
   experience: ExperienceEntry[];
   education: EducationEntry[];
   links: LinkEntry[];
+  preferences?: JobPreferences;
 }
 
 interface UserContextValue {
@@ -78,9 +79,29 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             bio: '',
             avatar: fbUser.photoURL || '',
             skills: [],
-            experience: [],
-            education: [],
-            links: []
+            experience: [],            education: [],
+            links: [],
+            preferences: {
+              titles: [],
+              locations: [],
+              salaryRange: { min: 0, max: 200000 },
+              jobType: 'Full-time',
+              seniority: 'Mid',
+              other: '',
+              includeKeywords: [],
+              excludeKeywords: [],
+              searchSchedule: {
+                enabled: false,
+                frequency: 'Daily',
+                customSchedule: '09:00',
+                notificationType: 'Email',
+                quietHours: {
+                  start: '22:00',
+                  end: '08:00'
+                },
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              }
+            }
           };
           await setDoc(ref, defaults);
           data = defaults;
@@ -106,8 +127,28 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           avatar: data.avatar || '',
           skills: Array.isArray(data.skills) ? data.skills : [],
           experience: Array.isArray(data.experience) ? data.experience : [],
-          education: Array.isArray(data.education) ? data.education : [],
-          links: Array.isArray(data.links) ? data.links : [],
+          education: Array.isArray(data.education) ? data.education : [],          links: Array.isArray(data.links) ? data.links : [],
+          preferences: data.preferences || {
+            titles: [],
+            locations: [],
+            salaryRange: { min: 0, max: 200000 },
+            jobType: 'Full-time',
+            seniority: 'Mid',
+            other: '',
+            includeKeywords: [],
+            excludeKeywords: [],
+            searchSchedule: {
+              enabled: false,
+              frequency: 'Daily',
+              customSchedule: '09:00',
+              notificationType: 'Email',
+              quietHours: {
+                start: '22:00',
+                end: '08:00'
+              },
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            }
+          },
           isAnonymous: false,
           providerData: [],
           refreshToken: '',

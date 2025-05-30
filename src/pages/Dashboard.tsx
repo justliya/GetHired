@@ -5,10 +5,13 @@ import { motion } from 'framer-motion';
 import { mockJobListings } from '../data/mockData';
 import JobCard from '../components/JobCard';
 
-const Dashboard = () => {
+interface DashboardProps {
+  onOpenPreferences: () => void;
+}
+
+const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [showJobPreferences, setShowJobPreferences] = useState(false);
   
   // Mock data for dashboard stats
   const stats = [
@@ -47,95 +50,16 @@ const Dashboard = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Track your job search progress</p>
         </div>
-        <div className="mt-4 md:mt-0">
+        <div className="mt-4 md:mt-0">          
           <button
-            onClick={() => setShowJobPreferences(!showJobPreferences)}
+            onClick={onOpenPreferences}
             className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
           >
             <Sparkles className="w-5 h-5 mr-2" />
-            {showJobPreferences ? 'Hide Preferences' : 'Job Preferences'}
+            Job Preferences
           </button>
         </div>
       </div>
-
-      {showJobPreferences && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8"
-        >
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Job Search Preferences</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Job Titles (comma separated)
-              </label>
-              <input
-                type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="Frontend Developer, UI Engineer"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Locations (comma separated)
-              </label>
-              <input
-                type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="San Francisco, Remote"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Skills (comma separated)
-              </label>
-              <input
-                type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="React, TypeScript, Node.js"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Minimum Salary
-              </label>
-              <input
-                type="number"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="80000"
-              />
-            </div>
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="remoteOnly"
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="remoteOnly" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                Remote Only
-              </label>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Experience Level
-              </label>
-              <select className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                <option value="">Any</option>
-                <option value="entry">Entry Level</option>
-                <option value="mid">Mid Level</option>
-                <option value="senior">Senior Level</option>
-              </select>
-            </div>
-          </div>
-          <div className="mt-6 flex justify-end">
-            <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200">
-              Save Preferences
-            </button>
-          </div>
-        </motion.div>
-      )}
 
       {/* Dashboard Stats */}
       <motion.div

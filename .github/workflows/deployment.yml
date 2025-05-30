@@ -72,6 +72,7 @@ jobs:
             SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
           run: | 
             yes y | $ADK_CMD deploy cloud_run \
+
               --project=$GOOGLE_CLOUD_PROJECT \
               --region=$GOOGLE_CLOUD_LOCATION \
               --service_name=$SERVICE_NAME \
