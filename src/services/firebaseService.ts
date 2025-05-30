@@ -158,10 +158,10 @@ export const initializeUserData = async (user: { uid: string; displayName: strin
         createdAt: new Date().toISOString(),
       },
       jobPreferences: defaultJobPreferences,
-      applications: defaultApplications,
-      resumes: defaultResumes,
-      jobListings: defaultJobListings,
-      jobSearches: defaultJobSearches
+      applications: [],
+      resumes: [],
+      jobListings: [],
+      jobSearches: []
     };
 
     // Create main user document
