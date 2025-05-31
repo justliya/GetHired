@@ -7,43 +7,36 @@ env:
 on:
   push:
     branches:
-      - main  
+      - main
     paths:
-      - 'GetHired-typescript'
-      - '.github/workflows/frontend_deploymemt.yml'
+      - "GetHired-typescript/**"
+      - "!GetHired-typescript/jobsearch_agents/**"
+      - ".github/workflows/frontend_deploymemt.yml"
 
 jobs:
-  build:
+  Deploy-Production:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: |
-          npm install
-
-      - name: Build the project
-        run: |
-          npm run build
-
-      - name: Install Vercel CLI        
+      - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Pull Vercel Environment Information        
+      - name: Pull Vercel Environment Information
         run: |
           vercel pull --yes --environment=preview --token=${{ secrets.GET_HIRED }}
 
-      - name: Build Project Artifacts        
+      - name: Build Project Artifacts
         run: |
           vercel build --token=${{ secrets.GET_HIRED }}
 
-      - name: Deploy Project Artifacts to Vercel        
+      - name: Deploy Project Artifacts to Vercel
         run: |
           vercel deploy --prebuilt --token=${{ secrets.GET_HIRED }}
