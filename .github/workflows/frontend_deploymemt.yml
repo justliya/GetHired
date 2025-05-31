@@ -11,6 +11,7 @@ on:
     paths:
       - 'GetHired-typescript/**'
       - '!GetHired-typescript/jobsearch_agents/**'
+      - '.github/workflows/frontend_deploymemt.yml'
 
 jobs:
   build:
