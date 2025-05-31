@@ -9,8 +9,7 @@ on:
     branches:
       - main  
     paths:
-      - 'GetHired-typescript/src**'
-      - '!GetHired-typescript/jobsearch_agents/**'
+      - 'GetHired-typescript'
       - '.github/workflows/frontend_deploymemt.yml'
 
 jobs:
