@@ -28,12 +28,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd GetHired-typescript
           npm install
 
       - name: Build the project
         run: |
-          cd GetHired-typescript
           npm run build
 
       - name: Install Vercel CLI        
