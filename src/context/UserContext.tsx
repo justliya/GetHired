@@ -100,7 +100,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                   end: '08:00'
                 },
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-              }
+              },
+              skills: []
             }
           };
           await setDoc(ref, defaults);
@@ -128,7 +129,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           skills: Array.isArray(data.skills) ? data.skills : [],
           experience: Array.isArray(data.experience) ? data.experience : [],
           education: Array.isArray(data.education) ? data.education : [],          links: Array.isArray(data.links) ? data.links : [],
-          preferences: data.preferences || {
+          : data.preferences || {
             titles: [],
             locations: [],
             salaryRange: { min: 0, max: 200000 },
@@ -147,7 +148,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
                 end: '08:00'
               },
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-            }
+            },
+            skills: []
           },
           isAnonymous: false,
           providerData: [],
