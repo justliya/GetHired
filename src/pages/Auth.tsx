@@ -8,7 +8,6 @@ import {
   signInWithPopup,
   onAuthStateChanged,
   doc,
-  setDoc,
   getDoc,
 } from "../firebase";
 import { User as UserIcon, LogIn } from "lucide-react";
