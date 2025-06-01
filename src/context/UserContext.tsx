@@ -129,7 +129,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           skills: Array.isArray(data.skills) ? data.skills : [],
           experience: Array.isArray(data.experience) ? data.experience : [],
           education: Array.isArray(data.education) ? data.education : [],          links: Array.isArray(data.links) ? data.links : [],
-          : data.preferences || {
+          preferences: data.preferences || {
             titles: [],
             locations: [],
             salaryRange: { min: 0, max: 200000 },
