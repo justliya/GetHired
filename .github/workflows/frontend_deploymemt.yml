@@ -8,11 +8,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "GetHired-typescript/**"
-      - "!GetHired-typescript/jobsearch_agents/**"
-      - ".github/workflows/frontend_deploymemt.yml"
-
 jobs:
   Deploy-Production:
     runs-on: ubuntu-latest
