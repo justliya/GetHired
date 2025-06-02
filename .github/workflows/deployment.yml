@@ -28,8 +28,8 @@ jobs:
         id: cached-poetry
         uses: actions/cache@v4
         with:
-          path: ~/.local  # the path depends on the OS
-          key: poetry-0  # increment to reset cache
+          path: ~/.local
+          key: poetry-0
 
       - name: Install and configure Poetry
         uses: snok/install-poetry@v1
@@ -56,26 +56,40 @@ jobs:
           export_environment_variables: true
           cleanup_credentials: true
 
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+
       - name: Decode Firebase service account key
         run: |
           echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/jobsearch_agents/serviceAccountKey.json
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
+      - name: Debug directory structure
+        run: |
+          echo "Repository root:"
+          ls -la
+          echo -e "\njobsearch_agents directory:"
+          ls -la jobsearch_agents/
+          echo -e "\nLooking for agent.py:"
+          find . -name "agent.py" -type f
+          echo -e "\nLooking for __init__.py:"
+          find . -name "__init__.py" -type f
+
       - name: Deploy to Cloud Run
+        working-directory: jobsearch_agents
         env:
-          AGENT_PATH: './agent.py'
-          SERVICE_NAME: 'gethired-agents'
-          APP_NAME: 'jobsearch_agents'
-          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
           SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
         run: |
+          echo "Current directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+          
           $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
-            --region=$GOOGLE_CLOUD_LOCATION \
-            --service_name=$SERVICE_NAME \
-            --app_name=$APP_NAME \
-            --with_ui \
-            $AGENT_PATH
+            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
+            --service_name=gethired-agents \
+            --app_name=jobsearch_agents \
+            .
