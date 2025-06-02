@@ -59,29 +59,44 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Ensure __init__.py has correct import
+      - name: Debug agent structure
         run: |
-          echo "Ensuring jobsearch_agents/jobsearch_agents/__init__.py has correct import"
-          echo "from . import agent" > jobsearch_agents/jobsearch_agents/__init__.py
+          echo "=== Checking agent.py content ==="
+          echo "First 50 lines of agent.py:"
+          head -n 50 jobsearch_agents/jobsearch_agents/agent.py
+          echo ""
+          echo "=== Looking for root_agent definition ==="
+          grep -n "root_agent" jobsearch_agents/jobsearch_agents/agent.py || echo "NO root_agent FOUND!"
+          echo ""
+          echo "=== Checking if it might be named differently ==="
+          grep -n -E "(agent|Agent)\s*=" jobsearch_agents/jobsearch_agents/agent.py | head -10
+          echo ""
+          echo "=== Current __init__.py content ==="
+          cat jobsearch_agents/jobsearch_agents/__init__.py 2>/dev/null || echo "No __init__.py found"
+
+      - name: Ensure proper module setup
+        run: |
+          # Create __init__.py with proper imports
+          cat > jobsearch_agents/jobsearch_agents/__init__.py << 'EOF'
+          from . import agent
           
-          echo "Verifying file structure:"
-          echo "Contents of jobsearch_agents/:"
-          ls -la jobsearch_agents/
-          echo "Contents of jobsearch_agents/jobsearch_agents/:"
-          ls -la jobsearch_agents/jobsearch_agents/
-          echo "Checking root_agent in agent.py:"
-          grep -n "root_agent" jobsearch_agents/jobsearch_agents/agent.py || echo "WARNING: No root_agent found"
+          # If root_agent is defined in agent.py, expose it at module level
+          from .agent import root_agent
+          EOF
+          
+          echo "Updated __init__.py content:"
+          cat jobsearch_agents/jobsearch_agents/__init__.py
 
       - name: Deploy to Cloud Run  
+        working-directory: jobsearch_agents
         env:
           FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
           SERVICE_ACCOUNT_KEY_PATH: jobsearch_agents/serviceAccountKey.json
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
           AGENT_PATH: ./jobsearch_agents
           SERVICE_NAME: gethired-agents
-          APP_NAME: agents
+          APP_NAME: jobsearch_agents
         run: |
-          cd jobsearch_agents
           echo "Current directory: $(pwd)"
           echo "AGENT_PATH: $AGENT_PATH"
           
@@ -90,5 +105,4 @@ jobs:
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
-            --with_ui \
             $AGENT_PATH
