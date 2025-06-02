@@ -66,7 +66,7 @@ jobs:
         working-directory: jobsearch_agents
         env:
           SERVICE_NAME: 'gethired-agents'
-          APP_NAME: 'gethired'
+          APP_NAME: 'jobsearch_agents'  # Changed this to match your module name
           GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
           SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
