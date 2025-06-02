@@ -65,16 +65,16 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Debug directory structure
+      - name: Check jobsearch_agents/__init__.py
+        working-directory: jobsearch_agents
         run: |
-          echo "Repository root:"
-          ls -la
-          echo -e "\njobsearch_agents directory:"
-          ls -la jobsearch_agents/
-          echo -e "\nLooking for agent.py:"
-          find . -name "agent.py" -type f
-          echo -e "\nLooking for __init__.py:"
-          find . -name "__init__.py" -type f
+          echo "Checking if jobsearch_agents/__init__.py exists and has correct import:"
+          if [ -f "jobsearch_agents/__init__.py" ]; then
+            cat jobsearch_agents/__init__.py
+          else
+            echo "Creating jobsearch_agents/__init__.py with correct import"
+            echo "from . import agent" > jobsearch_agents/__init__.py
+          fi
 
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
@@ -84,12 +84,12 @@ jobs:
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
         run: |
           echo "Current directory: $(pwd)"
-          echo "Directory contents:"
-          ls -la
+          echo "Contents of jobsearch_agents subdirectory:"
+          ls -la jobsearch_agents/
           
           $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --service_name=gethired-agents \
             --app_name=jobsearch_agents \
-            .
+            jobsearch_agents
