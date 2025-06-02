@@ -70,7 +70,6 @@ jobs:
           GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
           SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
-          GOOGLE_GENAI_USE_VERTEXAI: 'True'
         run: |
           $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
@@ -83,11 +82,10 @@ jobs:
       - name: Update Service
         env:
           SERVICE_NAME: 'gethired-agents'
-          GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          STAGING_BUCKET: '${{ env.SERVICE_NAME }}-staging'
+          STAGING_BUCKET: 'gethired-staging'
         run: |
           gcloud run services update $SERVICE_NAME \
-            --project=$GOOGLE_CLOUD_PROJECT \
+            --project=$GCP_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
-            --update-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET"
+            --update-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$GCP_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET"
