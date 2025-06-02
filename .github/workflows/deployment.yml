@@ -92,4 +92,6 @@ jobs:
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --service_name=gethired-agents \
             --app_name=jobsearch_agents \
+            --app_name=$APP_NAME \
+            --with_ui \ 
             jobsearch_agents
