@@ -63,20 +63,18 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
       - name: Deploy to Cloud Run
-        working-directory: jobsearch_agents
         env:
+          AGENT_PATH: './jobsearch_agents'
           SERVICE_NAME: 'gethired-agents'
-          APP_NAME: 'jobsearch_agents'  # Changed this to match your module name
+          APP_NAME: 'jobsearch_agents'
           GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
           SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
         run: |
-          yes y | $ADK_CMD deploy cloud_run \
+          $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
-            --trace_to_cloud \
-            --verbosity=error \
-            jobsearch_agents
+            $AGENT_PATH
