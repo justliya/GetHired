@@ -72,22 +72,9 @@ jobs:
           SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
         run: |
-          $ADK_CMD adk deploy cloud_run \
+          $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
-            --trace_to_cloud \
-            --verbosity=error \
-            $AGENT_PATH      
-      - name: Update Service
-        env:
-          SERVICE_NAME: 'gethired-agents'
-          GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          STAGING_BUCKET: '${{ env.SERVICE_NAME }}-staging'
-        run: |
-          gcloud run services update $SERVICE_NAME \
-            --project=$GOOGLE_CLOUD_PROJECT \
-            --region=$GOOGLE_CLOUD_LOCATION \
-            --update-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET"
+            $AGENT_PATH
