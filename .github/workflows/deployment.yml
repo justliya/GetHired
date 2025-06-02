@@ -64,7 +64,7 @@ jobs:
 
       - name: Deploy to Cloud Run
         env:
-          AGENT_PATH: 'jobsearch_agents/agent.py'
+          AGENT_PATH: './agent.py'
           SERVICE_NAME: 'gethired-agents'
           APP_NAME: 'jobsearch_agents'
           GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
