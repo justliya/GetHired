@@ -79,19 +79,24 @@ jobs:
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
-          FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
-          SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
+          FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+          SERVICE_ACCOUNT_KEY_PATH: jobsearch_agents/serviceAccountKey.json
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
+          AGENT_PATH: ./jobsearch_agents
+          SERVICE_NAME: gethired-agents
+          APP_NAME: jobsearch_agents
         run: |
           echo "Current directory: $(pwd)"
-          echo "Contents of jobsearch_agents subdirectory:"
-          ls -la jobsearch_agents/
+          echo "AGENT_PATH: $AGENT_PATH"
+          echo "Contents of current directory:"
+          ls -la
+          echo "Contents of agent directory:"
+          ls -la $AGENT_PATH/
           
-          $ADK_CMD deploy cloud_run \
+          poetry run adk deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
-            --service_name=gethired-agents \
-            --app_name=jobsearch_agents \
+            --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
-            --with_ui \ 
-            jobsearch_agents
+            --with_ui \
+            $AGENT_PATH
