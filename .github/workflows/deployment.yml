@@ -79,4 +79,15 @@ jobs:
             --app_name=$APP_NAME \
             --trace_to_cloud \
             --verbosity=error \
-            $AGENT_PATH
+            $AGENT_PATH      
+      - name: Update Service
+        env:
+          SERVICE_NAME: 'gethired-agents'
+          GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          STAGING_BUCKET: '${{ env.SERVICE_NAME }}-staging'
+        run: |
+          gcloud run services update $SERVICE_NAME \
+            --project=$GOOGLE_CLOUD_PROJECT \
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --update-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET"
