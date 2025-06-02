@@ -28,8 +28,8 @@ jobs:
         id: cached-poetry
         uses: actions/cache@v4
         with:
-          path: ~/.local
-          key: poetry-0
+          path: ~/.local  # the path depends on the OS
+          key: poetry-0  # increment to reset cache
 
       - name: Install and configure Poetry
         uses: snok/install-poetry@v1
@@ -56,29 +56,27 @@ jobs:
           export_environment_variables: true
           cleanup_credentials: true
 
-      - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v2'
-
       - name: Decode Firebase service account key
         run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/jobsearch_agents/serviceAccountKey.json
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/serviceAccountKey.json
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
-          FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
+          AGENT_PATH: 'jobsearch_agents'
+          SERVICE_NAME: 'gethired-agents'
+          APP_NAME: 'gethired'
+          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
           SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
-          GOOGLE_GENAI_USE_VERTEXAI: 'True'
         run: |
-          echo "Deploying from directory: $(pwd)"
-          echo "Agent directory contents:"
-          ls -la jobsearch_agents/
-          
-          $ADK_CMD deploy cloud_run \
+          yes y | $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
-            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
-            --service_name=gethired-agents \
-            --app_name=jobsearch_agents \
-            jobsearch_agents
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --service_name=$SERVICE_NAME \
+            --app_name=$APP_NAME \
+            --trace_to_cloud \
+            --verbosity=error \
+            $AGENT_PATH
