@@ -42,12 +42,6 @@ jobs:
         working-directory: jobsearch_agents
         run: |
           poetry install --no-interaction --no-ansi --no-root
-          ADK_PATH=$(poetry run which adk)
-          if [ -z "$ADK_PATH" ]; then
-            echo "Error: ADK command not found in PATH"
-            exit 1
-          fi
-          echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
 
       - id: 'auth'
         uses: 'google-github-actions/auth@v2'
@@ -65,38 +59,32 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Check jobsearch_agents/__init__.py
-        working-directory: jobsearch_agents
+      - name: Ensure __init__.py has correct import
         run: |
-          echo "Checking if jobsearch_agents/__init__.py exists and has correct import:"
-          if [ -f "jobsearch_agents/__init__.py" ]; then
-            cat jobsearch_agents/__init__.py
-          else
-            echo "Creating jobsearch_agents/__init__.py with correct import"
-            echo "from . import agent" > jobsearch_agents/__init__.py
-          fi
+          echo "Ensuring jobsearch_agents/jobsearch_agents/__init__.py has correct import"
+          echo "from . import agent" > jobsearch_agents/jobsearch_agents/__init__.py
 
       - name: Deploy to Cloud Run
-        working-directory: jobsearch_agents
+        working-directory: jobsearch_agents/jobsearch_agents
         env:
           FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
-          SERVICE_ACCOUNT_KEY_PATH: jobsearch_agents/serviceAccountKey.json
+          SERVICE_ACCOUNT_KEY_PATH: serviceAccountKey.json
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
-          AGENT_PATH: ./jobsearch_agents
+          AGENT_PATH: jobsearch_agents/jobsearch_agents
           SERVICE_NAME: gethired-agents
           APP_NAME: jobsearch_agents
         run: |
           echo "Current directory: $(pwd)"
-          echo "AGENT_PATH: $AGENT_PATH"
-          echo "Contents of current directory:"
+          echo "Contents:"
           ls -la
-          echo "Contents of agent directory:"
-          ls -la $AGENT_PATH/
+          echo "Checking agent.py:"
+          grep -n "root_agent" agent.py || echo "No root_agent found in agent.py"
           
-          poetry run adk deploy cloud_run \
+          cd ../..
+          echo "AGENT_PATH: $AGENT_PATH"
+          echo "y" | jobsearch_agents/.venv/bin/adk deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
-            --with_ui \
             $AGENT_PATH
