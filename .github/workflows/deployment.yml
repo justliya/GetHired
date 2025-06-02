@@ -63,26 +63,29 @@ jobs:
         run: |
           echo "Ensuring jobsearch_agents/jobsearch_agents/__init__.py has correct import"
           echo "from . import agent" > jobsearch_agents/jobsearch_agents/__init__.py
+          
+          echo "Verifying file structure:"
+          echo "Contents of jobsearch_agents/:"
+          ls -la jobsearch_agents/
+          echo "Contents of jobsearch_agents/jobsearch_agents/:"
+          ls -la jobsearch_agents/jobsearch_agents/
+          echo "Checking root_agent in agent.py:"
+          grep -n "root_agent" jobsearch_agents/jobsearch_agents/agent.py || echo "WARNING: No root_agent found"
 
-      - name: Deploy to Cloud Run
-        working-directory: jobsearch_agents/jobsearch_agents
+      - name: Deploy to Cloud Run  
         env:
           FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
-          SERVICE_ACCOUNT_KEY_PATH: serviceAccountKey.json
+          SERVICE_ACCOUNT_KEY_PATH: jobsearch_agents/serviceAccountKey.json
           GOOGLE_GENAI_USE_VERTEXAI: 'True'
-          AGENT_PATH: jobsearch_agents/jobsearch_agents
+          AGENT_PATH: ./jobsearch_agents
           SERVICE_NAME: gethired-agents
-          APP_NAME: jobsearch_agents
+          APP_NAME: agents
         run: |
+          cd jobsearch_agents
           echo "Current directory: $(pwd)"
-          echo "Contents:"
-          ls -la
-          echo "Checking agent.py:"
-          grep -n "root_agent" agent.py || echo "No root_agent found in agent.py"
-          
-          cd ../..
           echo "AGENT_PATH: $AGENT_PATH"
-          echo "y" | jobsearch_agents/.venv/bin/adk deploy cloud_run \
+          
+          echo "y" | poetry run adk deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --service_name=$SERVICE_NAME \
