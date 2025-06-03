@@ -59,10 +59,21 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Fix __init__.py to expose root_agent
+      - name: Create .env file for agent
+        working-directory: jobsearch_agents
         run: |
-          echo "Updating __init__.py to expose root_agent..."
-          cat > jobsearch_agents/jobsearch_agents/__init__.py << 'EOF'
+          cat > .env << EOF
+          SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
+          FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
+          GOOGLE_GENAI_USE_VERTEXAI=True
+          EOF
+          
+          echo "Created .env file"
+
+      - name: Fix __init__.py and test import
+        working-directory: jobsearch_agents
+        run: |
+          cat > jobsearch_agents/__init__.py << 'EOF'
           """
           Job Search Automation Agent package.
           """
@@ -72,8 +83,23 @@ jobs:
           __all__ = ['agent', 'root_agent']
           EOF
           
-          echo "Updated __init__.py content:"
-          cat jobsearch_agents/jobsearch_agents/__init__.py
+          echo "Testing if module can be imported..."
+          poetry run python -c "
+          import sys
+          import os
+          sys.path.insert(0, '.')
+          try:
+              import jobsearch_agents
+              print('Successfully imported jobsearch_agents')
+              print('Available attributes:', dir(jobsearch_agents))
+              print('Has root_agent?', hasattr(jobsearch_agents, 'root_agent'))
+              if hasattr(jobsearch_agents, 'root_agent'):
+                  print('root_agent type:', type(jobsearch_agents.root_agent))
+          except Exception as e:
+              print(f'Failed to import: {e}')
+              import traceback
+              traceback.print_exc()
+          "
 
       - name: Deploy to Cloud Run  
         working-directory: jobsearch_agents
