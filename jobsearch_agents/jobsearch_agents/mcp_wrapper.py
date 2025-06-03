@@ -1,8 +1,7 @@
 import os
 import asyncio
 import subprocess
-import time
-from typing import Optional, List, Union
+from typing import Optional, List
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, MCPTool
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams, StdioServerParameters
 import logging
@@ -82,7 +81,7 @@ class CloudRunMCPWrapper:
         
         # Create the toolset with the correct parameter name
         kwargs = {
-            "connection_params": server_params,  # Note: using connection_params
+            "connection_params": server_params,  # Use StreamableHTTPServerParams or StdioServerParameters
             
         }
         

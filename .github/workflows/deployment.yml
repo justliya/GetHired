@@ -115,9 +115,28 @@ jobs:
           # Create main.py for FastAPI
           cat > main.py << 'EOF'
           import os
+          import sys
           import uvicorn
+          import logging
+          import signal
           from google.adk.cli.fast_api import get_fast_api_app
+          from jobsearch_agents.mcp_wrapper import mcp_wrapper
           
+
+          logging.basicConfig(
+              level=logging.INFO,
+              format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+          )
+          logger = logging.getLogger(__name__)
+          
+          # Signal handler for graceful shutdown
+          def signal_handler(sig, frame):
+              logger.info("Shutting down gracefully...")
+              mcp_wrapper.cleanup()
+              sys.exit(0)
+          
+          signal.signal(signal.SIGINT, signal_handler)
+          signal.signal(signal.SIGTERM, signal_handler)
           # Get the directory where main.py is located
           AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
           # Example session DB URL (e.g., SQLite)
@@ -135,16 +154,49 @@ jobs:
               web=SERVE_WEB_INTERFACE,
           )
           
+          @app.on_event("shutdown")
+          async def shutdown_event():
+              """Clean up MCP servers on shutdown."""
+              mcp_wrapper.cleanup()
+
           # Health check endpoint
           @app.get("/health")
           async def health_check():
               return {"status": "healthy"}
           
+          # Debug endpoint
+          @app.get("/debug")
+
+          async def debug_info():
+              return {
+                  "agent_dir": AGENT_DIR,
+                  "cwd": os.getcwd(),
+                  "files": os.listdir(AGENT_DIR),
+                  "env_vars": {
+                      "K_SERVICE": os.environ.get("K_SERVICE", "Not in Cloud Run"),
+                      "GOOGLE_CLOUD_PROJECT": os.environ.get("GOOGLE_CLOUD_PROJECT"),
+                      "SERVICE_ACCOUNT_KEY_PATH": os.environ.get("SERVICE_ACCOUNT_KEY_PATH"),
+                      "FIREBASE_STORAGE_BUCKET": os.environ.get("FIREBASE_STORAGE_BUCKET"),
+                  }
+              }
+          
           if __name__ == "__main__":
               # Use the PORT environment variable provided by Cloud Run, defaulting to 8080
-              uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+              port = int(os.environ.get("PORT", 8080))
+              logger.info(f"Starting server on port {port}")
+              uvicorn.run(app, host="0.0.0.0", port=port)
           EOF
           
+
+                    
+          # Create start.sh
+          cat > start.sh << 'EOF'
+          #!/bin/bash
+          exec uvicorn main:app --host 0.0.0.0 --port $PORT
+          EOF
+          chmod +x start.sh
+
+
           # Create Dockerfile with Node.js installed
           cat > Dockerfile << 'EOF'
           FROM python:3.11-slim
@@ -173,7 +225,7 @@ jobs:
           
           ENV PATH="/home/myuser/.local/bin:$PATH"
           
-          CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
+          CMD ["./start.sh"]
           EOF
           
           # Create .gcloudignore
@@ -196,6 +248,7 @@ jobs:
           EOF
           
           echo "Deployment package created"
+          
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
