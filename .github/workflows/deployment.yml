@@ -1,9 +1,9 @@
-name: Deploy ADK Agents to Cloud Run
+name: Debug and Deploy ADK Agents to Cloud Run
 
 on:
   push:
     branches:
-      - main
+      - agent-interaction
     paths:
       - 'jobsearch_agents/**'
       - '.github/workflows/deployment.yml'
@@ -28,8 +28,8 @@ jobs:
         id: cached-poetry
         uses: actions/cache@v4
         with:
-          path: ~/.local  # the path depends on the OS
-          key: poetry-0  # increment to reset cache
+          path: ~/.local
+          key: poetry-0
 
       - name: Install and configure Poetry
         uses: snok/install-poetry@v1
@@ -38,16 +38,95 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
+      - name: Debug - Show full project structure
+        run: |
+          echo "=== Full project structure ==="
+          find . -type f -name "*.py" | grep -v __pycache__ | sort
+          echo ""
+          echo "=== Directory tree ==="
+          ls -la jobsearch_agents/
+          echo ""
+          echo "=== Sub-agents directory ==="
+          ls -la jobsearch_agents/sub_agents/ || echo "No sub_agents directory"
+          echo ""
+          echo "=== Tools directory ==="
+          ls -la jobsearch_agents/tools/ || echo "No tools directory"
+
       - name: Install dependencies
         working-directory: jobsearch_agents
         run: |
+          echo "=== Installing dependencies ==="
           poetry install --no-interaction --no-ansi --no-root
+          
+          echo "=== Verifying ADK installation ==="
           ADK_PATH=$(poetry run which adk)
           if [ -z "$ADK_PATH" ]; then
             echo "Error: ADK command not found in PATH"
+            poetry run pip list | grep -i adk
             exit 1
           fi
+          echo "ADK found at: $ADK_PATH"
           echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
+
+      - name: Debug - Check for root_agent
+        working-directory: jobsearch_agents
+        run: |
+          echo "=== Searching for root_agent ==="
+          grep -r "root_agent" . --include="*.py" | head -20 || echo "No root_agent found in Python files"
+          
+          echo ""
+          echo "=== Checking agent.py content ==="
+          if [ -f "agent.py" ]; then
+            echo "First 50 lines of agent.py:"
+            head -50 agent.py
+          fi
+          
+          echo ""
+          echo "=== Checking __init__.py content ==="
+          if [ -f "__init__.py" ]; then
+            echo "Content of __init__.py:"
+            cat __init__.py
+          fi
+          
+          echo ""
+          echo "=== Checking for Agent class ==="
+          grep -r "class.*Agent" . --include="*.py" | head -10 || echo "No Agent class found"
+
+      - name: Debug - Python import test
+        working-directory: jobsearch_agents
+        run: |
+          echo "=== Testing Python imports ==="
+          poetry run python -c "
+import sys
+print('Python path:', sys.path)
+print()
+
+try:
+    import jobsearch_agents
+    print('✓ jobsearch_agents imported successfully')
+    print('Dir:', dir(jobsearch_agents))
+except Exception as e:
+    print('✗ Failed to import jobsearch_agents:', e)
+
+try:
+    from jobsearch_agents import root_agent
+    print('✓ root_agent imported from jobsearch_agents')
+except Exception as e:
+    print('✗ Failed to import root_agent from jobsearch_agents:', e)
+
+try:
+    from jobsearch_agents.agent import root_agent
+    print('✓ root_agent imported from jobsearch_agents.agent')
+except Exception as e:
+    print('✗ Failed to import root_agent from jobsearch_agents.agent:', e)
+
+try:
+    import agent
+    print('✓ agent module imported')
+    print('Dir:', dir(agent))
+except Exception as e:
+    print('✗ Failed to import agent:', e)
+"
 
       - id: 'auth'
         uses: 'google-github-actions/auth@v2'
@@ -56,28 +135,120 @@ jobs:
           export_environment_variables: true
           cleanup_credentials: true
 
+      - name: Debug - Environment variables
+        run: |
+          echo "=== Environment Variables ==="
+          echo "GOOGLE_CLOUD_PROJECT: $GOOGLE_CLOUD_PROJECT"
+          echo "GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION }}"
+          echo "FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}"
+          echo ""
+          echo "=== Checking .env file ==="
+          if [ -f "jobsearch_agents/.env" ]; then
+            echo ".env file exists"
+            grep -E "^[^#]" jobsearch_agents/.env | sed 's/=.*/=***/' || echo "Empty .env file"
+          else
+            echo ".env file not found"
+          fi
+
       - name: Decode Firebase service account key
         run: |
           echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/serviceAccountKey.json
+          echo "Service account key created, size: $(wc -c < jobsearch_agents/serviceAccountKey.json) bytes"
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Deploy to Cloud Run
+      - name: Debug - ADK expectations
+        working-directory: jobsearch_agents
+        run: |
+          echo "=== Testing different app_name configurations ==="
+          
+          # Test 1: Using jobsearch_agents as app_name
+          echo "Test 1: app_name=jobsearch_agents"
+          poetry run python -c "
+try:
+    import jobsearch_agents
+    if hasattr(jobsearch_agents, 'root_agent'):
+        print('✓ root_agent found in jobsearch_agents module')
+    else:
+        print('✗ root_agent not found as attribute in jobsearch_agents')
+except Exception as e:
+    print('✗ Error:', e)
+"
+          
+          # Test 2: Create gethired symlink
+          echo ""
+          echo "Test 2: Creating gethired symlink"
+          ln -sf . gethired || echo "Failed to create symlink"
+          
+          poetry run python -c "
+try:
+    import gethired
+    print('✓ gethired module can be imported')
+    if hasattr(gethired, 'root_agent'):
+        print('✓ root_agent found in gethired module')
+    else:
+        print('✗ root_agent not found in gethired module')
+except Exception as e:
+    print('✗ Error importing gethired:', e)
+"
+
+      - name: Create deployment structure
+        working-directory: jobsearch_agents
+        run: |
+          echo "=== Creating expected structure ==="
+          
+          # If agent.py contains root_agent, expose it in __init__.py
+          if grep -q "root_agent" agent.py; then
+            echo "Found root_agent in agent.py, updating __init__.py"
+            echo "from .agent import root_agent" >> __init__.py
+            echo "__all__ = ['root_agent']" >> __init__.py
+          fi
+          
+          # Show final __init__.py
+          echo ""
+          echo "=== Final __init__.py content ==="
+          cat __init__.py
+
+      - name: Deploy to Cloud Run (with verbose output)
         working-directory: jobsearch_agents
         env:
-          AGENT_PATH: 'jobsearch_agents'
+          AGENT_PATH: '.'
           SERVICE_NAME: 'gethired-agents'
-          APP_NAME: 'gethired'
+          APP_NAME: 'jobsearch_agents'  # Changed to match your package name
           GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
-          SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
+          SERVICE_ACCOUNT_KEY_PATH: 'serviceAccountKey.json'
         run: |
+          echo "=== Deployment Configuration ==="
+          echo "AGENT_PATH: $AGENT_PATH"
+          echo "SERVICE_NAME: $SERVICE_NAME" 
+          echo "APP_NAME: $APP_NAME"
+          echo "PROJECT: $GOOGLE_CLOUD_PROJECT"
+          echo "REGION: $GOOGLE_CLOUD_LOCATION"
+          
+          echo ""
+          echo "=== Running ADK deploy ==="
           yes y | $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
             --trace_to_cloud \
-            --verbosity=error \
+            --verbosity=debug \
             --with_ui \
-            $AGENT_PATH
+            $AGENT_PATH || {
+              echo "=== Deployment failed, trying alternative configurations ==="
+              
+              # Try with gethired as app_name
+              echo "Trying with app_name=gethired"
+              ln -sf . gethired
+              yes y | $ADK_CMD deploy cloud_run \
+                --project=$GOOGLE_CLOUD_PROJECT \
+                --region=$GOOGLE_CLOUD_LOCATION \
+                --service_name=$SERVICE_NAME \
+                --app_name=gethired \
+                --trace_to_cloud \
+                --verbosity=debug \
+                --with_ui \
+                $AGENT_PATH
+            }
