@@ -19,8 +19,7 @@ from . import prompt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BASEDIR = os.path.abspath(os.path.dirname(__file__))
-load_dotenv(os.path.join(BASEDIR, "../.env"))
+load_dotenv(".env")
 
 service_path = os.environ.get("SERVICE_ACCOUNT_KEY_PATH")
 storage = os.environ.get("FIREBASE_STORAGE_BUCKET")
