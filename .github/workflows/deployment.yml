@@ -67,6 +67,7 @@ jobs:
           SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
+          GOOGLE_CLOUD_LOCATION= us-central1
           GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
           EOF
           
@@ -75,6 +76,7 @@ jobs:
           SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
+          GOOGLE_CLOUD_LOCATION= us-central1
           GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
           EOF
 
