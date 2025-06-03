@@ -1,6 +1,5 @@
 """
 Job Search Optimization Agent
-
 """
 
 import os
