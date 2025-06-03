@@ -64,7 +64,7 @@ jobs:
         run: |
           # Create .env in the inner jobsearch_agents directory
           cat > jobsearch_agents/.env << EOF
-          SERVICE_ACCOUNT_KEY_PATH=serviceAccountKey.json
+          SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
           GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
