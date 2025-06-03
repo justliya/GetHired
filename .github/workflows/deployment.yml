@@ -59,43 +59,9 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Check available imports and fix sub-agents
+      - name: Fix sub-agent imports
         working-directory: jobsearch_agents
         run: |
-          echo "Checking what's available in ADK modules..."
-          poetry run python -c "
-          print('=== Checking mcp_toolset ===')
-          try:
-              from google.adk.tools.mcp_tool import mcp_toolset
-              for attr in dir(mcp_toolset):
-                  if not attr.startswith('_'):
-                      print(f'  - {attr}')
-          except Exception as e:
-              print(f'Error: {e}')
-              
-          print('\n=== Checking mcp_session_manager ===')
-          try:
-              from google.adk.tools.mcp_tool import mcp_session_manager
-              for attr in dir(mcp_session_manager):
-                  if not attr.startswith('_') and 'Param' in attr:
-                      print(f'  - {attr}')
-          except Exception as e:
-              print(f'Error: {e}')
-              
-          print('\n=== Checking what is imported in mcp_toolset ===')
-          try:
-              import inspect
-              from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-              # Get the module that MCPToolset is from
-              module = inspect.getmodule(MCPToolset)
-              # Check __all__ if it exists
-              if hasattr(module, '__all__'):
-                  print('Exported names:', module.__all__)
-          except Exception as e:
-              print(f'Error: {e}')
-          "
-          
-          echo -e "\nCreating import fix file..."
           cat > fix_imports.py << 'EOF'
           import os
           import re
@@ -134,30 +100,24 @@ jobs:
           
           poetry run python fix_imports.py
 
-      - name: Create .env file for agent
+      - name: Create .env files
         working-directory: jobsearch_agents
         run: |
-  
-          cat > .env << EOF
-          SERVICE_ACCOUNT_KEY_PATH=/app/agents/jobsearch_agents/jobsearch_agents/serviceAccountKey.json
-          FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
-          GOOGLE_GENAI_USE_VERTEXAI=True
-          GOOGLE_CLOUD_PROJECT=${{ vars.GOOGLE_CLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT }}
-          EOF
-    
-          # Also create a local .env for testing
+          # Create .env in the inner jobsearch_agents directory
           cat > jobsearch_agents/.env << EOF
           SERVICE_ACCOUNT_KEY_PATH=serviceAccountKey.json
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
-          GOOGLE_CLOUD_PROJECT=${{ vars.GOOGLE_CLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
           EOF
-    
-          echo "=== Created .env files ==="
-          echo "--- Root .env ---"
-          cat .env
-          echo -e "\n--- Package .env ---"
-          cat jobsearch_agents/.env
+          
+          # Also create one at the root level
+          cat > .env << EOF
+          SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
+          FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
+          GOOGLE_GENAI_USE_VERTEXAI=True
+          GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
+          EOF
 
       - name: Fix __init__.py and ensure root_agent export
         working-directory: jobsearch_agents
@@ -179,97 +139,110 @@ jobs:
               echo "Adding root_agent export to agent.py..."
               echo -e "\n# Export root_agent for ADK\nroot_agent = agent" >> jobsearch_agents/agent.py
           fi
+
+      - name: Create deployment package
+        working-directory: jobsearch_agents
+        run: |
+          # Export requirements from poetry
+          poetry export -f requirements.txt --output requirements.txt --without-hashes
           
-          # Create a simple test to verify structure
-          cat > test_structure.py << 'EOF'
-          import sys
-          import os
+          # Create custom Dockerfile
+          cat > Dockerfile << 'EOF'
+          FROM python:3.11-slim
           
-          print("=== Current working directory ===")
-          print(os.getcwd())
+          WORKDIR /app
           
-          print("\n=== Python path ===")
-          for p in sys.path[:5]:
-              print(f"  - {p}")
+          # Install system dependencies
+          RUN apt-get update && apt-get install -y \
+              git \
+              build-essential \
+              && rm -rf /var/lib/apt/lists/*
           
-          print("\n=== Directory structure ===")
-          for root, dirs, files in os.walk('.'):
-              level = root.replace('.', '', 1).count(os.sep)
-              indent = ' ' * 2 * level
-              print(f'{indent}{os.path.basename(root)}/')
-              subindent = ' ' * 2 * (level + 1)
-              for file in files:
-                  if file.endswith(('.py', '.toml', '.env')):
-                      print(f'{subindent}{file}')
-              if level > 2:  # Limit depth
-                  dirs.clear()
+          # Upgrade pip
+          RUN pip install --upgrade pip
           
-          print("\n=== Testing import ===")
-          sys.path.insert(0, '.')
-          try:
-              import jobsearch_agents
-              print('✓ Successfully imported jobsearch_agents')
-              print(f'  Module location: {jobsearch_agents.__file__}')
-              print(f'  Has root_agent? {hasattr(jobsearch_agents, "root_agent")}')
-              if hasattr(jobsearch_agents, 'root_agent'):
-                  print(f'  root_agent type: {type(jobsearch_agents.root_agent)}')
-              
-              # Check if we can import agent directly
-              from jobsearch_agents import agent
-              print('✓ Successfully imported agent module')
-              print(f'  Has root_agent? {hasattr(agent, "root_agent")}')
-              
-              # List all attributes in agent module
-              print('\n  Agent module attributes:')
-              for attr in dir(agent):
-                  if not attr.startswith('_'):
-                      print(f'    - {attr}')
-                      
-          except Exception as e:
-              print(f'✗ Failed to import: {e}')
-              import traceback
-              traceback.print_exc()
+          # Copy requirements first for better caching
+          COPY requirements.txt /app/
+          RUN pip install -r requirements.txt
+          
+          # Install ADK with correct git+ prefix
+          RUN pip install git+https://github.com/google/adk-python.git
+          
+          # Copy the agent code
+          COPY . /app/agents/
+          
+          # Create the expected directory structure
+          RUN mkdir -p /app/agents/jobsearch_agents
+          
+          # Set up the environment
+          ENV PYTHONPATH=/app/agents:/app/agents/jobsearch_agents:$PYTHONPATH
+          ENV PORT=8080
+          ENV APP_NAME=jobsearch_agents
+          
+          # Change to the directory where the agent code lives
+          WORKDIR /app/agents/jobsearch_agents
+          
+          # Create a startup script that ensures we're in the right directory
+          RUN echo '#!/bin/bash\n\
+          cd /app/agents/jobsearch_agents\n\
+          echo "Current directory: $(pwd)"\n\
+          echo "Files in current directory:"\n\
+          ls -la\n\
+          echo "Python path: $PYTHONPATH"\n\
+          python -m google.adk.server.deployed_agent_server' > /app/start.sh && \
+          chmod +x /app/start.sh
+          
+          # Run the ADK server
+          CMD ["/app/start.sh"]
           EOF
           
-          echo "Running structure test..."
-          poetry run python test_structure.py
+          # Create .gcloudignore to exclude unnecessary files
+          cat > .gcloudignore << 'EOF'
+          .gcloudignore
+          .git
+          .gitignore
+          .venv/
+          __pycache__/
+          *.pyc
+          *.pyo
+          *.pyd
+          .Python
+          *.so
+          .coverage
+          .pytest_cache
+          .mypy_cache
+          .tox
+          .nox
+          poetry.lock
+          pyproject.toml
+          EOF
+          
+          echo "Deployment package created"
 
-      - name: Debug structure before deployment
-        working-directory: jobsearch_agents
-        run: |
-          echo "=== Final directory structure ==="
-          find . -type f $$ -name "*.py" -o -name "*.toml" -o -name ".env" $$ | grep -v __pycache__ | sort
-          
-          echo -e "\n=== Content of __init__.py files ==="
-          find . -name "__init__.py" -type f | while read f; do
-              echo -e "\n--- $f ---"
-              cat "$f" | head -10
-          done
-          
-          echo -e "\n=== Checking agent.py exports ==="
-          echo "--- Last 20 lines of jobsearch_agents/agent.py ---"
-          tail -20 jobsearch_agents/agent.py
-          
-          echo -e "\n=== Environment variables ==="
-          cat .env
-
-      - name: Deploy to Cloud Run  
+      - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
-          FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
-          SERVICE_ACCOUNT_KEY_PATH: jobsearch_agents/serviceAccountKey.json
-          GOOGLE_GENAI_USE_VERTEXAI: 'True'
-          AGENT_PATH: ./jobsearch_agents
           SERVICE_NAME: gethired-agents
-          APP_NAME: jobsearch_agents
         run: |
-          echo "Current directory: $(pwd)"
-          echo "AGENT_PATH: $AGENT_PATH"
-          
-          echo "y" | poetry run adk deploy cloud_run \
-            --project=$GOOGLE_CLOUD_PROJECT \
+          # Deploy using gcloud run deploy with our custom Dockerfile
+          gcloud run deploy $SERVICE_NAME \
+            --source . \
+            --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
-            --service_name=$SERVICE_NAME \
-            --app_name=$APP_NAME \
-            --with_ui \
-            $AGENT_PATH
+            --platform=managed \
+            --allow-unauthenticated \
+            --set-env-vars="FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},GOOGLE_GENAI_USE_VERTEXAI=True,GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }},APP_NAME=jobsearch_agents" \
+            --memory=2Gi \
+            --timeout=3600 \
+            --max-instances=10
+
+      - name: Display service URL
+        env:
+          SERVICE_NAME: gethired-agents
+        run: |
+          SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
+            --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
+            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
+            --format='value(status.url)')
+          echo "Service deployed at: $SERVICE_URL"
+          echo "You can test the agent at: $SERVICE_URL/ui"
