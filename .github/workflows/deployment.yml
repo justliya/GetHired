@@ -59,6 +59,81 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
+      - name: Check available imports and fix sub-agents
+        working-directory: jobsearch_agents
+        run: |
+          echo "Checking what's available in ADK modules..."
+          poetry run python -c "
+          print('=== Checking mcp_toolset ===')
+          try:
+              from google.adk.tools.mcp_tool import mcp_toolset
+              for attr in dir(mcp_toolset):
+                  if not attr.startswith('_'):
+                      print(f'  - {attr}')
+          except Exception as e:
+              print(f'Error: {e}')
+              
+          print('\n=== Checking mcp_session_manager ===')
+          try:
+              from google.adk.tools.mcp_tool import mcp_session_manager
+              for attr in dir(mcp_session_manager):
+                  if not attr.startswith('_') and 'Param' in attr:
+                      print(f'  - {attr}')
+          except Exception as e:
+              print(f'Error: {e}')
+              
+          print('\n=== Checking what is imported in mcp_toolset ===')
+          try:
+              import inspect
+              from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+              # Get the module that MCPToolset is from
+              module = inspect.getmodule(MCPToolset)
+              # Check __all__ if it exists
+              if hasattr(module, '__all__'):
+                  print('Exported names:', module.__all__)
+          except Exception as e:
+              print(f'Error: {e}')
+          "
+          
+          echo -e "\nCreating import fix file..."
+          cat > fix_imports.py << 'EOF'
+          import os
+          import re
+          
+          # Read the main agent.py to see what import pattern is used
+          with open('jobsearch_agents/agent.py', 'r') as f:
+              main_agent_content = f.read()
+          
+          # Find the import pattern used in main agent
+          if 'from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters' in main_agent_content:
+              # StdioServerParameters is imported from mcp_toolset
+              correct_import = 'from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams'
+          else:
+              # Try the session_manager import
+              correct_import = 'from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams'
+          
+          # Fix all Python files in sub_agents
+          for root, dirs, files in os.walk('jobsearch_agents/sub_agents'):
+              for file in files:
+                  if file.endswith('.py'):
+                      filepath = os.path.join(root, file)
+                      with open(filepath, 'r') as f:
+                          content = f.read()
+                      
+                      # Replace any import of StreamableHTTPServerParams
+                      content = re.sub(
+                          r'from google\.adk\.tools\.mcp_tool\.\w+ import .*StreamableHTTPServerParams.*',
+                          correct_import,
+                          content
+                      )
+                      
+                      with open(filepath, 'w') as f:
+                          f.write(content)
+                      print(f'Fixed imports in {filepath}')
+          EOF
+          
+          poetry run python fix_imports.py
+
       - name: Create .env file for agent
         working-directory: jobsearch_agents
         run: |
@@ -67,8 +142,6 @@ jobs:
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
           EOF
-          
-          echo "Created .env file"
 
       - name: Fix __init__.py and test import
         working-directory: jobsearch_agents
@@ -86,12 +159,10 @@ jobs:
           echo "Testing if module can be imported..."
           poetry run python -c "
           import sys
-          import os
           sys.path.insert(0, '.')
           try:
               import jobsearch_agents
               print('Successfully imported jobsearch_agents')
-              print('Available attributes:', dir(jobsearch_agents))
               print('Has root_agent?', hasattr(jobsearch_agents, 'root_agent'))
               if hasattr(jobsearch_agents, 'root_agent'):
                   print('root_agent type:', type(jobsearch_agents.root_agent))
@@ -121,4 +192,3 @@ jobs:
             --app_name=$APP_NAME \
             --with_ui \
             $AGENT_PATH
-
