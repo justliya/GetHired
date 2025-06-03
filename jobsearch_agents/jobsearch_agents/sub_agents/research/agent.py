@@ -11,7 +11,7 @@ company_research_agent = LlmAgent(
     output_key="company_research",
     tools=[
         mcp_wrapper.create_toolset(
-            external_url='https://gethired-mcp.onrender.com/jobsearch-mcp',
+            external_url='https://gethired-mcp.onrender.com/jobsearch-mcp/',
             tool_filter=[
                 # Company Research Tools
                 'search_companies',
