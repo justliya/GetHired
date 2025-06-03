@@ -10,11 +10,11 @@ readme = "../README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11"
-google-adk = "^1.1.1"
+google-adk = { git = "https://github.com/google/adk-python.git", rev = "main" }
 google-genai = "^1.5.0"
 google-cloud-bigquery = "^3.31.0"
 absl-py = "^2.2.2"
-google-cloud-aiplatform = { git = "https://github.com/googleapis/python-aiplatform.git", rev = "copybara_738852226", extras = ["agent-engines"] }
+google-cloud-aiplatform = "^1.95.1"
 pytest = "^8.3.5"
 pillow = "^11.1.0"
 
