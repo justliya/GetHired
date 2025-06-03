@@ -59,7 +59,6 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      
       - name: Create .env files
         working-directory: jobsearch_agents
         run: |
@@ -106,39 +105,65 @@ jobs:
           # Export requirements from poetry
           poetry export -f requirements.txt --output requirements.txt --without-hashes
           
-          # Create custom Dockerfile that matches ADK expectations
+          # Add additional requirements
+          echo "google_adk" >> requirements.txt
+          echo "uvicorn" >> requirements.txt
+          echo "python-dotenv" >> requirements.txt
+          
+          # Create main.py for FastAPI
+          cat > main.py << 'EOF'
+          import os
+          import uvicorn
+          from google.adk.cli.fast_api import get_fast_api_app
+          
+          # Get the directory where main.py is located
+          AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+          # Example session DB URL (e.g., SQLite)
+          SESSION_DB_URL = "sqlite:///./sessions.db"
+          # Example allowed origins for CORS
+          ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
+          # Set web=True to serve a web interface
+          SERVE_WEB_INTERFACE = True
+          
+          # Call the function to get the FastAPI app instance
+          app = get_fast_api_app(
+              agents_dir=AGENT_DIR,
+              session_db_url=SESSION_DB_URL,
+              allow_origins=ALLOWED_ORIGINS,
+              web=SERVE_WEB_INTERFACE,
+          )
+          
+          # Health check endpoint
+          @app.get("/health")
+          async def health_check():
+              return {"status": "healthy"}
+          
+          if __name__ == "__main__":
+              # Use the PORT environment variable provided by Cloud Run, defaulting to 8080
+              uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+          EOF
+          
+          # Create Dockerfile following the documentation
           cat > Dockerfile << 'EOF'
           FROM python:3.11-slim
+          WORKDIR /app
           
           # Install system dependencies
           RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
           
-          # Set working directory
-          WORKDIR /app
-          
-          # Copy requirements and install dependencies
           COPY requirements.txt .
           RUN pip install --no-cache-dir -r requirements.txt
           
-          # Install ADK
-          RUN pip install --no-cache-dir git+https://github.com/google/adk-python.git
+          RUN adduser --disabled-password --gecos "" myuser && \
+              chown -R myuser:myuser /app
           
-          # Copy the entire jobsearch_agents directory to /app/agents/
-          COPY . /app/agents/
+          COPY . .
           
-          # Set environment variables
-          ENV PORT=8000
-          ENV PYTHONPATH=/app/agents:$PYTHONPATH
-          ENV APP_NAME=jobsearch_agents
+          USER myuser
           
-          # The ADK server expects to find the agent module in a specific way
-          WORKDIR /app/agents
+          ENV PATH="/home/myuser/.local/bin:$PATH"
           
-          # Expose port 8000
-          EXPOSE 8000
-          
-          # Run the ADK server
-          CMD ["python", "-m", "google.adk.server.deployed_agent_server"]
+          CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
           EOF
           
           # Create .gcloudignore
@@ -162,20 +187,6 @@ jobs:
           
           echo "Deployment package created"
 
-      - name: Test local build
-        working-directory: jobsearch_agents
-        run: |
-          # Test if we can build the Docker image locally
-          docker build -t test-agent . || {
-            echo "Docker build failed. Checking structure..."
-            ls -la
-            echo "--- Checking jobsearch_agents directory ---"
-            ls -la jobsearch_agents/
-            exit 1
-          }
-          
-          echo "Docker build successful"
-
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
@@ -184,27 +195,12 @@ jobs:
           # Deploy using gcloud run deploy
           gcloud run deploy $SERVICE_NAME \
             --source . \
-            --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
-            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
-            --platform=managed \
+            --region ${{ vars.GOOGLE_CLOUD_LOCATION }} \
+            --project ${{ env.GOOGLE_CLOUD_PROJECT }} \
             --allow-unauthenticated \
-            --port=8000 \
-            --set-env-vars="FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},GOOGLE_GENAI_USE_VERTEXAI=True,GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }},APP_NAME=jobsearch_agents,PORT=8000" \
-            --memory=2Gi \
-            --max-instances=10
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }},GOOGLE_CLOUD_LOCATION=${{ vars.GOOGLE_CLOUD_LOCATION }},GOOGLE_GENAI_USE_VERTEXAI=True,FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json"
 
-      - name: Add IAM policy binding
-        env:
-          SERVICE_NAME: gethired-agents
-        run: |
-          # Add the IAM policy binding as suggested in the error
-          gcloud beta run services add-iam-policy-binding $SERVICE_NAME \
-            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
-            --member=allUsers \
-            --role=roles/run.invoker \
-            --project=${{ env.GOOGLE_CLOUD_PROJECT }}
-
-      - name: Display service URL and logs
+      - name: Display service URL
         env:
           SERVICE_NAME: gethired-agents
         run: |
@@ -213,11 +209,6 @@ jobs:
             --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --format='value(status.url)')
-          echo "Service URL: $SERVICE_URL"
-          
-          # Get recent logs to debug any issues
-          echo "Recent logs:"
-          gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$SERVICE_NAME" \
-            --limit=50 \
-            --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
-            --format="table(timestamp, textPayload)" || echo "Could not fetch logs"
+          echo "Service deployed at: $SERVICE_URL"
+          echo "Web interface available at: $SERVICE_URL/"
+          echo "API endpoint: $SERVICE_URL/docs"
