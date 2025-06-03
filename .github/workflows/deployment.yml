@@ -137,15 +137,32 @@ jobs:
       - name: Create .env file for agent
         working-directory: jobsearch_agents
         run: |
+  
           cat > .env << EOF
-          SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
+          SERVICE_ACCOUNT_KEY_PATH=/app/agents/jobsearch_agents/jobsearch_agents/serviceAccountKey.json
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
+          GOOGLE_CLOUD_PROJECT=${{ vars.GOOGLE_CLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT }}
           EOF
+    
+          # Also create a local .env for testing
+          cat > jobsearch_agents/.env << EOF
+          SERVICE_ACCOUNT_KEY_PATH=serviceAccountKey.json
+          FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
+          GOOGLE_GENAI_USE_VERTEXAI=True
+          GOOGLE_CLOUD_PROJECT=${{ vars.GOOGLE_CLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT }}
+          EOF
+    
+          echo "=== Created .env files ==="
+          echo "--- Root .env ---"
+          cat .env
+          echo -e "\n--- Package .env ---"
+          cat jobsearch_agents/.env
 
-      - name: Fix __init__.py and test import
+      - name: Fix __init__.py and ensure root_agent export
         working-directory: jobsearch_agents
         run: |
+          # Create proper __init__.py
           cat > jobsearch_agents/__init__.py << 'EOF'
           """
           Job Search Automation Agent package.
@@ -156,21 +173,85 @@ jobs:
           __all__ = ['agent', 'root_agent']
           EOF
           
-          echo "Testing if module can be imported..."
-          poetry run python -c "
+          # Ensure agent.py exports root_agent at the end
+          echo "Checking if agent.py exports root_agent..."
+          if ! grep -q "^root_agent" jobsearch_agents/agent.py; then
+              echo "Adding root_agent export to agent.py..."
+              echo -e "\n# Export root_agent for ADK\nroot_agent = agent" >> jobsearch_agents/agent.py
+          fi
+          
+          # Create a simple test to verify structure
+          cat > test_structure.py << 'EOF'
           import sys
+          import os
+          
+          print("=== Current working directory ===")
+          print(os.getcwd())
+          
+          print("\n=== Python path ===")
+          for p in sys.path[:5]:
+              print(f"  - {p}")
+          
+          print("\n=== Directory structure ===")
+          for root, dirs, files in os.walk('.'):
+              level = root.replace('.', '', 1).count(os.sep)
+              indent = ' ' * 2 * level
+              print(f'{indent}{os.path.basename(root)}/')
+              subindent = ' ' * 2 * (level + 1)
+              for file in files:
+                  if file.endswith(('.py', '.toml', '.env')):
+                      print(f'{subindent}{file}')
+              if level > 2:  # Limit depth
+                  dirs.clear()
+          
+          print("\n=== Testing import ===")
           sys.path.insert(0, '.')
           try:
               import jobsearch_agents
-              print('Successfully imported jobsearch_agents')
-              print('Has root_agent?', hasattr(jobsearch_agents, 'root_agent'))
+              print('✓ Successfully imported jobsearch_agents')
+              print(f'  Module location: {jobsearch_agents.__file__}')
+              print(f'  Has root_agent? {hasattr(jobsearch_agents, "root_agent")}')
               if hasattr(jobsearch_agents, 'root_agent'):
-                  print('root_agent type:', type(jobsearch_agents.root_agent))
+                  print(f'  root_agent type: {type(jobsearch_agents.root_agent)}')
+              
+              # Check if we can import agent directly
+              from jobsearch_agents import agent
+              print('✓ Successfully imported agent module')
+              print(f'  Has root_agent? {hasattr(agent, "root_agent")}')
+              
+              # List all attributes in agent module
+              print('\n  Agent module attributes:')
+              for attr in dir(agent):
+                  if not attr.startswith('_'):
+                      print(f'    - {attr}')
+                      
           except Exception as e:
-              print(f'Failed to import: {e}')
+              print(f'✗ Failed to import: {e}')
               import traceback
               traceback.print_exc()
-          "
+          EOF
+          
+          echo "Running structure test..."
+          poetry run python test_structure.py
+
+      - name: Debug structure before deployment
+        working-directory: jobsearch_agents
+        run: |
+          echo "=== Final directory structure ==="
+          find . -type f $$ -name "*.py" -o -name "*.toml" -o -name ".env" $$ | grep -v __pycache__ | sort
+          
+          echo -e "\n=== Content of __init__.py files ==="
+          find . -name "__init__.py" -type f | while read f; do
+              echo -e "\n--- $f ---"
+              cat "$f" | head -10
+          done
+          
+          echo -e "\n=== Checking agent.py exports ==="
+          echo "--- Last 20 lines of jobsearch_agents/agent.py ---"
+          tail -20 jobsearch_agents/agent.py
+          
+          echo -e "\n=== Environment variables ==="
+          cat .env
 
       - name: Deploy to Cloud Run  
         working-directory: jobsearch_agents
@@ -185,10 +266,4 @@ jobs:
           echo "Current directory: $(pwd)"
           echo "AGENT_PATH: $AGENT_PATH"
           
-          echo "y" | poetry run adk deploy cloud_run \
-            --project=$GOOGLE_CLOUD_PROJECT \
-            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
-            --service_name=$SERVICE_NAME \
-            --app_name=$APP_NAME \
-            --with_ui \
-            $AGENT_PATH
+         
