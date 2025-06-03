@@ -6,11 +6,11 @@ authors = [
     "Aaliyah Johnson, La'Kaleigh Harris <neoaxiom@gmail.com>"
 ]
 readme = "../README.md"
-
+package-mode = false 
 
 [tool.poetry.dependencies]
 python = ">=3.11"
-google-adk = { git = "https://github.com/google/adk-python.git", rev = "main" }
+google-adk = "^1.1.1"
 google-genai = "^1.5.0"
 google-cloud-bigquery = "^3.31.0"
 absl-py = "^2.2.2"
