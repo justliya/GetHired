@@ -28,8 +28,8 @@ jobs:
         id: cached-poetry
         uses: actions/cache@v4
         with:
-          path: ~/.local
-          key: poetry-0
+          path: ~/.local  # the path depends on the OS
+          key: poetry-0  # increment to reset cache
 
       - name: Install and configure Poetry
         uses: snok/install-poetry@v1
@@ -42,6 +42,12 @@ jobs:
         working-directory: jobsearch_agents
         run: |
           poetry install --no-interaction --no-ansi --no-root
+          ADK_PATH=$(poetry run which adk)
+          if [ -z "$ADK_PATH" ]; then
+            echo "Error: ADK command not found in PATH"
+            exit 1
+          fi
+          echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
 
       - id: 'auth'
         uses: 'google-github-actions/auth@v2'
@@ -50,145 +56,28 @@ jobs:
           export_environment_variables: true
           cleanup_credentials: true
 
-      - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v2'
-
       - name: Decode Firebase service account key
         run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/jobsearch_agents/serviceAccountKey.json
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/serviceAccountKey.json
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Check available imports and fix sub-agents
-        working-directory: jobsearch_agents
-        run: |
-          echo "Checking what's available in ADK modules..."
-          poetry run python -c "
-          print('=== Checking mcp_toolset ===')
-          try:
-              from google.adk.tools.mcp_tool import mcp_toolset
-              for attr in dir(mcp_toolset):
-                  if not attr.startswith('_'):
-                      print(f'  - {attr}')
-          except Exception as e:
-              print(f'Error: {e}')
-              
-          print('\n=== Checking mcp_session_manager ===')
-          try:
-              from google.adk.tools.mcp_tool import mcp_session_manager
-              for attr in dir(mcp_session_manager):
-                  if not attr.startswith('_') and 'Param' in attr:
-                      print(f'  - {attr}')
-          except Exception as e:
-              print(f'Error: {e}')
-              
-          print('\n=== Checking what is imported in mcp_toolset ===')
-          try:
-              import inspect
-              from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-              # Get the module that MCPToolset is from
-              module = inspect.getmodule(MCPToolset)
-              # Check __all__ if it exists
-              if hasattr(module, '__all__'):
-                  print('Exported names:', module.__all__)
-          except Exception as e:
-              print(f'Error: {e}')
-          "
-          
-          echo -e "\nCreating import fix file..."
-          cat > fix_imports.py << 'EOF'
-          import os
-          import re
-          
-          # Read the main agent.py to see what import pattern is used
-          with open('jobsearch_agents/agent.py', 'r') as f:
-              main_agent_content = f.read()
-          
-          # Find the import pattern used in main agent
-          if 'from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters' in main_agent_content:
-              # StdioServerParameters is imported from mcp_toolset
-              correct_import = 'from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams'
-          else:
-              # Try the session_manager import
-              correct_import = 'from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams'
-          
-          # Fix all Python files in sub_agents
-          for root, dirs, files in os.walk('jobsearch_agents/sub_agents'):
-              for file in files:
-                  if file.endswith('.py'):
-                      filepath = os.path.join(root, file)
-                      with open(filepath, 'r') as f:
-                          content = f.read()
-                      
-                      # Replace any import of StreamableHTTPServerParams
-                      content = re.sub(
-                          r'from google\.adk\.tools\.mcp_tool\.\w+ import .*StreamableHTTPServerParams.*',
-                          correct_import,
-                          content
-                      )
-                      
-                      with open(filepath, 'w') as f:
-                          f.write(content)
-                      print(f'Fixed imports in {filepath}')
-          EOF
-          
-          poetry run python fix_imports.py
-
-      - name: Create .env file for agent
-        working-directory: jobsearch_agents
-        run: |
-          cat > .env << EOF
-          SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
-          FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
-          GOOGLE_GENAI_USE_VERTEXAI=True
-          EOF
-
-      - name: Fix __init__.py and test import
-        working-directory: jobsearch_agents
-        run: |
-          cat > jobsearch_agents/__init__.py << 'EOF'
-          """
-          Job Search Automation Agent package.
-          """
-          from . import agent
-          from .agent import root_agent
-          
-          __all__ = ['agent', 'root_agent']
-          EOF
-          
-          echo "Testing if module can be imported..."
-          poetry run python -c "
-          import sys
-          sys.path.insert(0, '.')
-          try:
-              import jobsearch_agents
-              print('Successfully imported jobsearch_agents')
-              print('Has root_agent?', hasattr(jobsearch_agents, 'root_agent'))
-              if hasattr(jobsearch_agents, 'root_agent'):
-                  print('root_agent type:', type(jobsearch_agents.root_agent))
-          except Exception as e:
-              print(f'Failed to import: {e}')
-              import traceback
-              traceback.print_exc()
-          "
-
-      - name: Deploy to Cloud Run  
+      - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
+          AGENT_PATH: 'jobsearch_agents'
+          SERVICE_NAME: 'gethired-agents'
+          APP_NAME: 'gethired'
+          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
-          SERVICE_ACCOUNT_KEY_PATH: jobsearch_agents/serviceAccountKey.json
-          GOOGLE_GENAI_USE_VERTEXAI: 'True'
-          AGENT_PATH: ./jobsearch_agents
-          SERVICE_NAME: gethired-agents
-          APP_NAME: jobsearch_agents
+          SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
         run: |
-          echo "Current directory: $(pwd)"
-          echo "AGENT_PATH: $AGENT_PATH"
-          
-          echo "y" | poetry run adk deploy cloud_run \
+          yes y | $ADK_CMD deploy cloud_run \
             --project=$GOOGLE_CLOUD_PROJECT \
-            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
+            --region=$GOOGLE_CLOUD_LOCATION \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
+            --trace_to_cloud \
+            --verbosity=error \
             --with_ui \
             $AGENT_PATH
