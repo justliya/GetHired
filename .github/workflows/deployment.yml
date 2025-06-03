@@ -121,3 +121,4 @@ jobs:
             --app_name=$APP_NAME \
             --with_ui \
             $AGENT_PATH
+

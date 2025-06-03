@@ -1,10 +1,9 @@
-# sub_agents/listing/agent.py
-
 from google.adk.agents import LlmAgent
 from ...shared_libraries import constants
 from . import prompt
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
+# Import from mcp_toolset, not mcp_session_manager
+from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
 from ...tools.approval import approval_tool
 
 from google.adk.tools.agent_tool import AgentTool
@@ -39,8 +38,6 @@ listing_search_agent = LlmAgent(
                 'search_jobs_by_company',
                 'get_job_details',
                 'search_glassdoor_jobs',
-                
-                
             ]
         ),
         AgentTool(agent=request_approval, skip_summarization=True)

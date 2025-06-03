@@ -1,9 +1,9 @@
-# company_research_agent.py
 from google.adk.agents.llm_agent import LlmAgent
 from ...shared_libraries import constants
 from . import prompt
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
+# Import from mcp_toolset, not mcp_session_manager
+from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
 
 
 company_research_agent = LlmAgent(
