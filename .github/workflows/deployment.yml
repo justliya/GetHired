@@ -59,47 +59,7 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Fix sub-agent imports
-        working-directory: jobsearch_agents
-        run: |
-          cat > fix_imports.py << 'EOF'
-          import os
-          import re
-          
-          # Read the main agent.py to see what import pattern is used
-          with open('jobsearch_agents/agent.py', 'r') as f:
-              main_agent_content = f.read()
-          
-          # Find the import pattern used in main agent
-          if 'from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters' in main_agent_content:
-              # StdioServerParameters is imported from mcp_toolset
-              correct_import = 'from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams'
-          else:
-              # Try the session_manager import
-              correct_import = 'from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams'
-          
-          # Fix all Python files in sub_agents
-          for root, dirs, files in os.walk('jobsearch_agents/sub_agents'):
-              for file in files:
-                  if file.endswith('.py'):
-                      filepath = os.path.join(root, file)
-                      with open(filepath, 'r') as f:
-                          content = f.read()
-                      
-                      # Replace any import of StreamableHTTPServerParams
-                      content = re.sub(
-                          r'from google\.adk\.tools\.mcp_tool\.\w+ import .*StreamableHTTPServerParams.*',
-                          correct_import,
-                          content
-                      )
-                      
-                      with open(filepath, 'w') as f:
-                          f.write(content)
-                      print(f'Fixed imports in {filepath}')
-          EOF
-          
-          poetry run python fix_imports.py
-
+      
       - name: Create .env files
         working-directory: jobsearch_agents
         run: |
@@ -146,57 +106,42 @@ jobs:
           # Export requirements from poetry
           poetry export -f requirements.txt --output requirements.txt --without-hashes
           
-          # Create custom Dockerfile
+          # Create custom Dockerfile that matches ADK expectations
           cat > Dockerfile << 'EOF'
           FROM python:3.11-slim
           
+          # Install system dependencies
+          RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+          
+          # Set working directory
           WORKDIR /app
           
-          # Install system dependencies
-          RUN apt-get update && apt-get install -y \
-              git \
-              build-essential \
-              && rm -rf /var/lib/apt/lists/*
+          # Copy requirements and install dependencies
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir -r requirements.txt
           
-          # Upgrade pip
-          RUN pip install --upgrade pip
+          # Install ADK
+          RUN pip install --no-cache-dir git+https://github.com/google/adk-python.git
           
-          # Copy requirements first for better caching
-          COPY requirements.txt /app/
-          RUN pip install -r requirements.txt
-          
-          # Install ADK with correct git+ prefix
-          RUN pip install git+https://github.com/google/adk-python.git
-          
-          # Copy the agent code
+          # Copy the entire jobsearch_agents directory to /app/agents/
           COPY . /app/agents/
           
-          # Create the expected directory structure
-          RUN mkdir -p /app/agents/jobsearch_agents
-          
-          # Set up the environment
-          ENV PYTHONPATH=/app/agents:/app/agents/jobsearch_agents:$PYTHONPATH
-          ENV PORT=8080
+          # Set environment variables
+          ENV PORT=8000
+          ENV PYTHONPATH=/app/agents:$PYTHONPATH
           ENV APP_NAME=jobsearch_agents
           
-          # Change to the directory where the agent code lives
-          WORKDIR /app/agents/jobsearch_agents
+          # The ADK server expects to find the agent module in a specific way
+          WORKDIR /app/agents
           
-          # Create a startup script that ensures we're in the right directory
-          RUN echo '#!/bin/bash\n\
-          cd /app/agents/jobsearch_agents\n\
-          echo "Current directory: $(pwd)"\n\
-          echo "Files in current directory:"\n\
-          ls -la\n\
-          echo "Python path: $PYTHONPATH"\n\
-          python -m google.adk.server.deployed_agent_server' > /app/start.sh && \
-          chmod +x /app/start.sh
+          # Expose port 8000
+          EXPOSE 8000
           
           # Run the ADK server
-          CMD ["/app/start.sh"]
+          CMD ["python", "-m", "google.adk.server.deployed_agent_server"]
           EOF
           
-          # Create .gcloudignore to exclude unnecessary files
+          # Create .gcloudignore
           cat > .gcloudignore << 'EOF'
           .gcloudignore
           .git
@@ -211,38 +156,68 @@ jobs:
           .coverage
           .pytest_cache
           .mypy_cache
-          .tox
-          .nox
           poetry.lock
           pyproject.toml
           EOF
           
           echo "Deployment package created"
 
+      - name: Test local build
+        working-directory: jobsearch_agents
+        run: |
+          # Test if we can build the Docker image locally
+          docker build -t test-agent . || {
+            echo "Docker build failed. Checking structure..."
+            ls -la
+            echo "--- Checking jobsearch_agents directory ---"
+            ls -la jobsearch_agents/
+            exit 1
+          }
+          
+          echo "Docker build successful"
+
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
           SERVICE_NAME: gethired-agents
         run: |
-          # Deploy using gcloud run deploy with our custom Dockerfile
+          # Deploy using gcloud run deploy
           gcloud run deploy $SERVICE_NAME \
             --source . \
             --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},GOOGLE_GENAI_USE_VERTEXAI=True,GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }},APP_NAME=jobsearch_agents" \
+            --port=8000 \
+            --set-env-vars="FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},GOOGLE_GENAI_USE_VERTEXAI=True,GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }},APP_NAME=jobsearch_agents,PORT=8000" \
             --memory=2Gi \
-            --timeout=3600 \
             --max-instances=10
 
-      - name: Display service URL
+      - name: Add IAM policy binding
         env:
           SERVICE_NAME: gethired-agents
         run: |
+          # Add the IAM policy binding as suggested in the error
+          gcloud beta run services add-iam-policy-binding $SERVICE_NAME \
+            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
+            --member=allUsers \
+            --role=roles/run.invoker \
+            --project=${{ env.GOOGLE_CLOUD_PROJECT }}
+
+      - name: Display service URL and logs
+        env:
+          SERVICE_NAME: gethired-agents
+        run: |
+          # Get service URL
           SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
             --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --format='value(status.url)')
-          echo "Service deployed at: $SERVICE_URL"
-          echo "You can test the agent at: $SERVICE_URL/ui"
+          echo "Service URL: $SERVICE_URL"
+          
+          # Get recent logs to debug any issues
+          echo "Recent logs:"
+          gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$SERVICE_NAME" \
+            --limit=50 \
+            --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
+            --format="table(timestamp, textPayload)" || echo "Could not fetch logs"
