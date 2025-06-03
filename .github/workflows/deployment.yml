@@ -59,29 +59,17 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Debug agent structure
+      - name: Fix __init__.py to expose root_agent
         run: |
-          echo "=== Checking agent.py content ==="
-          echo "First 50 lines of agent.py:"
-          head -n 50 jobsearch_agents/jobsearch_agents/agent.py
-          echo ""
-          echo "=== Looking for root_agent definition ==="
-          grep -n "root_agent" jobsearch_agents/jobsearch_agents/agent.py || echo "NO root_agent FOUND!"
-          echo ""
-          echo "=== Checking if it might be named differently ==="
-          grep -n -E "(agent|Agent)\s*=" jobsearch_agents/jobsearch_agents/agent.py | head -10
-          echo ""
-          echo "=== Current __init__.py content ==="
-          cat jobsearch_agents/jobsearch_agents/__init__.py 2>/dev/null || echo "No __init__.py found"
-
-      - name: Ensure proper module setup
-        run: |
-          # Create __init__.py with proper imports
+          echo "Updating __init__.py to expose root_agent..."
           cat > jobsearch_agents/jobsearch_agents/__init__.py << 'EOF'
+          """
+          Job Search Automation Agent package.
+          """
           from . import agent
-          
-          # If root_agent is defined in agent.py, expose it at module level
           from .agent import root_agent
+          
+          __all__ = ['agent', 'root_agent']
           EOF
           
           echo "Updated __init__.py content:"
@@ -105,4 +93,5 @@ jobs:
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
+            --with_ui \
             $AGENT_PATH
