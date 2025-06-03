@@ -143,13 +143,21 @@ jobs:
               uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
           EOF
           
-          # Create Dockerfile following the documentation
+          # Create Dockerfile with Node.js installed
           cat > Dockerfile << 'EOF'
           FROM python:3.11-slim
           WORKDIR /app
           
-          # Install system dependencies
-          RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+          # Install system dependencies including Node.js
+          RUN apt-get update && apt-get install -y \
+              git \
+              curl \
+              && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+              && apt-get install -y nodejs \
+              && rm -rf /var/lib/apt/lists/*
+          
+          # Verify Node.js and npm installation
+          RUN node --version && npm --version
           
           COPY requirements.txt .
           RUN pip install --no-cache-dir -r requirements.txt
@@ -186,7 +194,6 @@ jobs:
           EOF
           
           echo "Deployment package created"
-
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
