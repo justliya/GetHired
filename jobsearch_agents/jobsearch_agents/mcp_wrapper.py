@@ -98,7 +98,7 @@ class CloudRunMCPWrapper:
                 logger.info(f"Stopping MCP server '{name}'")
                 process.terminate()
                 try:
-                    process.wait(timeout=5)
+                    process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
                     process.kill()
 
