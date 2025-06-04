@@ -51,13 +51,6 @@ jobs:
           poetry run python -c "import deprecated; print('✅ deprecated is installed')"
           poetry run which adk
 
-          ADK_PATH=$(which adk)
-          if [ -z "$ADK_PATH" ]; then
-            echo "Error: ADK command not found in PATH"
-            exit 1
-          fi
-          echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
-
       - id: auth
         uses: google-github-actions/auth@v2
         with:
