@@ -1,0 +1,90 @@
+name: Deploy ADK Agents to Cloud Run
+
+on:
+  push:
+    paths:
+      - 'jobsearch_agents/**'
+      - '.github/workflows/deployment.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Load cached Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v4
+        with:
+          path: ~/.local  # the path depends on the OS
+          key: poetry-0  # increment to reset cache
+
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.5.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        working-directory: jobsearch_agents
+        run: |
+          poetry install --no-interaction --no-ansi --no-root
+          ADK_PATH=$(poetry run which adk)
+          if [ -z "$ADK_PATH" ]; then
+            echo "Error: ADK command not found in PATH"
+            exit 1
+          fi
+          echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          export_environment_variables: true
+          cleanup_credentials: true
+
+      - name: Decode Firebase service account key
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > ${GITHUB_WORKSPACE}/${{ secrets.SA_PATH}}
+        env:
+          FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+
+      - name: Deploy to Cloud Run
+        env:
+          AGENT_PATH: './jobsearch_agents'
+          SERVICE_NAME: 'gethired-agents-test'
+          APP_NAME: 'jobsearch_agents-test'
+          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
+          SERVICE_ACCOUNT_KEY_PATH: '${{ secrets.SA_PATH }}'
+        run: |
+          $ADK_CMD deploy cloud_run \
+            --project=$GCP_PROJECT \
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --service_name=$SERVICE_NAME \
+            --app_name=$APP_NAME \
+            --trace_to_cloud \
+            --verbosity=error \
+            $AGENT_PATH      
+      - name: Update Service
+        env:
+          SERVICE_NAME: 'gethired-agents-test'
+          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          STAGING_BUCKET: 'gethired-staging'
+        run: |
+          gcloud run services update $SERVICE_NAME \
+            --project=$GCP_PROJECT \
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --update-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$GCP_PROJECT,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET"
+            --update-env-vars="GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
