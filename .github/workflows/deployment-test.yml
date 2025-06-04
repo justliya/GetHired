@@ -41,10 +41,11 @@ jobs:
 
       - name: Install dependencies (skip project installation)
         run: |
-          # Install deprecated package globally first
-          pip install deprecated==1.2.18
-
-          # Install project dependencies
+          # Create and activate poetry environment
+          poetry env use python3.11
+          source $(poetry env info --path)/bin/activate
+          
+          # Install dependencies for local development
           poetry install --no-interaction --no-ansi --no-root
 
           # Add the venv's bin to PATH so 'adk' is available
@@ -52,9 +53,10 @@ jobs:
           echo "VENV_BIN=$VENV_BIN" >> $GITHUB_ENV
           echo "$VENV_BIN" >> $GITHUB_PATH
 
-          # Verify that 'deprecated' is present and 'adk' can be found
-          python -c "import deprecated; print('✅ deprecated is installed (global)')"
-          poetry run python -c "import deprecated; print('✅ deprecated is installed (venv)')"
+          # Verify installations in the correct environment
+          poetry run python -c "import sys; print(f'Python path: {sys.path}')"
+          poetry run python -c "import deprecated; print('✅ deprecated is installed')"
+          poetry run python -c "from google.adk.cli import main; print('✅ adk is installed')"
           poetry run which adk
 
       - id: auth
@@ -80,6 +82,9 @@ jobs:
           FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
           SERVICE_ACCOUNT_KEY_PATH: '${{ secrets.SA_PATH }}'
         run: |
+          # Activate poetry environment
+          source $(poetry env info --path)/bin/activate
+          
           # Use Poetry's venv to invoke 'adk'
           poetry run adk deploy cloud_run \
             --project=$GCP_PROJECT \
