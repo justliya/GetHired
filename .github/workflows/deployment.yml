@@ -116,7 +116,6 @@ jobs:
           cat > main.py << 'EOF'
           import os
           import sys
-          import httpx
           import uvicorn
           import logging
           import signal
@@ -129,22 +128,7 @@ jobs:
               format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
           )
           logger = logging.getLogger(__name__)
-              async def warmup_mcp_servers():
-           """Warm up external MCP servers to avoid cold starts."""
-
-
-          mcp_urls = [
-             'https://gethired-mcp.onrender.com/jobsearch-mcp/'
-              ]
-
-          async with httpx.AsyncClient(timeout=30.0) as client:
-           for url in mcp_urls:
-            try:
-                logger.info(f"Warming up MCP server: {url}")
-                response = await client.get(url)
-                logger.info(f"MCP server {url} responded with status: {response.status_code}")
-            except Exception as e:
-                logger.warning(f"Failed to warm up {url}: {e}")
+             
           # Signal handler for graceful shutdown
           def signal_handler(sig, frame):
               logger.info("Shutting down gracefully...")
