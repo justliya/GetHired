@@ -1,12 +1,10 @@
 from google.adk.agents import LlmAgent
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, SseServerParams
+from google.adk.tools.agent_tool import AgentTool
+
 from ...shared_libraries import constants
 from . import prompt
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-# Import from mcp_toolset, not mcp_session_manager
-from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
 from ...tools.approval import approval_tool
-
-from google.adk.tools.agent_tool import AgentTool
 
 request_approval = LlmAgent(
     name="RequestHumanApproval",
@@ -29,8 +27,9 @@ listing_search_agent = LlmAgent(
     output_key="job_listings",
     tools=[
         MCPToolset(
-            connection_params=StreamableHTTPServerParams(
+            connection_params=SseServerParams(
                 url='https://gethired-mcp.onrender.com/jobsearch-mcp',
+                timeout=15
             ),
             tool_filter=[
                 # Job Discovery Tools
