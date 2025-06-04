@@ -24,14 +24,11 @@ COPY pyproject.toml poetry.lock* ./
 # Configure poetry to not create a virtual environment inside container
 RUN poetry config virtualenvs.create false
 
-# Install dependencies
+# Install all dependencies only
 RUN poetry install --no-interaction --no-ansi --no-root
 
 # Copy the rest of the application
 COPY . .
-
-# Install the application itself
-RUN poetry install --no-interaction
 
 # Default environment variables
 ENV PORT=8080
@@ -44,4 +41,4 @@ EXPOSE ${PORT}
 CMD ["poetry", "run", "adk", "api_server", \
      "--host=0.0.0.0", \
      "--port=8080", \
-     "jobsearch_agents/jobsearch_agents"]
+     "jobsearch_agents"]
