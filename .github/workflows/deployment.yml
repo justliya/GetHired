@@ -5,8 +5,8 @@ on:
     branches:
       - agent-interaction
     paths:
-      - 'jobsearch_agents/**'
-      - '.github/workflows/deployment.yml'
+      - "jobsearch_agents/**"
+      - ".github/workflows/deployment.yml"
   workflow_dispatch:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Load cached Poetry installation
         id: cached-poetry
@@ -43,15 +43,15 @@ jobs:
         run: |
           poetry install --no-interaction --no-ansi --no-root
 
-      - id: 'auth'
-        uses: 'google-github-actions/auth@v2'
+      - id: "auth"
+        uses: "google-github-actions/auth@v2"
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
           export_environment_variables: true
           cleanup_credentials: true
 
       - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v2'
+        uses: "google-github-actions/setup-gcloud@v2"
 
       - name: Decode Firebase service account key
         run: |
@@ -70,7 +70,7 @@ jobs:
           GOOGLE_CLOUD_LOCATION=us-central1
           GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
           EOF
-          
+
           # Also create one at the root level
           cat > .env << EOF
           SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
@@ -90,10 +90,10 @@ jobs:
           """
           from . import agent
           from .agent import root_agent
-          
+
           __all__ = ['agent', 'root_agent']
           EOF
-          
+
           # Ensure agent.py exports root_agent at the end
           echo "Checking if agent.py exports root_agent..."
           if ! grep -q "^root_agent" jobsearch_agents/agent.py; then
@@ -106,35 +106,51 @@ jobs:
         run: |
           # Export requirements from poetry
           poetry export -f requirements.txt --output requirements.txt --without-hashes
-          
+
           # Add additional requirements
           echo "google_adk" >> requirements.txt
           echo "uvicorn" >> requirements.txt
           echo "python-dotenv" >> requirements.txt
-          
+
           # Create main.py for FastAPI
           cat > main.py << 'EOF'
           import os
           import sys
+          import httpx
           import uvicorn
           import logging
           import signal
           from google.adk.cli.fast_api import get_fast_api_app
           from jobsearch_agents.mcp_wrapper import mcp_wrapper
-          
+
 
           logging.basicConfig(
               level=logging.INFO,
               format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
           )
           logger = logging.getLogger(__name__)
-          
+              async def warmup_mcp_servers():
+           """Warm up external MCP servers to avoid cold starts."""
+
+
+          mcp_urls = [
+             'https://gethired-mcp.onrender.com/jobsearch-mcp/'
+              ]
+
+          async with httpx.AsyncClient(timeout=30.0) as client:
+           for url in mcp_urls:
+            try:
+                logger.info(f"Warming up MCP server: {url}")
+                response = await client.get(url)
+                logger.info(f"MCP server {url} responded with status: {response.status_code}")
+            except Exception as e:
+                logger.warning(f"Failed to warm up {url}: {e}")
           # Signal handler for graceful shutdown
           def signal_handler(sig, frame):
               logger.info("Shutting down gracefully...")
               mcp_wrapper.cleanup()
               sys.exit(0)
-          
+
           signal.signal(signal.SIGINT, signal_handler)
           signal.signal(signal.SIGTERM, signal_handler)
           # Get the directory where main.py is located
@@ -145,7 +161,7 @@ jobs:
           ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
           # Set web=True to serve a web interface
           SERVE_WEB_INTERFACE = True
-          
+
           # Call the function to get the FastAPI app instance
           app = get_fast_api_app(
               agents_dir=AGENT_DIR,
@@ -153,7 +169,7 @@ jobs:
               allow_origins=ALLOWED_ORIGINS,
               web=SERVE_WEB_INTERFACE,
           )
-          
+
           @app.on_event("shutdown")
           async def shutdown_event():
               """Clean up MCP servers on shutdown."""
@@ -163,7 +179,7 @@ jobs:
           @app.get("/health")
           async def health_check():
               return {"status": "healthy"}
-          
+
           # Debug endpoint
           @app.get("/debug")
 
@@ -179,14 +195,14 @@ jobs:
                       "FIREBASE_STORAGE_BUCKET": os.environ.get("FIREBASE_STORAGE_BUCKET"),
                   }
               }
-          
+
           if __name__ == "__main__":
               # Use the PORT environment variable provided by Cloud Run, defaulting to 8080
               port = int(os.environ.get("PORT", 8080))
               logger.info(f"Starting server on port {port}")
               uvicorn.run(app, host="0.0.0.0", port=port)
           EOF
-          
+
 
                     
           # Create start.sh
@@ -201,7 +217,7 @@ jobs:
           cat > Dockerfile << 'EOF'
           FROM python:3.11-slim
           WORKDIR /app
-          
+
           # Install system dependencies including Node.js
           RUN apt-get update && apt-get install -y \
               git \
@@ -209,25 +225,25 @@ jobs:
               && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
               && apt-get install -y nodejs \
               && rm -rf /var/lib/apt/lists/*
-          
+
           # Verify Node.js and npm installation
           RUN node --version && npm --version
-          
+
           COPY requirements.txt .
           RUN pip install --no-cache-dir -r requirements.txt
-          
+
           RUN adduser --disabled-password --gecos "" myuser && \
               chown -R myuser:myuser /app
-          
+
           COPY . .
-          
+
           USER myuser
-          
+
           ENV PATH="/home/myuser/.local/bin:$PATH"
-          
+
           CMD ["./start.sh"]
           EOF
-          
+
           # Create .gcloudignore
           cat > .gcloudignore << 'EOF'
           .gcloudignore
@@ -246,9 +262,9 @@ jobs:
           poetry.lock
           pyproject.toml
           EOF
-          
+
           echo "Deployment package created"
-          
+
       - name: Deploy to Cloud Run
         working-directory: jobsearch_agents
         env:
