@@ -36,19 +36,19 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
-      - name: Install dependencies
+      - name: Install dependencies (skip project installation)
         working-directory: jobsearch_agents
         run: |
-          # Install all dependencies (including your ADK package and its deps)
-          poetry install --no-interaction --no-ansi
+          # Install only dependencies (google-adk, deprecated, etc.)—skip installing GetHired itself
+          poetry install --no-interaction --no-ansi --no-root
 
-          # Add the Poetry venv's bin directory to PATH so 'adk' is available
+          # Add the venv’s bin to PATH so 'adk' is available
           VENV_BIN="$(poetry env info -p)/bin"
           echo "VENV_BIN=$VENV_BIN" >> $GITHUB_ENV
           echo "$VENV_BIN" >> $GITHUB_PATH
 
-          # Verify that 'deprecated' is installed and 'adk' is in PATH
-          poetry run python -c "import deprecated; print('✅ deprecated is available')"
+          # Verify that 'deprecated' is present and 'adk' can be found
+          poetry run python -c "import deprecated; print('✅ deprecated is installed')"
           poetry run which adk
 
           ADK_PATH=$(which adk)
@@ -80,6 +80,7 @@ jobs:
           FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
           SERVICE_ACCOUNT_KEY_PATH: '${{ secrets.SA_PATH }}'
         run: |
+          # Use Poetry's venv to invoke 'adk'
           poetry run adk deploy cloud_run \
             --project=$GCP_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
