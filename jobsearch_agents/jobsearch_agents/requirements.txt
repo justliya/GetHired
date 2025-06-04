@@ -1,8 +1,9 @@
 deprecated==1.2.18
-google-genai>=1.14.0
+# google-genai constrained by both adk and aiplatform: >=1.14.0,<2.0.0
+google-genai>=1.14.0,<2.0.0
 google-cloud-bigquery==3.31.0
 absl-py==2.2.2
 google-cloud-aiplatform[agent-engines]>=1.95.1
 pillow==11.1.0
 python-dotenv
-google-adk @ git+https://github.com/google/adk-python.git@main
+google-adk==1.1.1
