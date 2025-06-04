@@ -27,7 +27,7 @@ class CloudRunMCPWrapper:
         
         # For external URLs
         if external_url:
-            server_params = SseServerParams(url=external_url)
+            server_params = SseServerParams(url=external_url, headers={'Accept': 'text/event-stream'})
             logger.info(f"Using external MCP server at {external_url}")
             
         # For local servers (like Firebase MCP)
