@@ -1,4 +1,4 @@
-name: Deploy ADK Agents to Cloud Run
+name: Test Deploy ADK Agents to Cloud Run
 
 on:
   push:
