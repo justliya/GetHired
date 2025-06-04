@@ -86,9 +86,6 @@ jobs:
           # Activate poetry environment
           source $(poetry env info --path)/bin/activate
           
-          # Verify the agent directory structure
-          ls -la $AGENT_PATH
-          
           # Use Poetry's venv to invoke 'adk'
           poetry run adk deploy cloud_run \
             --project=$GCP_PROJECT \
