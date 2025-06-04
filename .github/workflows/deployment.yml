@@ -67,7 +67,7 @@ jobs:
           SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
-          GOOGLE_CLOUD_LOCATION= us-central1
+          GOOGLE_CLOUD_LOCATION=us-central1
           GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
           EOF
           
@@ -76,7 +76,7 @@ jobs:
           SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
           FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_GENAI_USE_VERTEXAI=True
-          GOOGLE_CLOUD_LOCATION= us-central1
+          GOOGLE_CLOUD_LOCATION=us-central1
           GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
           EOF
 
@@ -111,14 +111,16 @@ jobs:
           echo "google_adk" >> requirements.txt
           echo "uvicorn" >> requirements.txt
           echo "python-dotenv" >> requirements.txt
+          echo "httpx" >> requirements.txt
           
-          # Create main.py for FastAPI
+          # Create main.py for FastAPI with enhanced debugging
           cat > main.py << 'EOF'
           import os
           import sys
           import uvicorn
           import logging
           import signal
+          import subprocess
           from google.adk.cli.fast_api import get_fast_api_app
           from jobsearch_agents.mcp_wrapper import mcp_wrapper
           
@@ -137,14 +139,18 @@ jobs:
           
           signal.signal(signal.SIGINT, signal_handler)
           signal.signal(signal.SIGTERM, signal_handler)
+          
           # Get the directory where main.py is located
           AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
-          # Example session DB URL (e.g., SQLite)
           SESSION_DB_URL = "sqlite:///./sessions.db"
-          # Example allowed origins for CORS
           ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
-          # Set web=True to serve a web interface
           SERVE_WEB_INTERFACE = True
+          
+          # Log startup information
+          logger.info(f"Starting ADK agent service...")
+          logger.info(f"Agent directory: {AGENT_DIR}")
+          logger.info(f"Current working directory: {os.getcwd()}")
+          logger.info(f"Python path: {sys.path}")
           
           # Call the function to get the FastAPI app instance
           app = get_fast_api_app(
@@ -164,10 +170,16 @@ jobs:
           async def health_check():
               return {"status": "healthy"}
           
-          # Debug endpoint
+          # Enhanced debug endpoint
           @app.get("/debug")
-
           async def debug_info():
+              npx_path = subprocess.run(["which", "npx"], capture_output=True, text=True).stdout.strip()
+              node_path = subprocess.run(["which", "node"], capture_output=True, text=True).stdout.strip()
+              
+              # Check if service account file exists
+              service_account_path = os.environ.get("SERVICE_ACCOUNT_KEY_PATH", "")
+              service_account_exists = os.path.exists(service_account_path) if service_account_path else False
+              
               return {
                   "agent_dir": AGENT_DIR,
                   "cwd": os.getcwd(),
@@ -175,29 +187,89 @@ jobs:
                   "env_vars": {
                       "K_SERVICE": os.environ.get("K_SERVICE", "Not in Cloud Run"),
                       "GOOGLE_CLOUD_PROJECT": os.environ.get("GOOGLE_CLOUD_PROJECT"),
-                      "SERVICE_ACCOUNT_KEY_PATH": os.environ.get("SERVICE_ACCOUNT_KEY_PATH"),
+                      "SERVICE_ACCOUNT_KEY_PATH": service_account_path,
+                      "SERVICE_ACCOUNT_EXISTS": service_account_exists,
                       "FIREBASE_STORAGE_BUCKET": os.environ.get("FIREBASE_STORAGE_BUCKET"),
+                      "PATH": os.environ.get("PATH"),
+                  },
+                  "node_info": {
+                      "npx_path": npx_path,
+                      "node_path": node_path,
                   }
               }
           
+          # Test Firebase MCP endpoint
+          @app.get("/test/firebase-mcp")
+          async def test_firebase_mcp():
+              """Test the Firebase MCP server."""
+              try:
+                  result = subprocess.run(
+                      ["npx", "-y", "@gannonh/firebase-mcp", "--version"],
+                      capture_output=True,
+                      text=True,
+                      timeout=30
+                  )
+                  
+                  return {
+                      "success": result.returncode == 0,
+                      "stdout": result.stdout,
+                      "stderr": result.stderr,
+                  }
+              except Exception as e:
+                  return {"error": str(e)}
+          
+          # Test external MCP connections
+          @app.get("/test/external-mcp")
+          async def test_external_mcp():
+              """Test connection to external MCP servers."""
+              import httpx
+              
+              results = {}
+              async with httpx.AsyncClient(timeout=30.0) as client:
+                  try:
+                      response = await client.get('https://gethired-mcp.onrender.com/jobsearch-mcp/')
+                      results['jobsearch-mcp'] = {
+                          'status': response.status_code,
+                          'response_time': response.elapsed.total_seconds()
+                      }
+                  except Exception as e:
+                      results['jobsearch-mcp'] = {'error': str(e)}
+              
+              return results
+          
           if __name__ == "__main__":
-              # Use the PORT environment variable provided by Cloud Run, defaulting to 8080
               port = int(os.environ.get("PORT", 8080))
               logger.info(f"Starting server on port {port}")
               uvicorn.run(app, host="0.0.0.0", port=port)
           EOF
           
-
-                    
-          # Create start.sh
+          # Create start.sh with better error handling
           cat > start.sh << 'EOF'
           #!/bin/bash
+          set -e
+          
+          echo "Starting ADK agent service..."
+          echo "Current directory: $(pwd)"
+          echo "Directory contents: $(ls -la)"
+          echo "Node version: $(node --version 2>/dev/null || echo 'Node not found')"
+          echo "NPM version: $(npm --version 2>/dev/null || echo 'NPM not found')"
+          echo "NPX location: $(which npx 2>/dev/null || echo 'NPX not found')"
+          
+          # Check if Firebase service account exists
+          if [ -n "$SERVICE_ACCOUNT_KEY_PATH" ]; then
+              if [ -f "$SERVICE_ACCOUNT_KEY_PATH" ]; then
+                  echo "Firebase service account found at: $SERVICE_ACCOUNT_KEY_PATH"
+              else
+                  echo "WARNING: Firebase service account not found at: $SERVICE_ACCOUNT_KEY_PATH"
+              fi
+          fi
+          
+          # Start the FastAPI server
           exec uvicorn main:app --host 0.0.0.0 --port $PORT
           EOF
           chmod +x start.sh
 
-
-          # Create Dockerfile with Node.js installed
+          # Create Dockerfile with Node.js and Firebase MCP installed
           cat > Dockerfile << 'EOF'
           FROM python:3.11-slim
           WORKDIR /app
@@ -206,6 +278,7 @@ jobs:
           RUN apt-get update && apt-get install -y \
               git \
               curl \
+              procps \
               && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
               && apt-get install -y nodejs \
               && rm -rf /var/lib/apt/lists/*
@@ -213,17 +286,40 @@ jobs:
           # Verify Node.js and npm installation
           RUN node --version && npm --version
           
+          # Create npm global directory for non-root user
+          RUN mkdir -p /home/myuser/.npm-global && \
+              npm config set prefix '/home/myuser/.npm-global'
+          
+          # Copy and install Python dependencies
           COPY requirements.txt .
           RUN pip install --no-cache-dir -r requirements.txt
           
+          # Create non-root user
           RUN adduser --disabled-password --gecos "" myuser && \
-              chown -R myuser:myuser /app
+              chown -R myuser:myuser /app && \
+              chown -R myuser:myuser /home/myuser/.npm-global
           
+          # Copy application files
           COPY . .
           
+          # Ensure service account key has correct permissions if it exists
+          RUN if [ -f "jobsearch_agents/serviceAccountKey.json" ]; then \
+                  chmod 644 jobsearch_agents/serviceAccountKey.json && \
+                  chown myuser:myuser jobsearch_agents/serviceAccountKey.json; \
+              fi
+          
+          # Switch to non-root user
           USER myuser
           
-          ENV PATH="/home/myuser/.local/bin:$PATH"
+          # Update PATH for npm global packages
+          ENV PATH="/home/myuser/.npm-global/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+          ENV NPM_CONFIG_PREFIX="/home/myuser/.npm-global"
+          
+          # Install Firebase MCP as the non-root user
+          RUN npm install -g @gannonh/firebase-mcp
+          
+                    # Verify installation
+          RUN npx -y @gannonh/firebase-mcp --version || echo "Firebase MCP installation verification failed"
           
           CMD ["./start.sh"]
           EOF
@@ -254,15 +350,17 @@ jobs:
         env:
           SERVICE_NAME: gethired-agents
         run: |
-          # Deploy using gcloud run deploy
+          # Deploy using gcloud run deploy with increased memory and timeout
           gcloud run deploy $SERVICE_NAME \
             --source . \
             --region ${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --project ${{ env.GOOGLE_CLOUD_PROJECT }} \
             --allow-unauthenticated \
+            --memory 1Gi \
+            --timeout 300 \
             --set-env-vars="GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }},GOOGLE_CLOUD_LOCATION=${{ vars.GOOGLE_CLOUD_LOCATION }},GOOGLE_GENAI_USE_VERTEXAI=True,FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json"
 
-      - name: Display service URL
+      - name: Display service URL and test endpoints
         env:
           SERVICE_NAME: gethired-agents
         run: |
@@ -271,6 +369,23 @@ jobs:
             --project=${{ env.GOOGLE_CLOUD_PROJECT }} \
             --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --format='value(status.url)')
+          
           echo "Service deployed at: $SERVICE_URL"
           echo "Web interface available at: $SERVICE_URL/"
           echo "API endpoint: $SERVICE_URL/docs"
+          echo ""
+          echo "Debug endpoints:"
+          echo "  - Health check: $SERVICE_URL/health"
+          echo "  - Debug info: $SERVICE_URL/debug"
+          echo "  - Firebase MCP test: $SERVICE_URL/test/firebase-mcp"
+          echo "  - External MCP test: $SERVICE_URL/test/external-mcp"
+          
+          # Wait for service to be ready
+          echo ""
+          echo "Waiting for service to be ready..."
+          sleep 10
+          
+          # Test health endpoint
+          echo ""
+          echo "Testing health endpoint..."
+          curl -s "$SERVICE_URL/health" || echo "Health check failed"

@@ -1,106 +1,84 @@
 import os
-import asyncio
+import logging
 import subprocess
-from typing import Optional, List
+from typing import Optional, List, Dict
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, MCPTool
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams, StdioServerParameters
-import logging
 
 logger = logging.getLogger(__name__)
 
 class CloudRunMCPWrapper:
-    """Wrapper for MCP tools that handles Cloud Run environment."""
+    """Wrapper for MCP tools that handles both local and external servers."""
     
     def __init__(self):
-        self.is_cloud_run = os.environ.get("K_SERVICE") is not None  # Cloud Run sets this
-        self.mcp_servers = {}
+        self.is_cloud_run = os.environ.get("K_SERVICE") is not None
+        logger.info(f"MCPWrapper initialized. Cloud Run: {self.is_cloud_run}")
         
-    async def start_mcp_server(self, name: str, command: List[str], port: int) -> Optional[subprocess.Popen]:
-        """Start an MCP server process."""
-        if not self.is_cloud_run:
-            return None
-            
-        try:
-            # Start the MCP server process
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env={**os.environ, "PORT": str(port)}
-            )
-            
-            # Wait a bit for the server to start
-            await asyncio.sleep(2)
-            
-            # Check if process is still running
-            if process.poll() is None:
-                logger.info(f"Started MCP server '{name}' on port {port}")
-                self.mcp_servers[name] = process
-                return process
-            else:
-                stdout, stderr = process.communicate()
-                logger.error(f"MCP server '{name}' failed to start: {stderr.decode()}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error starting MCP server '{name}': {e}")
-            return None
-    
     def create_toolset(
         self, 
         server_command: Optional[List[str]] = None,
-        port: Optional[int] = None,
+        server_args: Optional[List[str]] = None,
+        server_env: Optional[Dict[str, str]] = None,
         external_url: Optional[str] = None,
         tool_filter: Optional[List[str]] = None,
         tools: Optional[List[MCPTool]] = None
     ) -> MCPToolset:
         """Create an MCP toolset with appropriate configuration."""
         
-        # If external URL is provided, use it directly
+        # For external URLs
         if external_url:
             server_params = StreamableHTTPServerParams(url=external_url)
-            logger.info(f"Using external MCP server for {external_url}")
+            logger.info(f"Using external MCP server at {external_url}")
             
-        elif self.is_cloud_run and server_command and port:
-            # In Cloud Run with local server
-            server_params = StreamableHTTPServerParams(
-                url=f"http://localhost:{port}"
-            )
-            # Start the server asynchronously
-            asyncio.create_task(self.start_mcp_server( server_command, port))
+        # For local servers (like Firebase MCP)
+        elif server_command:
+            # Prepare environment
+            env = os.environ.copy()
+            if server_env:
+                env.update(server_env)
+                
+            # Log environment for debugging
+            logger.info(f"MCP server environment: {server_env}")
             
-        elif not self.is_cloud_run and server_command:
-            # In local development, use stdio
+            # Verify the command exists
+            if server_command == "npx":
+                try:
+                    result = subprocess.run(["which", "npx"], capture_output=True, text=True)
+                    logger.info(f"npx location: {result.stdout.strip()}")
+                except Exception as e:
+                    logger.error(f"Failed to locate npx: {e}")
+            
             server_params = StdioServerParameters(
-                command=server_command[0],
-                args=server_command[1:] if len(server_command) > 1 else []
+                command=server_command,
+                args=server_args or [],
+                env=env
             )
-        else:
-            # No server needed
-            server_params = None
-        
-        # Create the toolset with the correct parameter name
-        kwargs = {
-            "connection_params": server_params,  # Use StreamableHTTPServerParams or StdioServerParameters
+            logger.info(f"Using stdio for local MCP server: {server_command} {server_args}")
             
-        }
+        else:
+            server_params = None
+            logger.warning("No server configuration provided")
         
-        # Add tool_filter if provided
+        # Create the toolset
+        kwargs = {"connection_params": server_params}
+        
         if tool_filter:
             kwargs["tool_filter"] = tool_filter
             
-        return MCPToolset(**kwargs)
+        if tools:
+            kwargs["tools"] = tools
+            
+        try:
+            toolset = MCPToolset(**kwargs)
+            logger.info(f"MCPToolset created successfully")
+            return toolset
+        except Exception as e:
+            logger.error(f"Failed to create MCPToolset: {e}", exc_info=True)
+            raise
     
     def cleanup(self):
-        """Clean up any running MCP servers."""
-        for name, process in self.mcp_servers.items():
-            if process.poll() is None:
-                logger.info(f"Stopping MCP server '{name}'")
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+        """Cleanup method."""
+        logger.info("Cleanup called")
 
 # Global instance
 mcp_wrapper = CloudRunMCPWrapper()
