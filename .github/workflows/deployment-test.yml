@@ -13,51 +13,9 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: jobsearch_agents
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Load cached Poetry installation
-        id: cached-poetry
-        uses: actions/cache@v4
-        with:
-          path: ~/.local
-          key: poetry-0
-
-      - name: Install and configure Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 2.1.0
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Install dependencies (skip project installation)
-        run: |
-          # Create and activate poetry environment
-          poetry env use python3.11
-          source $(poetry env info --path)/bin/activate
-          
-          # Install dependencies for local development
-          poetry install --no-interaction --no-ansi --no-root
-
-          # Add the venv's bin to PATH so 'adk' is available
-          VENV_BIN="$(poetry env info -p)/bin"
-          echo "VENV_BIN=$VENV_BIN" >> $GITHUB_ENV
-          echo "$VENV_BIN" >> $GITHUB_PATH
-
-          # Verify installations in the correct environment
-          poetry run python -c "import sys; print(f'Python path: {sys.path}')"
-          poetry run python -c "import deprecated; print('✅ deprecated is installed')"
-          poetry run python -c "from google.adk.cli import main; print('✅ adk is installed')"
-          poetry run which adk
 
       - id: auth
         uses: google-github-actions/auth@v2
@@ -66,44 +24,48 @@ jobs:
           export_environment_variables: true
           cleanup_credentials: true
 
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Decode Firebase service account key
         working-directory: ${{ github.workspace }}
         run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > "${GITHUB_WORKSPACE}/${{ secrets.SA_PATH }}"
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > "${GITHUB_WORKSPACE}/service-account-key.json"
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
-      - name: Deploy to Cloud Run
+      - name: Build and Push Docker Image
         working-directory: ./jobsearch_agents
-        env:
-          AGENT_PATH: 'jobsearch_agents'  # Directory containing agent.py and __init__.py
-          SERVICE_NAME: 'gethired-agents-test'
-          APP_NAME: 'jobsearch_agents'
-          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
-          SERVICE_ACCOUNT_KEY_PATH: '${{ secrets.SA_PATH }}'
         run: |
-          # Activate poetry environment
-          source $(poetry env info --path)/bin/activate
+          # Build Docker image
+          IMAGE_NAME="gcr.io/$GOOGLE_CLOUD_PROJECT/gethired-agents-test"
+          IMAGE_TAG="${{ github.sha }}"
           
-          # Use Poetry's venv to invoke 'adk'
-          poetry run adk deploy cloud_run \
-            --project=$GCP_PROJECT \
-            --region=$GOOGLE_CLOUD_LOCATION \
-            --service_name=$SERVICE_NAME \
-            --app_name=$APP_NAME \
-            --trace_to_cloud \
-            --verbosity=error \
-            $AGENT_PATH
+          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+          docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+          
+          # Configure docker to use gcloud credentials
+          gcloud auth configure-docker gcr.io -q
+          
+          # Push images to Google Container Registry
+          docker push ${IMAGE_NAME}:${IMAGE_TAG}
+          docker push ${IMAGE_NAME}:latest
+          
+          echo "IMAGE=${IMAGE_NAME}:${IMAGE_TAG}" >> $GITHUB_ENV
 
-      - name: Update Service
+      - name: Deploy to Cloud Run
         env:
           SERVICE_NAME: 'gethired-agents-test'
-          GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          GOOGLE_CLOUD_LOCATION: 'us-central1'
+          FIREBASE_STORAGE_BUCKET: 'gethired-staging'
           STAGING_BUCKET: 'gethired-staging'
         run: |
-          gcloud run services update $SERVICE_NAME \
-            --project=$GCP_PROJECT \
+          gcloud run deploy $SERVICE_NAME \
+            --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
-            --update-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET" \
-            --update-env-vars="GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},SERVICE_ACCOUNT_KEY_PATH=${{ secrets.SA_PATH }}"
+            --image=$IMAGE \
+            --platform=managed \
+            --allow-unauthenticated \
+            --memory=2Gi \
+            --cpu=1 \
+            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,SERVICE_ACCOUNT_KEY_PATH=service-account-key.json"
