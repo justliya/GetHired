@@ -2,8 +2,8 @@ import os
 import logging
 import subprocess
 from typing import Optional, List, Dict
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, MCPTool
-from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams, StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, MCPTool,SseServerParams, StdioServerParameters
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class CloudRunMCPWrapper:
         
         # For external URLs
         if external_url:
-            server_params = StreamableHTTPServerParams(url=external_url)
+            server_params = SseServerParams(url=external_url)
             logger.info(f"Using external MCP server at {external_url}")
             
         # For local servers (like Firebase MCP)
