@@ -41,16 +41,20 @@ jobs:
 
       - name: Install dependencies (skip project installation)
         run: |
-          # Install only dependencies (google-adk, deprecated, etc.)—skip installing GetHired itself
+          # Install deprecated package globally first
+          pip install deprecated==1.2.18
+
+          # Install project dependencies
           poetry install --no-interaction --no-ansi --no-root
 
-          # Add the venv’s bin to PATH so 'adk' is available
+          # Add the venv's bin to PATH so 'adk' is available
           VENV_BIN="$(poetry env info -p)/bin"
           echo "VENV_BIN=$VENV_BIN" >> $GITHUB_ENV
           echo "$VENV_BIN" >> $GITHUB_PATH
 
           # Verify that 'deprecated' is present and 'adk' can be found
-          poetry run python -c "import deprecated; print('✅ deprecated is installed')"
+          python -c "import deprecated; print('✅ deprecated is installed (global)')"
+          poetry run python -c "import deprecated; print('✅ deprecated is installed (venv)')"
           poetry run which adk
 
       - id: auth
