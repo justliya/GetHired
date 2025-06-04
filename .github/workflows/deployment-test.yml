@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'jobsearch_agents/**'
-      - '.github/workflows/deployment.yml'
+      - '.github/workflows/deployment-test.yml'
   workflow_dispatch:
 
 jobs:
