@@ -74,16 +74,20 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
 
       - name: Deploy to Cloud Run
+        working-directory: ./jobsearch_agents
         env:
-          AGENT_PATH: '.'
+          AGENT_PATH: 'jobsearch_agents'  # Directory containing agent.py and __init__.py
           SERVICE_NAME: 'gethired-agents-test'
-          APP_NAME: 'jobsearch_agents-test'
+          APP_NAME: 'jobsearch_agents'
           GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
           SERVICE_ACCOUNT_KEY_PATH: '${{ secrets.SA_PATH }}'
         run: |
           # Activate poetry environment
           source $(poetry env info --path)/bin/activate
+          
+          # Verify the agent directory structure
+          ls -la $AGENT_PATH
           
           # Use Poetry's venv to invoke 'adk'
           poetry run adk deploy cloud_run \
