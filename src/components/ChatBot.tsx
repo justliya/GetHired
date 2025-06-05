@@ -7,6 +7,7 @@ interface Message {
   id: string | number;
   role: 'user' | 'assistant';
   content: string;
+  audio_url?: string; // Keep this for type compatibility but won't use it
 }
 
 interface ChatBotProps {
@@ -72,7 +73,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-          
+              className={`flex items-start space-x-2 ${
+                message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+              }`}
             >
               {message.role === 'assistant' && (
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
@@ -82,13 +85,33 @@ const ChatBot: React.FC<ChatBotProps> = ({
               <div
                 className={`max-w-[80%] rounded-lg p-3 ${
                   message.role === 'user'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-white ml-auto'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
                 }`}
               >
-                <ReactMarkdown className="prose dark:prose-invert max-w-none">
-                  {message.content}
-                </ReactMarkdown>
+                {message.role === 'user' ? (
+                  <p className="text-sm">{message.content}</p>
+                ) : (
+                  <ReactMarkdown 
+                    className="prose dark:prose-invert max-w-none text-sm prose-p:my-1 prose-headings:my-2"
+                    components={{
+                      p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                      li: ({children}) => <li className="mb-1">{children}</li>,
+                      code: ({className, children}) => {
+                        const isInline = !className;
+                        return isInline ? (
+                          <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">{children}</code>
+                        ) : (
+                          <code className="block bg-gray-200 dark:bg-gray-600 p-2 rounded text-xs my-2 overflow-x-auto">{children}</code>
+                        );
+                      }
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                )}
               </div>
               {message.role === 'user' && (
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
@@ -103,7 +126,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-          
+            className="flex items-start space-x-2"
           >
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
               <Bot className="w-5 h-5 text-blue-600 dark:text-blue-400" />

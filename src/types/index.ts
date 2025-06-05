@@ -46,11 +46,27 @@ export interface UserPreferences {
   experienceLevel: string | null;
 }
 
+
 export interface ChatMessage {
-  id: string;
+  id: string | number;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: string;
+  audio_url?: string;
+}
+
+export interface A2AResponse {
+  message: string;
+  data?: {
+    audio_url?: string;
+  };
+}
+
+export interface A2ARequest {
+  message: string;
+  context: {
+    user_id: string;
+  };
+  session_id: string;
 }
 
 export interface UserProfile {

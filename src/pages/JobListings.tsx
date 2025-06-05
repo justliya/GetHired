@@ -1,19 +1,22 @@
-import  { useState,  } from 'react';
+import { useState, useRef } from 'react';
 import {
   Search,
- 
   Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockJobListings } from '../data/mockData';
 import JobCard from '../components/JobCard';
 import ChatBot from '../components/ChatBot';
+import { v4 as uuidv4 } from 'uuid'; // Install with: npm install uuid @types/uuid
 
 interface ChatMessage {
   id: string | number;
   role: 'user' | 'assistant';
   content: string;
+  audio_url?: string;
 }
+
+const API_BASE_URL = 'http://localhost:8003';
 
 const JobListings = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +27,11 @@ const JobListings = () => {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  
+  // A2A Session Management
+  const [userId] = useState(() => `user-${uuidv4()}`);
+  const [sessionId, setSessionId] = useState(() => `conv-${uuidv4()}`);
+  const audioRefs = useRef<Map<string | number, HTMLAudioElement>>(new Map());
 
   // Filter and sort jobs
   const filteredJobs = mockJobListings
@@ -51,20 +59,100 @@ const JobListings = () => {
       }
     });
 
-  const clearFilters = () => { setLocationFilter([]); setStatusFilter([]); setSortField('datePosted'); setSortOrder('desc'); setSearchQuery(''); };
+  const clearFilters = () => { 
+    setLocationFilter([]); 
+    setStatusFilter([]); 
+    setSortField('datePosted'); 
+    setSortOrder('desc'); 
+    setSearchQuery(''); 
+  };
 
-  // ChatBot message handler
+  // A2A Speaker Agent message handler
   const handleSendMessage = async (message: string) => {
-    const userMsg: ChatMessage = { id: Date.now(), role: 'user', content: message };
+    // Add user message
+    const userMsg: ChatMessage = { 
+      id: Date.now(), 
+      role: 'user', 
+      content: message 
+    };
     setChatMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
-    // Simulate assistant response
-    setTimeout(() => {
-      const assistantMsg: ChatMessage = { id: Date.now()+1, role: 'assistant', content: `Received: ${message}` };
+
+    // Construct A2A payload
+    const payload = {
+      message: message,
+      context: {
+        user_id: userId
+      },
+      session_id: sessionId
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      
+      const assistantMessage = responseData.message || '(No message received)';
+      const audioUrl = responseData.data?.audio_url;
+      
+      // Add assistant response
+      const assistantMsg: ChatMessage = { 
+        id: Date.now() + 1, 
+        role: 'assistant', 
+        content: assistantMessage,
+        audio_url: audioUrl
+      };
+      
       setChatMessages(prev => [...prev, assistantMsg]);
+      
+      // Handle audio playback if URL is provided
+      if (audioUrl) {
+        // Process the audio URL (handle file:// protocol if needed)
+        const processedAudioUrl = audioUrl.startsWith('file://') 
+          ? audioUrl.replace('file://', '') 
+          : audioUrl;
+        
+        // Note: For file:// URLs, you might need to serve them through your backend
+        // or convert them to blob URLs if they're local files
+        console.log('Audio URL received:', processedAudioUrl);
+      }
+      
+    } catch (error) {
+      console.error('Error sending message to A2A agent:', error);
+      const errorMsg: ChatMessage = { 
+        id: Date.now() + 1, 
+        role: 'assistant', 
+        content: `Error: Could not connect to agent. ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+      setChatMessages(prev => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
   };
+
+  // Reset conversation
+  const handleNewConversation = () => {
+    setSessionId(`conv-${uuidv4()}`);
+    setChatMessages([]);
+    audioRefs.current.clear();
+  };
+
+  // Update ChatBot title and description when toggled
+  const chatBotTitle = showChatBot ? "🔊 A2A Speaker Agent" : "Job Search Assistant";
+  const chatBotDescription = showChatBot 
+    ? `Connected to Speaker Agent (Session: ${sessionId.substring(0, 8)}...)`
+    : "I can help you find and apply to jobs";
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -82,6 +170,15 @@ const JobListings = () => {
             <Sparkles className="w-5 h-5 mr-2" />
             {showChatBot ? 'Hide Assistant' : 'Job Assistant'}
           </button>
+          {showChatBot && (
+            <button
+              onClick={handleNewConversation}
+              className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors duration-200"
+              title="Start new conversation"
+            >
+              🧹 New Chat
+            </button>
+          )}
         </div>
       </div>
 
@@ -95,8 +192,8 @@ const JobListings = () => {
             className="mb-8"
           >
             <ChatBot
-              title="Job Search Assistant"
-              description="I can help you find and apply to jobs"
+              title={chatBotTitle}
+              description={chatBotDescription}
               messages={chatMessages}
               onSendMessage={handleSendMessage}
               isTyping={isTyping}
@@ -118,16 +215,6 @@ const JobListings = () => {
           />
         </div>
       </div>
-
-      {/* Filters Toggle */}
-      <AnimatePresence>
-        {/** original filter button moved above **/}
-      </AnimatePresence>
-
-      {/* Filters Section */}
-      <AnimatePresence>
-        {/** original filter panel **/}
-      </AnimatePresence>
 
       {/* Job Listings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

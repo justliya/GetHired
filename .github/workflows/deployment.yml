@@ -3,10 +3,10 @@ name: Deploy ADK Agents to Cloud Run
 on:
   push:
     branches:
-      - main
+      - agent-interaction
     paths:
-      - 'jobsearch_agents/**'
-      - '.github/workflows/deployment.yml'
+      - "jobsearch_agents/**"
+      - ".github/workflows/deployment.yml"
   workflow_dispatch:
 
 jobs:
@@ -22,14 +22,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Load cached Poetry installation
         id: cached-poetry
         uses: actions/cache@v4
         with:
-          path: ~/.local  # the path depends on the OS
-          key: poetry-0  # increment to reset cache
+          path: ~/.local
+          key: poetry-0
 
       - name: Install and configure Poetry
         uses: snok/install-poetry@v1
@@ -42,25 +42,212 @@ jobs:
         working-directory: jobsearch_agents
         run: |
           poetry install --no-interaction --no-ansi --no-root
-          ADK_PATH=$(poetry run which adk)
-          if [ -z "$ADK_PATH" ]; then
-            echo "Error: ADK command not found in PATH"
-            exit 1
-          fi
-          echo "ADK_CMD=$ADK_PATH" >> $GITHUB_ENV
 
-      - id: 'auth'
-        uses: 'google-github-actions/auth@v2'
+      - id: "auth"
+        uses: "google-github-actions/auth@v2"
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
           export_environment_variables: true
           cleanup_credentials: true
+
+      - name: Set up Cloud SDK
+        uses: "google-github-actions/setup-gcloud@v2"
 
       - name: Decode Firebase service account key
         run: |
           echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > ${GITHUB_WORKSPACE}/${{ secrets.SA_PATH}}
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+
+      - name: Create .env files
+        working-directory: jobsearch_agents
+        run: |
+          # Create .env in the inner jobsearch_agents directory
+          cat > jobsearch_agents/.env << EOF
+          SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
+          FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
+          GOOGLE_GENAI_USE_VERTEXAI=True
+          GOOGLE_CLOUD_LOCATION=us-central1
+          GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
+          EOF
+
+          # Also create one at the root level
+          cat > .env << EOF
+          SERVICE_ACCOUNT_KEY_PATH=jobsearch_agents/serviceAccountKey.json
+          FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}
+          GOOGLE_GENAI_USE_VERTEXAI=True
+          GOOGLE_CLOUD_LOCATION=us-central1
+          GOOGLE_CLOUD_PROJECT=${{ env.GOOGLE_CLOUD_PROJECT }}
+          EOF
+
+      - name: Fix __init__.py and ensure root_agent export
+        working-directory: jobsearch_agents
+        run: |
+          # Create proper __init__.py
+          cat > jobsearch_agents/__init__.py << 'EOF'
+          """
+          Job Search Automation Agent package.
+          """
+          from . import agent
+          from .agent import root_agent
+
+          __all__ = ['agent', 'root_agent']
+          EOF
+
+          # Ensure agent.py exports root_agent at the end
+          echo "Checking if agent.py exports root_agent..."
+          if ! grep -q "^root_agent" jobsearch_agents/agent.py; then
+              echo "Adding root_agent export to agent.py..."
+              echo -e "\n# Export root_agent for ADK\nroot_agent = agent" >> jobsearch_agents/agent.py
+          fi
+
+      - name: Create deployment package
+        working-directory: jobsearch_agents
+        run: |
+          # Export requirements from poetry
+          poetry export -f requirements.txt --output requirements.txt --without-hashes
+
+          # Add additional requirements
+          echo "google_adk" >> requirements.txt
+          echo "uvicorn" >> requirements.txt
+          echo "python-dotenv" >> requirements.txt
+
+          # Create main.py for FastAPI
+          cat > main.py << 'EOF'
+          import os
+          import sys
+          import uvicorn
+          import logging
+          import signal
+          from google.adk.cli.fast_api import get_fast_api_app
+          from jobsearch_agents.mcp_wrapper import mcp_wrapper
+
+
+          logging.basicConfig(
+              level=logging.INFO,
+              format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+          )
+          logger = logging.getLogger(__name__)
+             
+          # Signal handler for graceful shutdown
+          def signal_handler(sig, frame):
+              logger.info("Shutting down gracefully...")
+              mcp_wrapper.cleanup()
+              sys.exit(0)
+
+          signal.signal(signal.SIGINT, signal_handler)
+          signal.signal(signal.SIGTERM, signal_handler)
+          # Get the directory where main.py is located
+          AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+          # Example session DB URL (e.g., SQLite)
+          SESSION_DB_URL = "sqlite:///./sessions.db"
+          # Example allowed origins for CORS
+          ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
+          # Set web=True to serve a web interface
+          SERVE_WEB_INTERFACE = True
+
+          # Call the function to get the FastAPI app instance
+          app = get_fast_api_app(
+              agents_dir=AGENT_DIR,
+              session_db_url=SESSION_DB_URL,
+              allow_origins=ALLOWED_ORIGINS,
+              web=SERVE_WEB_INTERFACE,
+          )
+
+          @app.on_event("shutdown")
+          async def shutdown_event():
+              """Clean up MCP servers on shutdown."""
+              mcp_wrapper.cleanup()
+
+          # Health check endpoint
+          @app.get("/health")
+          async def health_check():
+              return {"status": "healthy"}
+
+          # Debug endpoint
+          @app.get("/debug")
+
+          async def debug_info():
+              return {
+                  "agent_dir": AGENT_DIR,
+                  "cwd": os.getcwd(),
+                  "files": os.listdir(AGENT_DIR),
+                  "env_vars": {
+                      "K_SERVICE": os.environ.get("K_SERVICE", "Not in Cloud Run"),
+                      "GOOGLE_CLOUD_PROJECT": os.environ.get("GOOGLE_CLOUD_PROJECT"),
+                      "SERVICE_ACCOUNT_KEY_PATH": os.environ.get("SERVICE_ACCOUNT_KEY_PATH"),
+                      "FIREBASE_STORAGE_BUCKET": os.environ.get("FIREBASE_STORAGE_BUCKET"),
+                  }
+              }
+
+          if __name__ == "__main__":
+              # Use the PORT environment variable provided by Cloud Run, defaulting to 8080
+              port = int(os.environ.get("PORT", 8080))
+              logger.info(f"Starting server on port {port}")
+              uvicorn.run(app, host="0.0.0.0", port=port)
+          EOF
+
+
+                    
+          # Create start.sh
+          cat > start.sh << 'EOF'
+          #!/bin/bash
+          exec uvicorn main:app --host 0.0.0.0 --port $PORT
+          EOF
+          chmod +x start.sh
+
+
+          # Create Dockerfile with Node.js installed
+          cat > Dockerfile << 'EOF'
+          FROM python:3.11-slim
+          WORKDIR /app
+
+          # Install system dependencies including Node.js
+          RUN apt-get update && apt-get install -y \
+              git \
+              curl \
+              && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+              && apt-get install -y nodejs \
+              && rm -rf /var/lib/apt/lists/*
+
+          # Verify Node.js and npm installation
+          RUN node --version && npm --version
+
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir -r requirements.txt
+
+          RUN adduser --disabled-password --gecos "" myuser && \
+              chown -R myuser:myuser /app
+
+          COPY . .
+
+          USER myuser
+
+          ENV PATH="/home/myuser/.local/bin:$PATH"
+
+          CMD ["./start.sh"]
+          EOF
+
+          # Create .gcloudignore
+          cat > .gcloudignore << 'EOF'
+          .gcloudignore
+          .git
+          .gitignore
+          .venv/
+          __pycache__/
+          *.pyc
+          *.pyo
+          *.pyd
+          .Python
+          *.so
+          .coverage
+          .pytest_cache
+          .mypy_cache
+          poetry.lock
+          pyproject.toml
+          EOF
+
+          echo "Deployment package created"
 
       - name: Deploy to Cloud Run
         env:
