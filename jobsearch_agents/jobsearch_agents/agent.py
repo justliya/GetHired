@@ -5,7 +5,8 @@ Job Search Optimization Agent
 import asyncio
 import os
 from google.adk.agents import Agent
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from dotenv import load_dotenv
 from .shared_libraries import constants
 from .sub_agents.listing.agent import listing_search_agent
@@ -24,16 +25,16 @@ root_agent = Agent(
     sub_agents=[listing_search_agent, company_research_agent],
     tools=[
         MCPToolset(
-            connection_params=StdioServerParameters(
-                command="npx",
-                args=["-y", "firebase-tools@latest", "experimental:mcp"],
+            connection_params=StreamableHTTPServerParams(
+                url="http://localhost:3000/mcp",
             ),
             tool_filter=[
-                "firestore_list_collections",
-                "firestore_query_collection",
                 "auth_get_user",
-                "storage_get_object_download_url",
-                "firestore_get_documents",
+                "storage_get_file_info",
+                "firestore_list_documents",
+                "firestore_get_document",
+                "firestore_list_collections",
+                "firestore_query_collection_group",
             ],
         )
     ],
