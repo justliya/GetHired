@@ -26,7 +26,7 @@ root_agent = Agent(
     tools=[
         MCPToolset(
             connection_params=StreamableHTTPServerParams(
-                url="http://localhost:3000/mcp",
+                url=f"http://localhost:{os.environ.get('PORT')}/mcp",
             ),
             tool_filter=[
                 "auth_get_user",
