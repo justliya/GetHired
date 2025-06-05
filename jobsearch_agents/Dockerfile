@@ -42,4 +42,4 @@ WORKDIR /app
 CMD ["poetry", "run", "adk", "api_server", \
      "--host=0.0.0.0", \
      "--port=8080", \
-     "jobsearch_agents"]
+     "."]
