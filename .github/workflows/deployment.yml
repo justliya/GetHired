@@ -3,7 +3,7 @@ name: Deploy ADK Agents to Cloud Run
 on:
   push:
     branches:
-      - main
+      - 'adk-architecture
     paths:
       - 'jobsearch_agents/**'
       - '.github/workflows/deployment.yml'
