@@ -17,13 +17,13 @@ async def create_coordinator_agent():
     exit_stack = AsyncExitStack()
     await exit_stack.__aenter__()
     
-    coach, profile_stack = await coach_agent()
+    jobcoach_agent, profile_stack = await coach_agent()
     await exit_stack.enter_async_context(profile_stack)
     
-    jobsearch, listing_stack = await jobsearch_agent()
+    listing_search_agent, listing_stack = await jobsearch_agent()
     await exit_stack.enter_async_context(listing_stack)
     
-    research, research_stack = await company_research_agent()
+    company_research, research_stack = await company_research_agent()
     await exit_stack.enter_async_context(research_stack)
     
    # resume, edit_stack = await resume_agent()
@@ -36,7 +36,7 @@ async def create_coordinator_agent():
         instruction=(
             "Your ultimate goal is to make the job search process highly automated user interaction is not required unless getting approval or advising"
         ),
-        sub_agents=[coach, jobsearch, research]
+        sub_agents=[listing_search_agent, company_research, jobcoach_agent]
         
     )
     return coordinator, exit_stack

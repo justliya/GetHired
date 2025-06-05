@@ -8,9 +8,10 @@ from contextlib import AsyncExitStack
 from . import prompt
 from . import approval
 
-
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
+# Get MCP timeout from environment or use default (60 seconds)
+MCP_TIMEOUT = float(os.getenv("MCP_CLIENT_TIMEOUT", "60.0"))
 
 request_approval = Agent(
     name="RequestHumanApproval",
@@ -22,15 +23,16 @@ request_approval = Agent(
     output_key="approval_response"
 )
 
-
 async def create_agent():
     # Create exit stack first
     exit_stack = AsyncExitStack()
     
-    # MCPToolset is NOT awaitable - instantiate directly
+    # MCPToolset with proper timeout settings
     tools = MCPToolset(
         connection_params=SseServerParams(
             url='https://gethired-mcp.onrender.com/jobsearch-mcp/',
+            timeout=MCP_TIMEOUT,  # Connection timeout
+            sse_read_timeout=MCP_TIMEOUT * 5  # SSE read timeout (5x connection timeout)
         ),
         tool_filter=[
             'search_jobs',
@@ -60,6 +62,5 @@ async def create_agent():
     )
     
     return agent_instance, exit_stack
-
 
 root_agent = create_agent()
