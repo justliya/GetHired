@@ -57,7 +57,7 @@ jobs:
           run: |
             echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > jobsearch_agents/serviceAccountKey.json
           env:
-            FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+            FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}  
 
         - name: Deploy to Cloud Run
           working-directory: jobsearch_agents
@@ -76,7 +76,14 @@ jobs:
             --service_name=$SERVICE_NAME \
             --app_name=$APP_NAME \
             --with_ui \
-            --trace_to_cloud \
-            --verbosity=error \
-            --startup-cmd="npx @gannonh/firebase-mcp" \
             jobsearch_agents
+
+        - name: Update Cloud Run service with MCP configuration
+
+          run: |
+            gcloud run services update $SERVICE_NAME \
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --set-env-vars="MCP_TRANSPORT=http,MCP_HTTP_PORT=3000" \
+            --command="npx" \
+            --args="@gannonh/firebase-mcp" \
+            --project=$GOOGLE_CLOUD_PROJECT
