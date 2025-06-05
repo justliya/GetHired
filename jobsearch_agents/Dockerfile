@@ -37,8 +37,9 @@ ENV GOOGLE_GENAI_USE_VERTEXAI=true
 # Expose the port
 EXPOSE ${PORT}
 
-# Run the ADK API Server
+# Run the ADK API Server from within the jobsearch_agents directory
+WORKDIR /app/jobsearch_agents
 CMD ["poetry", "run", "adk", "api_server", \
      "--host=0.0.0.0", \
      "--port=8080", \
-     "jobsearch_agents"]
+     "."]
