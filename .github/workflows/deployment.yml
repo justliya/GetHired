@@ -82,7 +82,7 @@ jobs:
 
           run: |
             gcloud run services update $SERVICE_NAME \
-            --region=$GOOGLE_CLOUD_LOCATION \
+            --region=${{ vars.GOOGLE_CLOUD_LOCATION }} \
             --set-env-vars="MCP_TRANSPORT=http,MCP_HTTP_PORT=3000" \
             --command="npx" \
             --args="@gannonh/firebase-mcp" \
