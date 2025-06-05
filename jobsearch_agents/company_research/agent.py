@@ -8,6 +8,7 @@ from . import prompt
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
+
 # Get MCP timeout from environment or use default (60 seconds)
 MCP_TIMEOUT = float(os.getenv("MCP_CLIENT_TIMEOUT", "60.0"))
 
@@ -21,6 +22,7 @@ async def create_agent():
             url='https://gethired-mcp.onrender.com/jobsearch-mcp/',
             timeout=MCP_TIMEOUT,  # Connection timeout
             sse_read_timeout=MCP_TIMEOUT * 5  # SSE read timeout (5x connection timeout)
+
         ),
         tool_filter=[
             # Company Research Tools
