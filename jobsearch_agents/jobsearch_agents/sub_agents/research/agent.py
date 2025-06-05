@@ -2,7 +2,6 @@ from google.adk.agents.llm_agent import LlmAgent
 from ...shared_libraries import constants
 from . import prompt
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-# Import from mcp_toolset, not mcp_session_manager
 from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
 
 
@@ -15,17 +14,16 @@ company_research_agent = LlmAgent(
     tools=[
         MCPToolset(
             connection_params=StreamableHTTPServerParams(
-                url='https://gethired-mcp.onrender.com/jobsearch-mcp',
+                url="https://gethired-mcp.onrender.com/jobsearch-mcp/",
             ),
             tool_filter=[
-                # Company Research Tools
-                'search_companies',
-                'get_company_overview',
-                'get_company_reviews',
-                'get_company_salaries_glassdoor',
-                'get_company_interviews',
-                'get_company_salary'
-            ]
+                "search_companies",
+                "get_company_overview",
+                "get_company_reviews",
+                "get_company_salaries_glassdoor",
+                "get_company_interviews",
+                "get_company_salary",
+            ],
         )
-    ]
+    ],
 )

@@ -2,7 +2,6 @@ from google.adk.agents import LlmAgent
 from ...shared_libraries import constants
 from . import prompt
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-# Import from mcp_toolset, not mcp_session_manager
 from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
 from ...tools.approval import approval_tool
 
@@ -15,7 +14,7 @@ request_approval = LlmAgent(
         "Wait for approval before proceeding."
     ),
     tools=[approval_tool],
-    output_key="approval_response"
+    output_key="approval_response",
 )
 
 listing_search_agent = LlmAgent(
@@ -30,16 +29,16 @@ listing_search_agent = LlmAgent(
     tools=[
         MCPToolset(
             connection_params=StreamableHTTPServerParams(
-                url='https://gethired-mcp.onrender.com/jobsearch-mcp',
+                url="https://gethired-mcp.onrender.com/jobsearch-mcp/",
             ),
             tool_filter=[
                 # Job Discovery Tools
-                'search_jobs',
-                'search_jobs_by_company',
-                'get_job_details',
-                'search_glassdoor_jobs',
-            ]
+                "search_jobs",
+                "search_jobs_by_company",
+                "get_job_details",
+                "search_glassdoor_jobs",
+            ],
         ),
-        AgentTool(agent=request_approval, skip_summarization=True)
-    ]
+        AgentTool(agent=request_approval, skip_summarization=True),
+    ],
 )
