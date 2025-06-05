@@ -64,7 +64,7 @@ jobs:
           env:
             AGENT_PATH: './agent'
             SERVICE_NAME: 'gethired-agents'
-            APP_NAME: 'jobsearch_agentsd'
+            APP_NAME: 'jobsearch_agents'
             GOOGLE_CLOUD_LOCATION: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
             SERVICE_ACCOUNT_KEY_PATH: 'jobsearch_agents/serviceAccountKey.json'
             GOOGLE_GENAI_USE_VERTEXAI: 'True'
