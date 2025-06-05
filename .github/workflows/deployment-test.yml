@@ -64,8 +64,9 @@ jobs:
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --image=$IMAGE \
+            --port=8080 \
             --platform=managed \
             --allow-unauthenticated \
             --memory=2Gi \
             --cpu=1 \
-            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,SERVICE_ACCOUNT_KEY_PATH=service-account-key.json"
+            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,SERVICE_ACCOUNT_KEY_PATH=${{secrets.SA_PATH}}
