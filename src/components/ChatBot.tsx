@@ -1,13 +1,18 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// components/ChatBot.tsx (enhanced version)
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import JobListingDisplay from './JobListingDisplay';
 
 interface Message {
   id: string | number;
   role: 'user' | 'assistant';
   content: string;
-  audio_url?: string; // Keep this for type compatibility but won't use it
+  audio_url?: string;
+  jobs?: any[]; // Jobs parsed from the message
 }
 
 interface ChatBotProps {
@@ -53,6 +58,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
     }
   };
 
+  // Check if message contains job listings
+  const containsJobListings = (message: Message): boolean => {
+    return (message.jobs && message.jobs.length > 0) || 
+           message.content.toLowerCase().includes('position:') || 
+           message.content.toLowerCase().includes('job:') ||
+           message.content.includes('{') && message.content.includes('jobs');
+  };
+
   return (
     <div className="flex flex-col h-[600px] bg-white dark:bg-gray-800 rounded-lg shadow-md">
       {/* Header */}
@@ -82,36 +95,53 @@ const ChatBot: React.FC<ChatBotProps> = ({
                   <Bot className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
               )}
-              <div
-                className={`max-w-[80%] rounded-lg p-3 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white ml-auto'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                }`}
-              >
-                {message.role === 'user' ? (
-                  <p className="text-sm">{message.content}</p>
-                ) : (
-                  <ReactMarkdown 
-                    className="prose dark:prose-invert max-w-none text-sm prose-p:my-1 prose-headings:my-2"
-                    components={{
-                      p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                      ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                      ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                      li: ({children}) => <li className="mb-1">{children}</li>,
-                      code: ({className, children}) => {
-                        const isInline = !className;
-                        return isInline ? (
-                          <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">{children}</code>
-                        ) : (
-                          <code className="block bg-gray-200 dark:bg-gray-600 p-2 rounded text-xs my-2 overflow-x-auto">{children}</code>
-                        );
-                      }
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                )}
+              <div className="flex-1 max-w-[80%]">
+                <div
+                  className={`rounded-lg p-3 ${
+                    message.role === 'user'
+                      ? 'bg-blue-600 text-white ml-auto'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                  }`}
+                >
+                  {message.role === 'user' ? (
+                    <p className="text-sm">{message.content}</p>
+                  ) : (
+                    <>
+                      <ReactMarkdown 
+                        className="prose dark:prose-invert max-w-none text-sm prose-p:my-1 prose-headings:my-2"
+                        components={{
+                          p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                          ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                          li: ({children}) => <li className="mb-1">{children}</li>,
+                          code: ({className, children}) => {
+                            const isInline = !className;
+                            return isInline ? (
+                              <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">{children}</code>
+                            ) : (
+                              <code className="block bg-gray-200 dark:bg-gray-600 p-2 rounded text-xs my-2 overflow-x-auto">{children}</code>
+                            );
+                          }
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                      
+                      {/* Display parsed job listings if detected */}
+                      {containsJobListings(message) && (
+                        <>
+                          <JobListingDisplay message={message.content} />
+                          {message.jobs && message.jobs.length > 0 && (
+                            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                              <Briefcase className="inline w-3 h-3 mr-1" />
+                              {message.jobs.length} job{message.jobs.length !== 1 ? 's' : ''} found and added to the listings above
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
               {message.role === 'user' && (
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
@@ -148,7 +178,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your message..."
+              placeholder="Ask about job opportunities..."
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={1}
               style={{ minHeight: '40px', maxHeight: '120px' }}
