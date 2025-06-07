@@ -26,7 +26,7 @@ root_agent = Agent(
     tools=[
         MCPToolset(
             connection_params=StreamableHTTPServerParams(
-                url=f"http://localhost:{os.environ.get('PORT')}/mcp",
+                url=f"https://gethired-mcp-1.onrender.com/firebase-mcp/",
             ),
             tool_filter=[
                 "auth_get_user",
@@ -35,6 +35,10 @@ root_agent = Agent(
                 "firestore_get_document",
                 "firestore_list_collections",
                 "firestore_query_collection_group",
+                "storage_upload",
+                "storage_upload_from_url"
+
+
             ],
         )
     ],
