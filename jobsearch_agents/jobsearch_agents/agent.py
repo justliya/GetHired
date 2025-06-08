@@ -40,7 +40,7 @@ root_agent = LlmAgent(
         # Firebase MCP Server for storage and coordination
         MCPToolset(
               connection_params=StreamableHTTPServerParams(
-                url='http://localhost:8000/mcp',
+                url='http://localhost:3000/mcp',
                 env={
                     "SERVICE_ACCOUNT_KEY_PATH": service_path,
                     "FIREBASE_STORAGE_BUCKET": storage,
