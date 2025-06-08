@@ -7,8 +7,8 @@ import logging
 from dotenv import load_dotenv
 
 from google.adk.agents.llm_agent import LlmAgent
-
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 
 from .shared_libraries import constants
 from .sub_agents.listing.agent import listing_search_agent
@@ -39,9 +39,8 @@ root_agent = LlmAgent(
     tools=[
         # Firebase MCP Server for storage and coordination
         MCPToolset(
-            connection_params=StdioServerParameters(
-                command="npx",
-                args=["-y", "@gannonh/firebase-mcp"],
+              connection_params=StreamableHTTPServerParams(
+                url='http://localhost:8000/mcp',
                 env={
                     "SERVICE_ACCOUNT_KEY_PATH": service_path,
                     "FIREBASE_STORAGE_BUCKET": storage,
