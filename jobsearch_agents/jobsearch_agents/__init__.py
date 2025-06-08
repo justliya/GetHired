@@ -1,4 +1,4 @@
 """
 Job Search Automation Agent package.
 """
-from . import agent
+from .agent import root_agent
