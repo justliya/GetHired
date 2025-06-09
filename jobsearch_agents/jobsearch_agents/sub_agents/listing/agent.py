@@ -30,7 +30,7 @@ listing_search_agent = LlmAgent(
     tools=[
         MCPToolset(
             connection_params=StreamableHTTPServerParams(
-                url='https://gethired-mcp.onrender.com/jobsearch-mcp',
+                url='https://gethired-mcp.onrender.com/jobsearch-mcp/',
             ),
             tool_filter=[
                 # Job Discovery Tools

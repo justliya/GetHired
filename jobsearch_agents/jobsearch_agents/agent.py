@@ -32,6 +32,7 @@ root_agent = LlmAgent(
     name=constants.AGENT_NAME,
     description=constants.DESCRIPTION,
     instruction=prompt.ROOT_PROMPT,
+    output_key="preferred_job_listings",
     sub_agents=[
         listing_search_agent,
         company_research_agent,
