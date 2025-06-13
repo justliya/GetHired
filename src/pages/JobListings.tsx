@@ -21,7 +21,7 @@ interface ChatMessage {
   jobs?: JobListing[]; // Add jobs property to store parsed jobs
 }
 
-const API_BASE_URL = 'http://localhost:8003';
+const API_BASE_URL = 'https://gethired-agents.onrender.com';
 
 const JobListings = () => {
   const [searchQuery, setSearchQuery] = useState('');
