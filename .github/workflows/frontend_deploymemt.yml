@@ -8,9 +8,13 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+
     paths:
-      - '!jobsearch_agents/**'
-      - '.github/workflows/frontend_deployment.yml'
+      - "!jobsearch_agents/**"
+      - ".github/workflows/frontend_deployment.yml"
 jobs:
   Deploy-Production:
     runs-on: ubuntu-latest
@@ -31,4 +35,3 @@ jobs:
       - name: Deploy Project Artifacts to Vercel
         run: |
           vercel deploy --prebuilt --token=${{ secrets.GET_HIRED }}
-
