@@ -1,8 +1,8 @@
 from google.adk.agents.llm_agent import LlmAgent
 from ...shared_libraries import constants
 from . import prompt
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
-# Import from mcp_toolset, not mcp_session_manager
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+
 from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
 
 google_maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
@@ -16,7 +16,7 @@ company_research_agent = LlmAgent(
     tools=[
         MCPToolset(
             connection_params=StreamableHTTPServerParams(
-                url='https://gethired-mcp.onrender.com/jobsearch-mcp',
+                url='https://gethired-mcp.onrender.com/jobsearch-mcp/',
             ),
             tool_filter=[
                 # Company Research Tools
