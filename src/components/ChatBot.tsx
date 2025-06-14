@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import JobListingDisplay from './jobListingDisplay';
+import JobListingDisplay from './JobListingDisplay';
 
 interface Message {
   id: string | number;
