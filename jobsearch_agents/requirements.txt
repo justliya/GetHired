@@ -1,0 +1,8 @@
+google-adk
+praw
+python-dotenv 
+requests>=2.31.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0 
+aiohttp
+npx
