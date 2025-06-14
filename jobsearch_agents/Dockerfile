@@ -3,6 +3,11 @@ FROM python:3.11-slim
 # Set up working directory
 WORKDIR /app
 
+# Set environment variables
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+ENV GOOGLE_GENAI_USE_VERTEXAI=true
+
 # Install essential tools
 RUN apt-get update && apt-get install -y \
     curl \
@@ -15,31 +20,29 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install --no-cache-dir poetry==2.1.0
+# Copy requirements file
+COPY requirements.txt .
 
-# Copy poetry configuration files
-COPY pyproject.toml poetry.lock* ./
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Configure poetry to not create a virtual environment inside container
-RUN poetry config virtualenvs.create false
+# Install additional required packages
+RUN pip install --no-cache-dir \
+    google-adk>=1.1.1 \
+    google-genai>=1.5.0 \
+    google-cloud-bigquery>=3.31.0 \
+    absl-py>=2.2.2 \
+    google-cloud-aiplatform[agent-engines]>=1.95.1 \
+    pytest>=8.3.5 \
+    pillow>=11.1.0 \
+    deprecated>=1.2.18 \
+    python-dotenv \
+    fastapi>=0.100.0 \
+    uvicorn[standard]>=0.20.0 \
+    aiohttp
 
-# Install all dependencies only
-RUN poetry install --no-interaction --no-ansi --no-root
-
-# Copy the rest of the application
 COPY . .
 
-# Default environment variables
-ENV PORT=8080
-ENV GOOGLE_GENAI_USE_VERTEXAI=true
-
-# Expose the port
 EXPOSE ${PORT}
 
-# Run the ADK API Server from the main directory
-WORKDIR /app
-CMD ["poetry", "run", "adk", "api_server", \
-     "--host=0.0.0.0", \
-     "--port=8080", \
-     "."]
+CMD ["python", "-m", "coordinator", "--host=0.0.0.0", "--port=8080"]
