@@ -38,7 +38,7 @@ jobs:
         working-directory: ./jobsearch_agents
         run: |
           # Build Docker image
-          IMAGE_NAME="gcr.io/$GOOGLE_CLOUD_PROJECT/gethired-agents-test"
+          IMAGE_NAME="gcr.io/$GOOGLE_CLOUD_PROJECT/gethired-agents"
           IMAGE_TAG="${{ github.sha }}"
           
           docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
