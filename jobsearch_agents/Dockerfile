@@ -41,6 +41,14 @@ RUN pip install --no-cache-dir \
     uvicorn[standard]>=0.20.0 \
     aiohttp
 
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm install
+
+# Install the Firebase MCP package globally
+RUN npm install @gannonh/firebase-mcp
+
 COPY . .
 
 EXPOSE ${PORT}

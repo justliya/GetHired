@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
+from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams, StdioServerParameters
 from contextlib import AsyncExitStack
 
 
@@ -11,6 +11,8 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.en
 
 # Get MCP timeout from environment or use default (60 seconds)
 MCP_TIMEOUT = float(os.getenv("MCP_CLIENT_TIMEOUT", "60.0"))
+service_path = os.getenv('SERVICE_ACCOUNT_KEY_PATH', '')
+storage = os.getenv('FIREBASE_STORAGE_BUCKET', '')
 
 async def create_agent():
     # Create exit stack first
@@ -18,9 +20,13 @@ async def create_agent():
     
     # MCPToolset with proper timeout settings
     tools = MCPToolset(
-        connection_params=StreamableHTTPServerParams(
-            url='http://localhost:3000/mcp',
-            
+        connection_params=StdioServerParameters(
+            command="npx",
+            args=["-y", "@gannonh/firebase-mcp"],
+            env={
+                "SERVICE_ACCOUNT_KEY_PATH": service_path,
+                "FIREBASE_STORAGE_BUCKET": storage,
+            },
         ),
         tool_filter=[
             # Company Research Tools

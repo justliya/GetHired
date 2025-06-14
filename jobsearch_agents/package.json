@@ -1,0 +1,8 @@
+{
+  "name": "agents-app",
+  "version": "1.0.0",
+  "description": "Agents application",
+  "dependencies": {
+    "@gannonh/firebase-mcp": "latest"
+  }
+}
