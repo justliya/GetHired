@@ -13,6 +13,11 @@ import ChatBot from '../components/ChatBot';
 import { v4 as uuidv4 } from 'uuid';
 import type { JobListing } from '../types/index';
 
+// Firebase imports
+import { auth } from '../firebase'; // Adjust path to your Firebase config
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { signInAnonymously } from 'firebase/auth';
+
 interface ChatMessage {
   id: string | number;
   role: 'user' | 'assistant';
@@ -35,10 +40,22 @@ const JobListings = () => {
   const [agentJobs, setAgentJobs] = useState<JobListing[]>([]); // Store jobs from agent
   const [useAgentJobs, setUseAgentJobs] = useState(false); // Toggle between mock and agent jobs
   
-  // A2A Session Management
-  const [userId] = useState(() => `user-${uuidv4()}`);
+  // Firebase Auth
+  const [user, loading, error] = useAuthState(auth);
+  
+  // A2A Session Management - using Firebase user ID or fallback
+  const userId = user?.uid || `anonymous-${uuidv4()}`;
   const [sessionId, setSessionId] = useState(() => `conv-${uuidv4()}`);
   const audioRefs = useRef<Map<string | number, HTMLAudioElement>>(new Map());
+
+  // Sign in anonymously if no user
+  useEffect(() => {
+    if (!loading && !user && !error) {
+      signInAnonymously(auth).catch((error) => {
+        console.error('Error signing in anonymously:', error);
+      });
+    }
+  }, [user, loading, error]);
 
   // Parse job listings from agent response
   // Update the parseJobListings function with the corrected pattern
@@ -217,11 +234,14 @@ const handleSendMessage = async (message: string) => {
   setChatMessages(prev => [...prev, userMsg]);
   setIsTyping(true);
 
-  // Construct A2A payload
+  // Construct A2A payload with Firebase user ID
   const payload = {
     message: message,
     context: {
-      user_id: userId
+      user_id: userId,
+      firebase_uid: user?.uid,
+      user_email: user?.email,
+      is_anonymous: user?.isAnonymous
     },
     session_id: sessionId
   };
@@ -311,7 +331,7 @@ const handleSendMessage = async (message: string) => {
 };
 
 useEffect(() => {
-  if (showChatBot && chatMessages.length === 0) {
+  if (showChatBot && chatMessages.length === 0 && !loading) {
     const initialMessage = `Hello! I'm looking for job opportunities. When you find jobs, please return them in this JSON format:
 {
   "jobs": [
@@ -330,7 +350,8 @@ useEffect(() => {
     handleSendMessage(initialMessage);
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [showChatBot]);
+}, [showChatBot, loading]);
+
   // Reset conversation
   const handleNewConversation = () => {
     setSessionId(`conv-${uuidv4()}`);
@@ -342,7 +363,33 @@ useEffect(() => {
 
   // Update ChatBot title and description
   const chatBotTitle = "🔊 A2A Speaker Agent";
-  const chatBotDescription = `Connected to Speaker Agent (Session: ${sessionId.substring(0, 8)}...)`;
+  const chatBotDescription = `Connected to Speaker Agent (User: ${user?.uid?.substring(0, 8) || 'anonymous'}...)`;
+
+  // Show loading state while Firebase Auth is initializing
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-center items-center py-12">
+          <div className="text-lg text-gray-600 dark:text-gray-400">
+            Initializing authentication...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if Firebase Auth fails
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-center items-center py-12">
+          <div className="text-lg text-red-600 dark:text-red-400">
+            Authentication error: {error.message}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -354,6 +401,11 @@ useEffect(() => {
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
             Found {filteredJobs.length} jobs {useAgentJobs && agentJobs.length > 0 ? 'from AI search' : 'in database'}
+            {user && (
+              <span className="ml-2 text-sm">
+                • User: {user.isAnonymous ? 'Anonymous' : (user.email || user.uid.substring(0, 8))}
+              </span>
+            )}
           </p>
         </div>
         <div className="mt-4 md:mt-0 flex space-x-2">
