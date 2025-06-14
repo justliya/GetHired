@@ -55,7 +55,7 @@ jobs:
 
       - name: Deploy to Cloud Run
         env:
-          SERVICE_NAME: 'gethired-agents-test'
+          SERVICE_NAME: 'gethired-agents'
           GOOGLE_CLOUD_LOCATION: 'us-central1'
           FIREBASE_STORAGE_BUCKET: 'gethired-staging'
           STAGING_BUCKET: 'gethired-staging'
