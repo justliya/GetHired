@@ -2,9 +2,10 @@ name: Deploy ADK Agents to Cloud Run
 
 on:
   push:
+    # TODO Trigger deployment on push to main branch
     paths:
       - 'jobsearch_agents/**'
-      - '.github/workflows/deployment-test.yml'
+      - '.github/workflows/deployment.yml'
   workflow_dispatch:
 
 jobs:
