@@ -1,114 +1,46 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CalendarDays, MapPin, DollarSign, Heart } from 'lucide-react';
-import type { JobListing } from '../types/index';
+import { Bookmark, Briefcase, MapPin } from 'lucide-react';
+import type { JobListing } from '../types';
 
 interface JobCardProps {
   job: JobListing;
+  onFavoriteToggle: (job: JobListing) => void;
+  onResearch: (job: JobListing) => void;
 }
 
-const statusColors: Record<JobListing['status'], string> = {
-  new: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  researching: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  applying: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  applied: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  interviewing: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  offered: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300'
-};
-
-const statusLabels: Record<JobListing['status'], string> = {
-  new: 'New',
-  researching: 'Researching',
-  applying: 'Applying',
-  applied: 'Applied',
-  interviewing: 'Interviewing',
-  rejected: 'Rejected',
-  offered: 'Offered'
-};
-
-const JobCard: React.FC<JobCardProps> = ({ job }) => {
-  const navigate = useNavigate();
-  // Safely handle qualifications possibly being undefined
-  const qualifications = job.qualifications ?? [];
-
+const JobCard = ({ job, onFavoriteToggle, onResearch }: JobCardProps) => {
   return (
-    <div 
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col"
-    >
-      <div className="p-5 flex-grow">
-        <div className="flex justify-between items-start mb-3">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <img src={job.avatar || '/placeholder-avatar.png'} alt="Company logo" className="w-10 h-10 rounded-full" />
           <div>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[job.status]}`}>
-              {statusLabels[job.status]}
-            </span>
-          </div>
-          <button className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors duration-200">
-            {job.favorite ? (
-              <Heart className="w-5 h-5 fill-red-500 text-red-500" />
-            ) : (
-              <Heart className="w-5 h-5" />
-            )}
-          </button>
-        </div>
-        
-        <h3 
-          className="text-lg font-semibold text-gray-900 dark:text-white mb-1 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
-          onClick={() => navigate(`/jobs/${job.id}`)}
-        >
-          {job.title}
-        </h3>
-        
-        <p className="text-gray-700 dark:text-gray-300 font-medium mb-3">{job.company}</p>
-        
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-            <span>{job.location}</span>
-          </div>
-          
-          {job.salary && (
-            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-              <DollarSign className="w-4 h-4 mr-1 flex-shrink-0" />
-              <span>{job.salary}</span>
-            </div>
-          )}
-          
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <CalendarDays className="w-4 h-4 mr-1 flex-shrink-0" />
-            <span>Posted {job.datePosted}</span>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{job.title}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{job.company}</p>
           </div>
         </div>
-        
-        <div className="flex flex-wrap gap-2 mt-2">
-          {qualifications.slice(0, 2).map((qualification, index) => (
-            <span 
-              key={index} 
-              className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-            >
-              {qualification.length > 25 ? `${qualification.substring(0, 25)}...` : qualification}
-            </span>
-          ))}
-          {qualifications.length > 2 && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-              +{qualifications.length - 2} more
-            </span>
-          )}
-        </div>
-      </div>
-      
-      <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-750 flex justify-between">
-        <button 
-          onClick={() => navigate(`/company-research/${job.id}`)}
-          className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          Research Company
+        <button onClick={() => onFavoriteToggle(job)}>
+          <Bookmark className={`w-5 h-5 ${job.favorite ? 'text-yellow-500' : 'text-gray-400'}`} />
         </button>
-        <button 
-          onClick={() => navigate(`/resume-tailoring/${job.id}`)}
-          className="text-sm font-medium text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300"
+      </div>
+      <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3 mb-4">{job.description}</p>
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
+        <Briefcase className="w-4 h-4" />
+        <span>{job.salary || 'Salary not listed'}</span>
+        <MapPin className="w-4 h-4 ml-4" />
+        <span>{job.location}</span>
+      </div>
+      <div className="flex justify-between">
+        <button
+          onClick={() => window.open(job.url || '#', '_blank')}
+          className="text-blue-600 hover:underline dark:text-blue-400"
         >
-          Tailor Resume
+          View Job
+        </button>
+        <button
+          onClick={() => onResearch(job)}
+          className="text-gray-600 dark:text-gray-300 hover:underline text-sm"
+        >
+          Research
         </button>
       </div>
     </div>
