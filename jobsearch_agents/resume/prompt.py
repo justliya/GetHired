@@ -150,6 +150,7 @@ Volunteer Experience:
 Please separate sections using double newlines.
 """
 TEMPLATE_DOCUMENT_CREATION = """
-Act as an expert recruiter and Microsoft word power users
-and create a formatted document with the final draft of the resume: 'final_resume'
+Act as an expert recruiter and Microsoft word power user
+and create a formatted document using the available tools with the final draft of the resume: 'final_resume'
+You should return the output from the tool in your reposnse.
 """

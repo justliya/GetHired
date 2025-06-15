@@ -2,11 +2,10 @@ from google.adk.agents.llm_agent import Agent
 from google.adk.agents import SequentialAgent
 
 from . import prompt
-from .resume_doc import load_resume_job_desc, create_formatted_resume
+from .resume_doc import create_formatted_resume
 from contextlib import AsyncExitStack
 
-#resume, job_spec = load_resume_job_desc()
-job_spec = "Dummy Job Description: Seeking a software engineer with experience in Python and machine learning. Must have strong problem-solving skills and the ability to work in a team environment."
+
 base_resume_cleanup =  Agent(
     model="gemini-2.0-flash",
     name="base_resume_cleanup",
@@ -17,28 +16,28 @@ base_resume_cleanup =  Agent(
 job_optimization_agent =  Agent(
     model="gemini-2.0-flash",
     name="job_optimization_agent",
-    instruction = prompt.JOB_OPTIMIZATION.format(job_spec),
+    instruction = prompt.JOB_OPTIMIZATION,
     output_key="job_optimized_resume"
     )
 
 experience_optimization_agent  =  Agent(
     model="gemini-2.0-flash",
     name="experience_optimization_agent",
-    instruction = prompt.EXPERIENCE_OPTIMIZATION.format(job_spec),
+    instruction = prompt.EXPERIENCE_OPTIMIZATION,
     output_key='experience_optimizated_resume'
     )
 
 ats_optimization_agent =  Agent(
     model="gemini-2.0-flash",
     name="ats_optimization_agent",
-    instruction = prompt.ATS_OPTIMIZATION.format(job_spec),
+    instruction = prompt.ATS_OPTIMIZATION,
     output_key='ats_optimized_resume'
     )
 
 humanize_resume_agent =  Agent(
     model="gemini-2.0-flash",
     name="humanize_resume_agent",
-    instruction = prompt.HUMANIZE.format(job_spec),
+    instruction = prompt.HUMANIZE,
     output_key='draft_resume'
     )
 

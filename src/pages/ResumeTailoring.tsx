@@ -84,11 +84,7 @@ const ResumeTailoring = () => {
             setSelectedResumeId(defaultResume.id);
             setSelectedResumeUrl(defaultResume.fileUrl);
             setResumeInputMethod('saved');
-            setResumeText(`Resume loaded: ${defaultResume.metadata?.title || 'Untitled Resume'}
-
-File stored at: ${defaultResume.fileUrl}
-
-The resume content will be processed automatically. You can also paste additional text if needed.`);
+            setResumeText(`Upload resume content will be processed automatically.`);
           }
         }
 
@@ -158,11 +154,7 @@ The resume content will be processed automatically. You can also paste additiona
         setSelectedResumeUrl(newResume.fileUrl);
         setResumeInputMethod('upload');
         
-        setResumeText(`Resume uploaded: ${newResume.metadata?.title || 'Untitled Resume'}
-
-File stored at: ${newResume.fileUrl}
-
-The resume content will be processed automatically. You can also paste additional text if needed.`);
+        setResumeText(`The resume content will be processed automatically.`);
       }
     } catch (err) {
       console.error('Error uploading resume:', err);
@@ -178,11 +170,7 @@ The resume content will be processed automatically. You can also paste additiona
     setSelectedResumeUrl(resume.fileUrl);
     setResumeInputMethod('saved');
     
-    setResumeText(`Resume loaded: ${resume.metadata?.title || 'Untitled Resume'}
-
-File stored at: ${resume.fileUrl}
-
-The resume content will be processed automatically. You can also paste additional text if needed.`);
+    setResumeText(`The resume content will be processed automatically. You can also paste additional text if needed.`);
   };
 
   const loadSampleResume = () => {
