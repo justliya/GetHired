@@ -72,3 +72,7 @@ async def create_agent():
         ],
     )
     return resume_pipeline_agent, exit_stack
+
+def root_agent():
+    """Return the agent creation coroutine"""
+    return create_agent()
