@@ -66,7 +66,7 @@ jobs:
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --image=$IMAGE \
-            --set-secrets=SERVICE_ACCOUNT_KEY_PATH=firebase-service-account-key:latest \
+            --set-secrets=SERVICE_ACCOUNT_KEY_PATH=firebase-service-account-key:latest:/secrets/firebase/serviceAccountKey.json \
             --port=8080 \
             --platform=managed \
             --allow-unauthenticated \
