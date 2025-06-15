@@ -75,12 +75,14 @@ const JobListings = () => {
   // 2) Load profile jobs
   const loadProfile = useCallback(async () => {
     if (!user?.uid) return;
-    const userRef = doc(db, "users", user.uid);
-    const snap = await getDoc(userRef);
-    if (snap.exists()) {
-      const data = snap.data() as any;
-      if (Array.isArray(data.jobListings)) {
-        setProfileJobs(data.jobListings);
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const data = snap.data() as any;
+        if (Array.isArray(data.jobListings)) {
+          setProfileJobs(data.jobListings);
+        }
       }
     } catch (e) {
       console.error("Error in JSON parsing:", e);
