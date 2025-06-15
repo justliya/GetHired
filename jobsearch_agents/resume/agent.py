@@ -5,12 +5,12 @@ from . import prompt
 from .resume_doc import load_resume_job_desc, create_formatted_resume
 from contextlib import AsyncExitStack
 
-resume, job_spec = load_resume_job_desc()
-
+#resume, job_spec = load_resume_job_desc()
+job_spec = "Dummy Job Description: Seeking a software engineer with experience in Python and machine learning. Must have strong problem-solving skills and the ability to work in a team environment."
 base_resume_cleanup =  Agent(
     model="gemini-2.0-flash",
     name="base_resume_cleanup",
-    instruction = prompt.BASE_PROMPT.format("Lakaleigh","Software Engineer", "AI", resume),
+    instruction = prompt.BASE_PROMPT,
     output_key="base_resume",
     )
 
