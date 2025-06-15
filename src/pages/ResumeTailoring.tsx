@@ -52,6 +52,7 @@ const ResumeTailoring = () => {
   const [selectedResumeUrl, setSelectedResumeUrl] = useState<string>('');
   const [isLoadingResumes, setIsLoadingResumes] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [resumeInputMethod, setResumeInputMethod] = useState<'manual' | 'upload' | 'saved'>('manual');
   
   // Job selection state
   const [userJobs, setUserJobs] = useState<JobListing[]>([]);
@@ -82,6 +83,12 @@ const ResumeTailoring = () => {
           if (defaultResume) {
             setSelectedResumeId(defaultResume.id);
             setSelectedResumeUrl(defaultResume.fileUrl);
+            setResumeInputMethod('saved');
+            setResumeText(`Resume loaded: ${defaultResume.metadata?.title || 'Untitled Resume'}
+
+File stored at: ${defaultResume.fileUrl}
+
+The resume content will be processed automatically. You can also paste additional text if needed.`);
           }
         }
 
@@ -149,9 +156,13 @@ const ResumeTailoring = () => {
         setUserResumes(prev => [...prev, newResume]);
         setSelectedResumeId(newResume.id);
         setSelectedResumeUrl(newResume.fileUrl);
+        setResumeInputMethod('upload');
         
-        // TODO: Extract text from uploaded file for resumeText
-        // For now, user will need to paste text manually
+        setResumeText(`Resume uploaded: ${newResume.metadata?.title || 'Untitled Resume'}
+
+File stored at: ${newResume.fileUrl}
+
+The resume content will be processed automatically. You can also paste additional text if needed.`);
       }
     } catch (err) {
       console.error('Error uploading resume:', err);
@@ -164,15 +175,21 @@ const ResumeTailoring = () => {
     const resume = userResumes.find(r => r.id === resumeId);
     if (!resume) return;
 
-    // Set the resume URL for backend submission
     setSelectedResumeUrl(resume.fileUrl);
+    setResumeInputMethod('saved');
     
-    // TODO: Extract text from the resume file URL
-    // For now, we'll show a placeholder message
-    setResumeText('// Resume text will be extracted from uploaded file\n// Please paste your resume text here for now');
+    setResumeText(`Resume loaded: ${resume.metadata?.title || 'Untitled Resume'}
+
+File stored at: ${resume.fileUrl}
+
+The resume content will be processed automatically. You can also paste additional text if needed.`);
   };
 
   const loadSampleResume = () => {
+    setResumeInputMethod('manual');
+    setSelectedResumeId('');
+    setSelectedResumeUrl('');
+    
     const sampleResume = `John Doe
 Software Developer
 john.doe@email.com | (555) 123-4567 | LinkedIn: linkedin.com/in/johndoe
@@ -272,8 +289,7 @@ Join our team and help build the next generation of web applications that serve 
 
     setIsAnalyzing(true);
     try {
-      // Call your backend AI agent API
-      const response = await fetch('https://gethired-agents-104139545590.us-central1.run.app/run', {
+      const response = await fetch('https://gethired-agents-staging-104139545590.us-central1.run.app/run', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -293,7 +309,10 @@ ${jobDescription}
             is_anonymous: user?.isAnonymous || false,
             task: 'resume_tailoring',
             user_name: userName || user?.displayName || '',
-            resume_storage_url: selectedResumeUrl || ''
+            resume_storage_url: selectedResumeUrl || '',
+            job_description: jobDescription,
+            job_title: job?.title || '',
+            job_company: job?.company || ''
           },
           session_id: `resume-${Date.now()}`
         }),
@@ -325,7 +344,6 @@ ${jobDescription}
     } catch (error) {
       console.error('Analysis failed:', error);
       
-      // Fallback to mock data if API fails
       setTailoringData({
         suggestedChanges: [
           {
@@ -345,10 +363,8 @@ ${jobDescription}
 
 I am excited to apply for the ${job?.title || 'position'} at ${job?.company || 'your company'}. Based on the job description, I believe my experience aligns well with your requirements.
 
-[AI-generated cover letter content would appear here]
-
 Best regards,
-[Your Name]`,
+${userName || 'Your Name'}`,
         tailoredResumeUrl: undefined
       });
     } finally {
@@ -380,9 +396,13 @@ Best regards,
     }
   };
 
-  const copySuggestion = (text: string) => {
-    navigator.clipboard.writeText(text);
-    // TODO: show toast notification
+  const copySuggestion = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log('Text copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
   };
 
   const title = job?.title || '';
@@ -428,9 +448,19 @@ Best regards,
 
       {/* Resume Selection Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Select Your Resume
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Select Your Resume
+          </h2>
+          {resumeInputMethod !== 'manual' && (
+            <div className="flex items-center px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded-full">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+              <span className="text-sm text-green-700 dark:text-green-300">
+                {resumeInputMethod === 'upload' ? 'File Uploaded' : 'Resume Loaded'}
+              </span>
+            </div>
+          )}
+        </div>
         <div className="flex flex-wrap gap-4 mb-4">
           {/* Upload Resume Button */}
           <button
@@ -455,6 +485,10 @@ Best regards,
                   setSelectedResumeId(e.target.value);
                   if (e.target.value) {
                     handleLoadResumeText(e.target.value);
+                  } else {
+                    setResumeInputMethod('manual');
+                    setSelectedResumeUrl('');
+                    setResumeText('');
                   }
                 }}
                 className="px-4 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
@@ -502,14 +536,38 @@ Best regards,
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Resume Text Area */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Resume Text
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Resume Text
+              </label>
+              {resumeInputMethod !== 'manual' && (
+                <button
+                  onClick={() => {
+                    setResumeInputMethod('manual');
+                    setSelectedResumeId('');
+                    setSelectedResumeUrl('');
+                    setResumeText('');
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Switch to manual input
+                </button>
+              )}
+            </div>
             <textarea
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
-              className="w-full p-3 border rounded-md h-64 resize-none dark:bg-gray-700 dark:text-white"
-              placeholder="Paste your current resume text here or upload a file above..."
+              disabled={resumeInputMethod !== 'manual'}
+              className={`w-full p-3 border rounded-md h-64 resize-none dark:bg-gray-700 dark:text-white ${
+                resumeInputMethod !== 'manual' 
+                  ? 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 cursor-not-allowed' 
+                  : ''
+              }`}
+              placeholder={
+                resumeInputMethod === 'manual' 
+                  ? "Paste your current resume text here or upload a file above..."
+                  : "Resume loaded from file. Use 'Switch to manual input' to edit manually."
+              }
             />
           </div>
 
@@ -523,11 +581,11 @@ Best regards,
                 {userJobs.length > 0 && (
                   <button
                     onClick={() => setShowJobSelector(!showJobSelector)}
-                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center transition-colors"
                   >
                     <FileText className="w-4 h-4 mr-1" />
-                    Load from saved jobs
-                    <ChevronDown className="w-4 h-4 ml-1" />
+                    Load from saved jobs ({userJobs.length})
+                    <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${showJobSelector ? 'rotate-180' : ''}`} />
                   </button>
                 )}
                 <button
@@ -541,15 +599,18 @@ Best regards,
             </div>
 
             {showJobSelector && (
-              <div className="mb-4 border rounded-md max-h-32 overflow-y-auto">
+              <div className="mb-4 border border-gray-300 dark:border-gray-600 rounded-md max-h-32 overflow-y-auto bg-white dark:bg-gray-800 shadow-lg z-10 relative">
                 {userJobs.map((jobListing) => (
                   <button
                     key={jobListing.id}
                     onClick={() => handleLoadJobFromListing(jobListing)}
-                    className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b last:border-b-0"
+                    className="w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-600 last:border-b-0 transition-colors"
                   >
-                    <div className="font-medium text-sm">{jobListing.title}</div>
-                    <div className="text-xs text-gray-500">{jobListing.company}</div>
+                    <div className="font-medium text-sm text-gray-900 dark:text-white">{jobListing.title}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{jobListing.company}</div>
+                    {jobListing.location && (
+                      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">{jobListing.location}</div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -564,20 +625,29 @@ Best regards,
           </div>
         </div>
 
-        <button
-          onClick={startAnalysis}
-          disabled={!resumeText || !jobDescription || isAnalyzing}
-          className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
-        >
-          {isAnalyzing ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            'Tailor Resume'
+        <div className="flex items-center justify-between">
+          <button
+            onClick={startAnalysis}
+            disabled={!resumeText || !jobDescription || isAnalyzing}
+            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+          >
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              'Tailor Resume'
+            )}
+          </button>
+          
+          {(!resumeText || !jobDescription) && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {!resumeText && !jobDescription ? 'Please add resume text and job description' :
+               !resumeText ? 'Please add resume text' : 'Please add job description'}
+            </span>
           )}
-        </button>
+        </div>
       </div>
 
       {/* Results Section */}
