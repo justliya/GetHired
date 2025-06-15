@@ -11,7 +11,7 @@ from . import prompt
 
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-api_key=os.environ.get("GOOGLE_API_KEY")
+
 
 async def create_coordinator_agent():
     exit_stack = AsyncExitStack()
@@ -31,11 +31,9 @@ async def create_coordinator_agent():
 
     coordinator = Agent(
         name="coordinator_agent",
-        description=prompt.ROOT_PROMPT,
+        description='Coordinates finding job listings, researching companies, and tailoring resumes for job applications.',
         model="gemini-2.0-flash-001",
-        instruction=(
-            "Your ultimate goal is to make the job search process highly automated user interaction is not required unless getting approval or advising"
-        ),
+        instruction=prompt.COORDINATOR_AGENT_INSTRUCTION,
         sub_agents=[listing_search_agent, company_research, jobcoach_agent, resume]
         
     )
