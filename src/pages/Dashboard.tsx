@@ -1,9 +1,13 @@
-import  { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Briefcase, Building2, FileText, Sparkles } from 'lucide-react';
+import {
+  Search, Briefcase, Building2, FileText, Sparkles,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
-import { mockJobListings } from '../data/mockData';
+import { collection, getDocs } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import JobCard from '../components/JobCard';
+import type { JobListing } from '../types';
 
 interface DashboardProps {
   onOpenPreferences: () => void;
@@ -12,26 +16,43 @@ interface DashboardProps {
 const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Mock data for dashboard stats
-  const stats = [
-    { label: 'Jobs Found', value: 42, icon: <Search className="w-5 h-5 text-blue-500" /> },
-    { label: 'Applications', value: 12, icon: <Briefcase className="w-5 h-5 text-purple-500" /> },
-    { label: 'Interviews', value: 3, icon: <Building2 className="w-5 h-5 text-teal-500" /> },
-    { label: 'Offers', value: 1, icon: <FileText className="w-5 h-5 text-green-500" /> },
-  ];
+  const [jobListings, setJobListings] = useState<JobListing[]>([]);
 
-  // Recent jobs (showing just a few from our mock data)
-  const recentJobs = mockJobListings.slice(0, 3);
+  useEffect(() => {
+    const fetchJobs = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const snapshot = await getDocs(collection(db, 'users', user.uid, 'jobListings'));
+      const jobs: JobListing[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as JobListing[];
+
+      setJobListings(jobs);
+    };
+
+    fetchJobs();
+  }, []);
+
+  const filteredJobs = jobListings.filter(job =>
+    job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    job.company.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const stats = [
+    { label: 'Jobs Found', value: jobListings.length, icon: <Search className="w-5 h-5 text-blue-500" /> },
+    { label: 'Applications', value: jobListings.filter(j => j.status === 'applying' || j.status === 'applied').length, icon: <Briefcase className="w-5 h-5 text-purple-500" /> },
+    { label: 'Interviews', value: jobListings.filter(j => j.status === 'interviewing').length, icon: <Building2 className="w-5 h-5 text-teal-500" /> },
+    { label: 'Offers', value: jobListings.filter(j => j.status === 'offered').length, icon: <FileText className="w-5 h-5 text-green-500" /> },
+  ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+      transition: { staggerChildren: 0.1 },
+    },
   };
 
   const itemVariants = {
@@ -39,8 +60,8 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.4 }
-    }
+      transition: { duration: 0.4 },
+    },
   };
 
   return (
@@ -50,7 +71,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Track your job search progress</p>
         </div>
-        <div className="mt-4 md:mt-0">          
+        <div className="mt-4 md:mt-0">
           <button
             onClick={onOpenPreferences}
             className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
@@ -61,7 +82,6 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
         </div>
       </div>
 
-      {/* Dashboard Stats */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -85,7 +105,6 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
         ))}
       </motion.div>
 
-      {/* Search Bar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -96,7 +115,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          <button 
+          <button
             className="absolute right-3 top-1/2 transform -translate-y-1/2 px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
             onClick={() => navigate('/jobs')}
           >
@@ -105,11 +124,10 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
         </div>
       </div>
 
-      {/* Recent Jobs */}
       <section className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Jobs</h2>
-          <button 
+          <button
             onClick={() => navigate('/jobs')}
             className="text-blue-600 dark:text-blue-400 hover:underline"
           >
@@ -117,13 +135,18 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {recentJobs.map((job) => (
-            <JobCard key={job.id} job={job} />
+          {filteredJobs.slice(0, 3).map((job) => (
+            <JobCard
+              key={job.id}
+              job={job}
+              onFavoriteToggle={() => {}}
+              onResearch={() => {}}
+            />
           ))}
         </div>
       </section>
 
-      {/* Agent Overview */}
+      {/* AI Agents Section */}
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Your AI Assistants</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -137,7 +160,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
                 <p className="mt-1 text-gray-600 dark:text-gray-400">
                   Scans job boards based on your preferences and finds the best matches for you.
                 </p>
-                <button 
+                <button
                   onClick={() => navigate('/jobs')}
                   className="mt-3 text-blue-600 dark:text-blue-400 font-medium hover:underline"
                 >
@@ -146,7 +169,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
             <div className="flex items-start">
               <div className="rounded-full p-3 bg-purple-100 dark:bg-purple-900 mr-4">
@@ -157,7 +180,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
                 <p className="mt-1 text-gray-600 dark:text-gray-400">
                   Gathers insights on company culture, reviews, and team structure to help you prepare.
                 </p>
-                <button 
+                <button
                   onClick={() => navigate('/company-research/new')}
                   className="mt-3 text-purple-600 dark:text-purple-400 font-medium hover:underline"
                 >
@@ -166,7 +189,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-teal-500">
             <div className="flex items-start">
               <div className="rounded-full p-3 bg-teal-100 dark:bg-teal-900 mr-4">
@@ -177,7 +200,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
                 <p className="mt-1 text-gray-600 dark:text-gray-400">
                   Analyzes job descriptions and suggests tailored resume and cover letter changes.
                 </p>
-                <button 
+                <button
                   onClick={() => navigate('/resume-tailoring/new')}
                   className="mt-3 text-teal-600 dark:text-teal-400 font-medium hover:underline"
                 >
@@ -186,7 +209,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border-l-4 border-green-500">
             <div className="flex items-start">
               <div className="rounded-full p-3 bg-green-100 dark:bg-green-900 mr-4">
@@ -197,9 +220,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
                 <p className="mt-1 text-gray-600 dark:text-gray-400">
                   Tracks your applications, sends reminders, and helps with follow-ups.
                 </p>
-                <button 
-                  className="mt-3 text-green-600 dark:text-green-400 font-medium hover:underline"
-                >
+                <button className="mt-3 text-green-600 dark:text-green-400 font-medium hover:underline">
                   Coming Soon
                 </button>
               </div>
