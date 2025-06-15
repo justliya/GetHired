@@ -1,19 +1,18 @@
-name: Deploy ADK Agents to Cloud Run
+name: Deploy Agents to Cloud Run
 
 on:
   push:
-    # TODO Trigger deployment on push to main branch
-    paths:
-      - 'jobsearch_agents/**'
-      - '.github/workflows/deployment.yml'
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
 
 jobs:
-  deploy:
+  build:
     permissions:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,6 +36,7 @@ jobs:
           SA_PATH: ${{ secrets.SA_FILE_PATH }}
 
       - name: Build and Push Docker Image
+        id: build
         working-directory: ./jobsearch_agents
         run: |
           # Build Docker image
@@ -53,11 +53,29 @@ jobs:
           docker push ${IMAGE_NAME}:${IMAGE_TAG}
           docker push ${IMAGE_NAME}:latest
           
-          echo "IMAGE=${IMAGE_NAME}:${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "image=${IMAGE_NAME}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
 
-      - name: Deploy to Cloud Run
+  deploy-staging:
+    if: github.event_name == 'pull_request'
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          export_environment_variables: true
+          cleanup_credentials: true
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run (Staging)
         env:
-          SERVICE_NAME: 'gethired-agents'
+          SERVICE_NAME: 'gethired-agents-staging'
           GOOGLE_CLOUD_LOCATION: 'us-central1'
           FIREBASE_STORAGE_BUCKET: 'gethired-staging'
           STAGING_BUCKET: 'gethired-staging'
@@ -65,7 +83,45 @@ jobs:
           gcloud run deploy $SERVICE_NAME \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
-            --image=$IMAGE \
+            --image=${{ needs.build.outputs.image }} \
+            --update-secrets=${{secrets.SA_PATH}}=firebase-service-account-key:latest \
+            --port=8080 \
+            --platform=managed \
+            --allow-unauthenticated \
+            --memory=2Gi \
+            --cpu=2.0 \
+            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET" \
+            --set-env-vars="FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.SA_PATH }}"
+
+  deploy-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          export_environment_variables: true
+          cleanup_credentials: true
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run (Production)
+        env:
+          SERVICE_NAME: 'gethired-agents'
+          GOOGLE_CLOUD_LOCATION: 'us-central1'
+          FIREBASE_STORAGE_BUCKET: 'gethired-prod'
+          STAGING_BUCKET: 'gethired-prod'
+        run: |
+          gcloud run deploy $SERVICE_NAME \
+            --project=$GOOGLE_CLOUD_PROJECT \
+            --region=$GOOGLE_CLOUD_LOCATION \
+            --image=${{ needs.build.outputs.image }} \
             --update-secrets=${{secrets.SA_PATH}}=firebase-service-account-key:latest \
             --port=8080 \
             --platform=managed \
@@ -73,4 +129,4 @@ jobs:
             --memory=5Gi \
             --cpu=4.0 \
             --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET" \
-            --set-env-vars="FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.SA_PATH }}" 
+            --set-env-vars="FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.SA_PATH }}"

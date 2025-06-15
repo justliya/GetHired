@@ -27,21 +27,6 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install additional required packages
-RUN pip install --no-cache-dir \
-    google-adk>=1.1.1 \
-    google-genai>=1.5.0 \
-    google-cloud-bigquery>=3.31.0 \
-    absl-py>=2.2.2 \
-    google-cloud-aiplatform[agent-engines]>=1.95.1 \
-    pytest>=8.3.5 \
-    pillow>=11.1.0 \
-    deprecated>=1.2.18 \
-    python-dotenv \
-    fastapi>=0.100.0 \
-    uvicorn[standard]>=0.20.0 \
-    aiohttp
-
 COPY package*.json ./
 
 # Install Node.js dependencies
