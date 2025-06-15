@@ -1,38 +1,25 @@
 // hooks/JobSave.ts
-import { doc, setDoc, updateDoc } from "firebase/firestore";
-import { getFirestore } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import type { JobListing } from "../types";
 
-const db = getFirestore();
-
-export const saveListingsToUserProfile = async (
+export async function saveListingsToUserProfile(
   uid: string,
   listings: JobListing[]
-): Promise<void> => {
+): Promise<void> {
   if (!uid) return;
-
   const userRef = doc(db, "users", uid);
+  const payload = {
+    jobListings: listings,
+    lastJobUpdate: new Date().toISOString(),
+  };
 
   try {
-    await updateDoc(userRef, {
-      jobListings: listings,
-      lastJobUpdate: new Date().toISOString(),
-    });
-    console.log("Job listings updated to user profile");
-  } catch (error) {
-    console.warn("Initial update failed, attempting to create document:", error);
-    try {
-      await setDoc(
-        userRef,
-        {
-          jobListings: listings,
-          lastJobUpdate: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-      console.log("User document created and listings saved");
-    } catch (createError) {
-      console.error("Error saving job listings to user profile:", createError);
-    }
+    // Always merge so existing fields aren’t clobbered
+    await setDoc(userRef, payload, { merge: true });
+    console.log("✅ Job listings successfully saved for user", uid);
+  } catch (err) {
+    console.error("🔥 Failed to save job listings:", err);
+    throw err;
   }
-};
+}
