@@ -11,7 +11,6 @@ from . import approval
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
-# Get MCP timeout from environment or use default (60 seconds)
 MCP_TIMEOUT = float(os.getenv("MCP_CLIENT_TIMEOUT", "60.0"))
 
 request_approval = Agent(
@@ -32,8 +31,8 @@ async def create_agent():
     tools = MCPToolset(
         connection_params=StreamableHTTPServerParams(
             url='https://gethired-mcp.onrender.com/jobsearch-mcp',
-            timeout=MCP_TIMEOUT,  # Connection timeout
-            sse_read_timeout=MCP_TIMEOUT * 5  # SSE read timeout (5x connection timeout)
+            timeout=MCP_TIMEOUT, 
+            sse_read_timeout=MCP_TIMEOUT * 5  
         ),
         tool_filter=[
             'search_jobs',
@@ -57,7 +56,7 @@ async def create_agent():
             "Search and retrieve job listings based on user preferences, "
             "then allow human selection of listings for further research."
         ),
-        instruction=prompt.LISTING_SEARCH_AGENT_PROMPT,
+        instruction=prompt.LISTING_SEARCH_AGENT,
         model="gemini-2.0-flash-001",
         tools=[tools, AgentTool(agent=request_approval, skip_summarization=True)],
     )

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
 from contextlib import AsyncExitStack
+from . import prompt
 
 env = os.environ.copy()
 
@@ -38,9 +39,9 @@ async def create_agent():
 
     agent_instance = Agent(
         name="jobcoach_agent",
-        description="You are job search agent that automates and personalizes the job search process. Your primary function is to pass task results through agents. Starting with job listing agent that search for jobs based off user preferences, research the companies, tailor resume to each job description, and apply for the job upon users approval.",
+        description="You are a job coach responsible for managing user job preferences and profile",
         model="gemini-2.0-flash-001",
-        instruction="Be a friendly job coach when user initiates",
+        instruction=prompt.JOB_COACH,
         tools=[tools],
     )
 
@@ -48,5 +49,5 @@ async def create_agent():
 
 
 def root_agent():
-    """Return the agent creation coroutine"""
+  
     return create_agent()

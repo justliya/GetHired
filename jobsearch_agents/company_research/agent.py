@@ -14,7 +14,7 @@ async def create_agent():
 
     exit_stack = AsyncExitStack()
 
-    # Initialize the MCPToolset
+
     tools = MCPToolset(
         connection_params=StreamableHTTPServerParams(
             url="https://gethired-mcp.onrender.com/jobsearch-mcp",
@@ -36,7 +36,7 @@ async def create_agent():
 
     exit_stack.push_async_callback(cleanup)
 
-    # Create the agent
+
     agent_instance = Agent(
         name="company_research",
         description="Perform extensive research on companies and provide comprehensive intelligence reports",

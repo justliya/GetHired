@@ -19,8 +19,7 @@ def external_approval_tool(
         - status: 'pending' | 'approved' | 'rejected'
         - ticket_id: a unique ID for this approval request
     """
-    # 1. Send listings + context.ticket_id to your human‐review UI / API.
-    # 2. Return an initial 'pending' response with a ticket ID.
+    
     return {
         "status": "pending",
         "ticket_id": "approval-ticket-1234"
