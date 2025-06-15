@@ -2,16 +2,14 @@ export interface JobListing {
   id: string;
   title: string;
   company: string;
+  status: 'applied' | 'applying' | 'interviewing' | 'offered' | string;
   location: string;
-  salary: string | null;
   description: string;
-  qualifications: string[];
-  datePosted: string;
-  url: string;
-  favorite: boolean;
-  status: 'new' | 'researching' | 'applying' | 'applied' | 'interviewing' | 'rejected' | 'offered';
+  salary?: string;
+  url?: string;
+  favorite?: boolean;
+  avatar?: string;
 }
-
 export interface CompanyResearch {
   id: string;
   jobId: string;
