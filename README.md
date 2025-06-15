@@ -23,7 +23,12 @@
 ### 🧠 Company Research Agent
 - Compiles insights on company culture, employee reviews, benefits, and salary range.
 
+### 📬 Job Coach Agent
+- Learns user preferences over time
+- Sends reminders for follow-ups and interview prep
+- Logs progress in Firestore
 
+## Coordinator Agent
 ---
 
 ## ⚙️ How We Built It
@@ -106,7 +111,7 @@
 	GOOGLE_GENAI_USE_VERTEXAI=True
 	GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT>
 	GOOGLE_CLOUD_LOCATION=us-central1
-	SERVICE_ACCOUNT_KEY_PATH=<YOUR_FIREBASE_SERVICE_KEY>
+	SERVICE_ACCOUNT_KEY_PATH=<YOUR_FIREBASE_SERVICE_KEY_PATH>
 	FIREBASE_STORAGE_BUCKET=<YOUR_BUCKET>
 
 ## Authenticate with Google Cloud
@@ -136,6 +141,10 @@
 ## Navigate to the backend directory
 
 	cd jobsearch_agents
+
+	export GOOGLE_GENAI_USE_VERTEXAI=True
+	export GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT>
+	export GOOGLE_CLOUD_LOCATION=us-central1
 
 
 ## Running the agent server for testing
