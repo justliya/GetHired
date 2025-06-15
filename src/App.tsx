@@ -1,97 +1,151 @@
 // src/App.tsx
-import { useState, useEffect } from "react";
-import Sidebar from "./components/layout/Sidebar";
-import Header from "./components/layout/Header";
-import Dashboard from "./pages/Dashboard";
-import JobDiscovery from "./pages/JobDiscovery";
-import ResumeTailoring from "./pages/ResumeTailoring";
-import CompanyResearch from "./pages/CompanyResearch";
-import ApplicationTracker from "./pages/ApplicationTracker";
-import Networking from "./pages/Networking";
-import Profile from "./pages/Profile";
-import Auth from "./pages/Auth";
-import { type Page } from "./types";
-
-import { auth, onAuthStateChanged } from "./firebase";
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeProvider';
+import Layout from './components/Layout';
+import Dashboard from './pages/Dashboard';
+import JobListings from './pages/JobListings';
+import CompanyResearch from './pages/CompanyResearch';
+import ResumeTailoring from './pages/ResumeTailoring';
+import Settings from './pages/Settings';
+import Profile from './pages/Profile';
+import Auth from './pages/Auth';
+import { auth, onAuthStateChanged } from './firebase';
+import { updateUserPreferences, getUserPreferences } from './services/firebaseService';
+import UserPreferencesModal from "./components/ui/UserPreferencesModal";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("auth");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
+  const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<'auth' | 'dashboard' | 'loading'>('loading');
+  const [isNewUser, setIsNewUser] = useState<boolean>(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        setCurrentPage("dashboard");
+        try {
+          // Check if user has preferences set
+          const prefsResult = await getUserPreferences(user.uid);
+          
+          // Determine if this is a new user by checking if they have customized preferences
+          const hasCustomPreferences = prefsResult.success && 
+            prefsResult.data && 
+            (prefsResult.data.titles?.length > 0 || 
+             prefsResult.data.locations?.length > 0 ||
+             prefsResult.data.skills?.length > 0);
+          
+          setCurrentPage('dashboard');
+          
+          // Only show preferences modal for new users without preferences
+          if (!hasCustomPreferences) {
+            setIsNewUser(true);
+            // Delay showing modal to ensure smooth transition
+            setTimeout(() => {
+              setShowUserPrefs(true);
+            }, 500);
+          }
+        } catch (error) {
+          console.error('Error checking user preferences:', error);
+          setCurrentPage('dashboard');
+        }
       } else {
-        setCurrentPage("auth");
+        setCurrentPage('auth');
+        setIsNewUser(false);
+        setShowUserPrefs(false);
       }
     });
+
     return () => unsubscribe();
   }, []);
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen((open) => !open);
-  };
+  // Show loading state while checking auth
+  if (currentPage === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case "dashboard":
-        return <Dashboard onNavigate={(p) => setCurrentPage(p)} />;
-      case "jobs":
-        return <JobDiscovery />;
-      case "resume":
-        return <ResumeTailoring />;
-      case "company":
-        return <CompanyResearch />;
-      case "applications":
-        return <ApplicationTracker />;
-      case "networking":
-        return <Networking />;
-      case "profile":
-        return <Profile />;
-      case "auth":
-        return <Auth />;
-      default:
-        return <Dashboard onNavigate={(p) => setCurrentPage(p)} />;
-    }
-  };
+  if (currentPage === 'auth') {
+    return <Auth />;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans flex">
-      {currentPage !== "auth" && (
-        <Sidebar
-          isOpen={isSidebarOpen}
-          currentPage={currentPage}
-          onNavigate={(p) => setCurrentPage(p)}
-        />
-      )}
-
-      <div className="flex-1 flex flex-col transition-all duration-300">
-        {currentPage !== "auth" && (
-          <Header
-            toggleSidebar={toggleSidebar}
-            isSidebarOpen={isSidebarOpen}
-            currentPage={currentPage}
-            onNavigate={(p) => setCurrentPage(p)}
-          />
-        )}
-
-        <main
-          className={`flex-1 overflow-y-auto ${
-            currentPage !== "auth" ? "p-4 md:p-6" : ""
-          }`}
-        >
-          <div
-            className={`${
-              currentPage !== "auth" ? "max-w-7xl mx-auto animate-fade-in" : ""
-            }`}
-          >
-            {renderPage()}
-          </div>
-        </main>
-      </div>
-    </div>
+    <ThemeProvider>
+      <Router>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard onOpenPreferences={() => setShowUserPrefs(true)} />} />
+            <Route path="/jobs" element={<JobListings />} />
+            <Route path="/company-research/:jobId" element={<CompanyResearch />} />
+            <Route path="/resume-tailoring/:jobId" element={<ResumeTailoring />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+          
+          {showUserPrefs && (
+            <UserPreferencesModal 
+              show={showUserPrefs} 
+              onHide={() => {
+                setShowUserPrefs(false);
+                // If user closes modal without saving and they're new, show a reminder
+                if (isNewUser) {
+                  console.log('Remember to set your preferences for better job matches!');
+                }
+              }}
+              onSubmit={async (formData) => {
+                try {
+                  const userId = auth.currentUser?.uid;
+                  if (!userId) {
+                    throw new Error('No authenticated user');
+                  }
+                  
+                  // Map the form data to match your JobPreferences structure
+                  const preferences = {
+                    titles: formData.preferences.roles || [],
+                    locations: formData.preferences.locations || [],
+                    skills: formData.preferences.skills || [],
+                    salaryRange: formData.preferences.salaryRange || { min: 0, max: 200000 },
+                    jobType: formData.preferences.jobType || 'Full-time',
+                    seniority: formData.preferences.seniority || 'Mid',
+                    searchSchedule: formData.preferences.searchSchedule || {
+                      enabled: false,
+                      frequency: 'Daily',
+                      notificationType: 'Email',
+                      quietHours: {
+                        start: '22:00',
+                        end: '08:00'
+                      },
+                      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    },
+                    companies: formData.preferences.companies || [],
+                    other: formData.preferences.other || '',
+                    includeKeywords: formData.preferences.includeKeywords || [],
+                    excludeKeywords: formData.preferences.excludeKeywords || []
+                  };
+                  
+                  const result = await updateUserPreferences(userId, preferences);
+                  
+                  if (!result.success) {
+                    throw new Error(result.error || 'Failed to update preferences');
+                  }
+                  
+                  setShowUserPrefs(false);
+                  setIsNewUser(false);
+                  
+                  // Optionally show success message
+                  console.log('Preferences saved successfully!');
+                } catch (error) {
+                  console.error('Failed to save preferences:', error);
+                  // You might want to show an error toast here
+                  alert('Failed to save preferences. Please try again.');
+                }
+              }}
+            />
+          )}
+        </Layout>
+      </Router>
+    </ThemeProvider>
   );
 }
 

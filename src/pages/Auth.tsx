@@ -8,12 +8,11 @@ import {
   signInWithPopup,
   onAuthStateChanged,
   doc,
-  setDoc,
   getDoc,
 } from "../firebase";
 import { User as UserIcon, LogIn } from "lucide-react";
 import type { User } from "firebase/auth";
-
+import { initializeUserData } from "../services/firebaseService";
 export default function Auth() {
   const [user, setUser] = useState<User | null>(null);
 
@@ -33,18 +32,15 @@ export default function Auth() {
 
     return () => unsubscribe();
   }, []);
-
   const createUserDoc = async (user: User) => {
+    console.log('🔄 Auth - Creating user document for:', user.uid);
     const userRef = doc(db, "users", user.uid);
     const docSnap = await getDoc(userRef);
     if (!docSnap.exists()) {
-      await setDoc(userRef, {
-        uid: user.uid,
-        name: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
-        createdAt: new Date(),
-      });
+      console.log('🆕 Auth - New user, initializing data structure...');
+      await initializeUserData(user, userRef);
+    } else {
+      console.log('👤 Auth - User document already exists');
     }
   };
 

@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 *env
-
-__pycache__/
-.python-version
-/docs
+*__pycache__/
+docs/
+serviceAccount*.json
+.vercel
