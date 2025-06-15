@@ -108,7 +108,7 @@ class ParsedResume():
         self.email = None
         self.phone = None
         self.professional_summary = None
-        
+
         # Store structured entries instead of plain text strings
         self.education = []             # list of EducationEntry
         self.certifications = []        # list of certifications strings (if not further structured)
@@ -116,10 +116,10 @@ class ParsedResume():
         self.volunteer_experience = []  # list of VolunteerExperienceEntry
         self.experience_section = []    # list of ExperienceEntry
         self.skills = SkillSet()        # structured skills: technical and soft skills
-        
+
         self.format_info = {}
         self.parse_resume(resume)
-        
+
     def parse_resume(self, text):
         # Extract contact information and professional summary
         info = self.extract_contact_info(text)
@@ -127,41 +127,41 @@ class ParsedResume():
         self.email = info.get("email")
         self.phone = info.get("phone")
         self.professional_summary = self.extract_professional_summary(text)
-        
+
         # Extract education entries
         for m in re.finditer(ParsedResume.education_regex, text):
             edu_text = m.group(1).strip()
             edu_entry = self.parse_education_entry(edu_text)
             if edu_entry:
                 self.education.append(edu_entry)
-                
+
         # Extract experience entries
         for m in re.finditer(ParsedResume.experience_regex, text):
             exp_text = m.group(1).strip()
             exp_entry = self.parse_experience_entry(exp_text)
             if exp_entry:
                 self.experience_section.append(exp_entry)
-                
+
         # Extract certifications
         for m in re.finditer(ParsedResume.certifications_regex, text):
             cert_text = m.group(1).strip()
             if cert_text:
                 self.certifications.append(cert_text)
-                
+
         # Extract project entries
         for m in re.finditer(ParsedResume.projects_regex, text):
             proj_text = m.group(1).strip()
             proj_entry = self.parse_project_entry(proj_text)
             if proj_entry:
                 self.projects.append(proj_entry)
-                
+
         # Extract volunteer experience entries
         for m in re.finditer(ParsedResume.volunteer_regex, text):
             vol_text = m.group(1).strip()
             vol_entry = self.parse_volunteer_entry(vol_text)
             if vol_entry:
                 self.volunteer_experience.append(vol_entry)
-                
+
         # Extract skills if present
         if "Technical Skills" in text and "Soft Skills" in text:
             skills = self.parse_skill_set(text)
@@ -183,7 +183,7 @@ class ParsedResume():
                 details=[]
             )
         return None
-    
+
     def extract_contact_info(self, text):
         name_match = re.search(r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", text)
         email_match = re.search(r"[\w\.-]+@[\w\.-]+", text)
@@ -200,7 +200,7 @@ class ParsedResume():
     def extract_professional_summary(self, text):
         summary_match = re.search(r"Summary:\n(.*?)(?:\n\n|$)", text, re.DOTALL | re.IGNORECASE)
         return summary_match.group(1).strip() if summary_match else None
-    
+
     def parse_experience_entry(self, text):
         m = re.search(r"(?P<title>.+?)\n(?P<company>.+?) \| (?P<start>\w+\s+\d{4})\s*[-–]\s*(?P<end>\w+\s+\d{4}|Present)", text)
         if m:
