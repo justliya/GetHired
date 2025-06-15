@@ -65,7 +65,6 @@ jobs:
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --image=$IMAGE \
-            --update-secrets=${{secrets.SA_PATH}}=service-account-key-path:latest \
             --port=8080 \
             --platform=managed \
             --allow-unauthenticated \
