@@ -31,9 +31,10 @@ jobs:
       - name: Decode Firebase service account key
         working-directory: ${{ github.workspace }}
         run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > "${GITHUB_WORKSPACE}/service-account-key.json"
+          echo "$FIREBASE_SERVICE_ACCOUNT_B64" | base64 -d > "${GITHUB_WORKSPACE}/$SA_PATH"
         env:
           FIREBASE_SERVICE_ACCOUNT_B64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}
+          SA_PATH: ${{ secrets.SA_FILE_PATH }}
 
       - name: Build and Push Docker Image
         working-directory: ./jobsearch_agents
