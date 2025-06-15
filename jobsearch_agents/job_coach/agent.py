@@ -6,7 +6,7 @@ from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParamet
 from contextlib import AsyncExitStack
 
 env = os.environ.copy()
-
+env["SERVICE_ACCOUNT_KEY_PATH"] = env["FIREBASE_SERVICE_ACCOUNT_KEY"]
 
 async def create_agent():
     """Create the job coach agent with MCP tools"""
