@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Set environment variables
 ENV PORT=8080
+ENV MCP_FIREBASE_PORT=3000
 ENV PYTHONUNBUFFERED=1
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
 
@@ -52,5 +53,6 @@ RUN npm install @gannonh/firebase-mcp
 COPY . .
 
 EXPOSE ${PORT}
+EXPOSE ${MCP_FIREBASE_PORT}
 
 CMD ["python", "-m", "coordinator", "--host=0.0.0.0", "--port=8080"]
