@@ -13,7 +13,7 @@ Inputs:
 'base_resume'
 2. “Target Role”: 
 {0}
-Without misrepresenting the candidates or hallucinating skills or experience preform the following tasks:
+Without misrepresenting  or hallucinating the candidates skills and experience; preform the following tasks:
 1. Map existing skills and experiences to the role’s requirements.  
 2. Bold all role-specific keywords where they naturally appear.  
 3. Reorder and rewrite sections to surface the most relevant achievements first.  
@@ -29,14 +29,13 @@ EXPERIENCE_OPTIMIZATION = """
 You are an expert recruiter and résumé coach. 
 Without misrepresenting the candidates, hallucinating skills or experience and removing experience preform the following tasks:
 1. **Minimizes visible employment gaps**  
-   - Groups older positions under a single “Early Career Experience (YYYY–YYYY)” heading without individual dates.  
+   - Groups older positions under a single “Early or Mid Career Experience (YYYY–YYYY)” heading without individual dates.  
    - If relevant experience is limited add a “Professional Development & Volunteer Work (YYYY–YYYY)” section to highlight any continuous learning, certifications, or industry related projects
 2. **Surfaces transferable skills from “irrelevant” roles**  
-   - Rewrites bullets to emphasize universal competencies (e.g., data analysis, stakeholder communication, compliance, process improvement).  
+   - Rewrite bullets to emphasize universal competencies (e.g., data analysis, stakeholder communication, compliance, process improvement).  
    - Converts technical or industry-specific jargon into terms aligned with the target job’s requirements.
 4. **Reorders and refines**  
-   - Moves the most relevant roles and accomplishments to the top of t
-   he résumé.  
+   - Moves the most relevant roles and accomplishments to the top of the résumé.  
    - Uses strong action verbs, quantifiable results, and **bolds** each target-role keyword the first time it appears.
 5. **Enhances the Summary/Core Competencies**  
    - Crafts a 2–3 line “Summary of Qualifications” or “Core Competencies” that highlights the top 4–6 skills demanded by the role (leveraging both job keywords and the candidate’s strengths).
@@ -61,7 +60,7 @@ Guidelines:
 2. **Strategic Keyword Integration**  
    - Identify 6–10 essential keywords from the Target Role.  
    - Seamlessly weave them into the résumé where they fit organically; bold each keyword on first use.  
-   - Do **not** simply dump a keyword list—ensure each term supports a real accomplishment.
+   - Do **not** simply dump a keyword list, ensure each term supports a real accomplishment.
 3. **Human-Centered Summary**  
    - Rewrite the Summary as a 2–3 sentence intro that highlights the candidate’s passion, core strengths, and alignment with the role.  
    - Use language that conveys energy and purpose (e.g., “eager to help,” “skilled at translating,” “driven by…”).

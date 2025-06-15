@@ -3,7 +3,7 @@ from google.adk.agents import SequentialAgent
 
 from . import prompt
 from .resume_doc import load_resume_job_desc, create_formatted_resume
-
+from contextlib import AsyncExitStack
 
 resume, job_spec = load_resume_job_desc()
 
@@ -56,8 +56,9 @@ doc_creator_agent =  Agent(
         create_formatted_resume
     ]
     )
-
-resume_pipeline_agent = SequentialAgent(
+async def create_agent():
+    exit_stack = AsyncExitStack()
+    resume_pipeline_agent = SequentialAgent(
     name='ResumeTailorAgent',
     description='Agent design to tailor resumes to a job description',
     sub_agents=[
@@ -69,4 +70,5 @@ resume_pipeline_agent = SequentialAgent(
         proof_reader_agent,
         doc_creator_agent,
         ],
-)
+    )
+    return resume_pipeline_agent, exit_stack

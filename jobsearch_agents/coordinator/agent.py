@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from job_coach.agent import create_agent as coach_agent
 from company_research.agent import create_agent as company_research_agent
-#from resume.agent import create_agent as resume_agent
+from resume.agent import create_agent as resume_agent
 from job_listing.agent import create_agent as jobsearch_agent
 from . import prompt
 
@@ -26,8 +26,8 @@ async def create_coordinator_agent():
     company_research, research_stack = await company_research_agent()
     await exit_stack.enter_async_context(research_stack)
     
-   # resume, edit_stack = await resume_agent()
-   # await exit_stack.enter_async_context(edit_stack)
+    resume, edit_stack = await resume_agent()
+    await exit_stack.enter_async_context(edit_stack)
 
     coordinator = Agent(
         name="coordinator_agent",
@@ -36,7 +36,7 @@ async def create_coordinator_agent():
         instruction=(
             "Your ultimate goal is to make the job search process highly automated user interaction is not required unless getting approval or advising"
         ),
-        sub_agents=[listing_search_agent, company_research, jobcoach_agent]
+        sub_agents=[listing_search_agent, company_research, jobcoach_agent, resume]
         
     )
     return coordinator, exit_stack
