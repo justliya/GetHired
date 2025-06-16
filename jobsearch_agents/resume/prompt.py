@@ -1,4 +1,10 @@
 BASE_PROMPT = """
+CRITICAL: You MUST process the ENTIRE HUMANIZE = """
+CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
+
+You are a senior recruiter and professional writer. Your mission is to transform a candidate's résumé into a polished, engaging, and authentic narrative—while preserving ATS compatibility.
+Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:ume content without truncation or omission.
+
 Act as a recruiter for a large company that is tailoring a resume for a candidate. You are rewriting the resume of {0}. The types of roles {0} is applying for are {1} with a focus on {2}
 
 Fetch the candidate's resume using the provided link from firebase and extract the text.
@@ -8,6 +14,8 @@ Pass the results for job optimization
 """
 
 JOB_OPTIMIZATION = """
+CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
+
 Act as an expert recruiter and resume writer. 
 Inputs:
 1. “Current Resume”: 
@@ -27,6 +35,8 @@ Output:
 Pass the results for experience optimization  
 """
 EXPERIENCE_OPTIMIZATION = """
+CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
+
 You are an expert recruiter and résumé coach. 
 Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 1. **Minimizes visible employment gaps**  
@@ -124,6 +134,8 @@ Outputs:
 Next hand off this version of the resume for Humanization
 """
 RESUME_FORMAT_HELPER ="""
+CRITICAL: You MUST process the ENTIRE resume text without truncation or omission. Include ALL sections and content from the input resume.
+
 Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 Please format the resume in a structured way using the following labeled sections,
 each starting on a new line with a clear section name. 
