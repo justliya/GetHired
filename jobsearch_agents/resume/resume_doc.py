@@ -200,6 +200,24 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         # Add the candidate object itself for templates that expect {{ candidate.name }}
         template_context["candidate"] = candidate_data["candidate"]
         
+        # Handle skills properly - extract from SkillSet structure
+        skills_data = candidate.get("skills", {})
+        if hasattr(skills_data, 'technical'):
+            # SkillSet object
+            technical_skills = skills_data.technical or []
+            soft_skills = skills_data.soft_skills or []
+        elif isinstance(skills_data, dict):
+            # Dictionary format
+            technical_skills = skills_data.get("technical", [])
+            soft_skills = skills_data.get("soft_skills", [])
+        elif isinstance(skills_data, list):
+            # List format (all skills as technical)
+            technical_skills = skills_data
+            soft_skills = []
+        else:
+            technical_skills = []
+            soft_skills = []
+        
         # Add some additional helper variables that might be useful in the template
         template_context.update({
             "full_name": candidate.get("name", ""),
@@ -210,8 +228,8 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
             "education_list": candidate.get("education", []),
             "project_list": candidate.get("projects", []),
             "certification_list": candidate.get("certifications", []),
-            "technical_skills": candidate.get("skills", []),
-            "soft_skills": [],
+            "technical_skills": technical_skills,
+            "soft_skills": soft_skills,
             "volunteer_work": candidate.get("volunteer_experience", [])
         })
         

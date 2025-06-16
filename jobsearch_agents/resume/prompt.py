@@ -128,37 +128,88 @@ Without misrepresenting the candidates, hallucinating skills, education or exper
 Please format the resume in a structured way using the following labeled sections,
 each starting on a new line with a clear section name. 
 
+IMPORTANT FORMATTING REQUIREMENTS:
+- Use only standard characters (letters, numbers, basic punctuation: . , - @ | • )
+- Remove ALL special symbols, markdown formatting, and decorative characters
+- Convert any special phone/email symbols to plain text
+- Use standard bullet points (•) for lists
+- Use standard dashes (-) for date ranges
+- Do NOT use bold formatting (**text**), italics, or other markdown
+- Keep phone numbers in standard format: 123-456-7890
+- Keep email addresses clean: email@domain.com
+
 Note if a section is not present in the resume do not create it:
+
 Name:  
 Email:  
 Phone:  
+
 Summary:  
-<1-3 sentence summary here>
+<1-3 sentence summary here - no special formatting>
+
 Skills:  
-<bullet list of skills grouped by category if possible>
+Technical Skills:
+• Skill 1
+• Skill 2  
+• Skill 3
+
+Soft Skills:
+• Communication
+• Leadership
+• Problem Solving
+
+OR if no clear categories exist:
+• Skill 1
+• Skill 2  
+• Skill 3
+
 Experience:  
 <job title>  
-<company>, <location> | <start date> – <end date>  
+<company>, <location> | <start date> - <end date>  
 • Bullet 1  
 • Bullet 2  
 • Bullet 3
+
+<job title>  
+<company>, <location> | <start date> - <end date>  
+• Bullet 1  
+• Bullet 2
+
+<job title>  
+<company>, <location> | <start date> - <end date>  
+• Bullet 1  
+• Bullet 2
+
+---END EXPERIENCE---
+
 Projects:  
 <Project Title>  
 • Bullet 1  
 • Bullet 2
+
+---END PROJECTS---
+
 Education:  
-<Degree>, <School> | <start year> – <end year>
+<Degree>, <School> | <start year> - <end year>
+
+---END EDUCATION---
+
 Certifications:  
-- Certification Name 1  
-- Certification Name 2
+• Certification Name 1  
+• Certification Name 2
+
+---END CERTIFICATIONS---
+
 Volunteer Experience:  
-<Role>, <Organization> | <start date> – <end date>  
+<Role>, <Organization> | <start date> - <end date>  
 • Bullet 1  
 • Bullet 2
-Please separate sections using double newlines.
+
+---END VOLUNTEER EXPERIENCE---
+
+Please separate sections using double newlines and use the ---END [SECTION]--- markers to clearly delineate section boundaries for parsing.
 """
 TEMPLATE_DOCUMENT_CREATION = """
 Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the final draft of the resume: 'final_resume'
 You should return the url to resume that was uploaded  to firebase or GCS and the resume text as a JSON Object. Do not return the tool code.
 """
-

@@ -93,13 +93,13 @@ class ParsedResume():
         serialize() -> str:
             Serializes the parsed resume data into a JSON string.
     """
-    summary_regex = re.compile(r"(?:Professional Summary|Summary|Objective)\s*[:\-]?\s*(.*?)\n(?:\w|\s)*?(?=\n(?:Experience|Work History|Skills|Education|Projects|$))", re.IGNORECASE | re.DOTALL)
-    experience_regex = re.compile(r"(?:Work Experience|Professional Experience|Experience)\s*[:\-]?\s*(.*?)\n(?:\w|\s)*?(?=\n(?:Education|Skills|Projects|Certifications|$))", re.IGNORECASE | re.DOTALL)
-    job_entry_regex = re.compile(r"(?P<title>[A-Z][A-Za-z\s/&,-]+)\s*\n(?P<company>[A-Z][\w\s,&.-]+)?\n(?P<dates>\w+\s+\d{4}\s*[-–]\s*\w+\s+\d{4}|\w+\s+\d{4}\s*[-–]\s*Present)", re.IGNORECASE)
-    volunteer_regex = re.compile(r"(?:Volunteer Experience|Community Involvement|Volunteering)\s*[:\-]?\s*(.*?)\n(?:\w|\s)*?(?=\n(?:Projects|Skills|Education|$))", re.IGNORECASE | re.DOTALL)
-    projects_regex = re.compile(r"(?:Projects|Selected Projects|Portfolio)\s*[:\-]?\s*(.*?)\n(?:\w|\s)*?(?=\n(?:Skills|Education|Certifications|$))", re.IGNORECASE | re.DOTALL)
-    education_regex = re.compile(r"(?:Education|Academic Background)\s*[:\-]?\s*(.*?)\n(?:\w|\s)*?(?=\n(?:Skills|Certifications|Projects|$))", re.IGNORECASE | re.DOTALL)
-    certifications_regex = re.compile(r"(?:Certifications|Licenses|Certificates)\s*[:\-]?\s*(.*?)\n(?:\w|\s)*?(?=\n(?:Skills|Education|Projects|$))", re.IGNORECASE | re.DOTALL)
+    # Simplified regex patterns for clean, standardized format
+    summary_regex = re.compile(r"Summary:\s*\n(.*?)(?:\n(?:Skills:|Experience:|Education:|Projects:|$))", re.IGNORECASE | re.DOTALL)
+    experience_regex = re.compile(r"Experience:\s*\n(.*?)(?:\n(?:---END EXPERIENCE---|Skills:|Education:|Projects:|Certifications:|$))", re.IGNORECASE | re.DOTALL)
+    volunteer_regex = re.compile(r"Volunteer Experience:\s*\n(.*?)(?:\n(?:---END VOLUNTEER EXPERIENCE---|Projects:|Skills:|Education:|$))", re.IGNORECASE | re.DOTALL)
+    projects_regex = re.compile(r"Projects:\s*\n(.*?)(?:\n(?:---END PROJECTS---|Skills:|Education:|Certifications:|$))", re.IGNORECASE | re.DOTALL)
+    education_regex = re.compile(r"Education:\s*\n(.*?)(?:\n(?:---END EDUCATION---|Skills:|Certifications:|Projects:|$))", re.IGNORECASE | re.DOTALL)
+    certifications_regex = re.compile(r"Certifications:\s*\n(.*?)(?:\n(?:---END CERTIFICATIONS---|Skills:|Education:|Projects:|$))", re.IGNORECASE | re.DOTALL)
 
 
     def __init__(self, resume):
@@ -135,12 +135,12 @@ class ParsedResume():
             if edu_entry:
                 self.education.append(edu_entry)
 
-        # Extract experience entries
+        # Extract experience entries - handle multiple entries within the experience section
         for m in re.finditer(ParsedResume.experience_regex, text):
-            exp_text = m.group(1).strip()
-            exp_entry = self.parse_experience_entry(exp_text)
-            if exp_entry:
-                self.experience_section.append(exp_entry)
+            exp_section_text = m.group(1).strip()
+            # Parse individual experience entries from the experience section
+            individual_experiences = self.parse_experience_section(exp_section_text)
+            self.experience_section.extend(individual_experiences)
 
         # Extract certifications
         for m in re.finditer(ParsedResume.certifications_regex, text):
@@ -172,140 +172,105 @@ class ParsedResume():
         return m.group(1).strip() if m else None
 
     def parse_education_entry(self, text):
-        """Parse education with better field extraction"""
+        """Parse education from clean, standardized format"""
+        # Simple pattern for: Degree, School | Year - Year or Year
         patterns = [
-            r"(?P<degree>.+?)\s*\|\s*(?P<school>.+?)\s*\|\s*(?P<year>\d{4})",
-            r"(?P<school>.+?)\s*—\s*(?P<degree>.+?)\s*\((?P<year>\d{4})\)",
-            r"(?P<degree>.+?),\s*(?P<school>.+?)\s*\|\s*(?P<year>\d{4})",
-            r"(?P<school>.+?),\s*(?P<degree>.+?)\s*,?\s*(?P<year>\d{4})",
-            r"(?P<degree>.+?),\s*(?P<school>.+?) \| (?P<start>\d{4})\s*[-–]\s*(?P<end>\d{4})",
-            r"Bachelor.*?(?P<degree>[A-Za-z\s]+)\s*(?P<school>[A-Za-z\s&,.-]+)\s*\|\s*(?P<year>\d{4})",
-            r"(?P<school>[A-Za-z\s&,.-]+University[A-Za-z\s&,.-]*)\s*\|\s*(?P<year>\d{4})",
+            r"(?P<degree>.+?),\s*(?P<school>.+?)\s*\|\s*(?P<dates>[\d\s\-–]+)",
+            r"(?P<school>.+?)\s*\|\s*(?P<degree>.+?)\s*\|\s*(?P<dates>[\d\s\-–]+)",
+            r"(?P<degree>.+?),\s*(?P<school>.+)",  # Simple format without dates
         ]
         
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 groups = match.groupdict()
+                degree = groups.get("degree", "").strip()
+                school = groups.get("school", "").strip()
+                dates = groups.get("dates", "").strip()
                 
-                # Handle different pattern formats
-                if 'start' in groups and 'end' in groups:
+                start_date, end_date = "", ""
+                if dates:
+                    # Split on dash
+                    date_parts = re.split(r'\s*[-–]\s*', dates, 1)
+                    start_date = date_parts[0].strip()
+                    end_date = date_parts[1].strip() if len(date_parts) > 1 else start_date
+                
+                if degree and school:
                     return EducationEntry(
-                        degree=groups.get("degree", "").strip(),
-                        school=groups.get("school", "").strip(),
-                        start_date=groups.get("start"),
-                        end_date=groups.get("end"),
-                        details=[]
-                    )
-                else:
-                    year = groups.get("year", "")
-                    return EducationEntry(
-                        degree=groups.get("degree", "").strip(),
-                        school=groups.get("school", "").strip(),
-                        start_date=year,
-                        end_date=year,
+                        degree=degree,
+                        school=school,
+                        start_date=start_date,
+                        end_date=end_date,
                         details=[]
                     )
         
         return None
 
     def extract_contact_info(self, text):
-        """Extract contact information with better pattern matching, including special formatting"""
-        # First, handle special formatting with symbols like /phone/, /linkedin/, /envelope_alt
-        processed_text = text
-        
-        # Replace special symbols with readable text
-        symbol_replacements = {
-            r'/phone/': 'Phone: ',
-            r'/linkedin/': 'LinkedIn: ',
-            r'/envelope_alt/': 'Email: ',
-            r'/envelope/': 'Email: ',
-            r'\.osf': '',  # Remove .osf extensions
-            r'\.': '.',    # Normalize dots
-        }
-        
-        for symbol, replacement in symbol_replacements.items():
-            processed_text = re.sub(symbol, replacement, processed_text, flags=re.IGNORECASE)
-        
-        # Try multiple name patterns
+        """Extract contact information from clean, standardized resume format"""
+        # Simple patterns for the clean format produced by the prompt
         name_patterns = [
-            r"^([A-Z][a-z']+(?:\s+[A-Z][a-z']+)+)(?=\n)",  # Traditional FirstName LastName followed by newline
-            r"^(.+?)(?=\n(?:Phone:|Email:|Contact:|/phone/|/envelope))",  # Everything before contact details on next line
-            r"^(.+?)(?:\s+\w+@\w+)",  # Everything before email on same line
+            r"^Name:\s*(.+?)(?=\n)",  # Name: label format
+            r"^([A-Z][a-z']+(?:\s+[A-Z][a-z']+)+)(?=\n)",  # Traditional FirstName LastName
         ]
         
         name = None
         for pattern in name_patterns:
-            name_match = re.search(pattern, processed_text, re.IGNORECASE)
+            name_match = re.search(pattern, text, re.MULTILINE)
             if name_match and name_match.group(1).strip():
-                candidate_name = name_match.group(1).strip()
-                # Clean up any remaining symbols
-                candidate_name = re.sub(r'[/\\]', '', candidate_name)
-                if len(candidate_name) > 1 and not candidate_name.isdigit():
-                    name = candidate_name
-                    break
+                name = name_match.group(1).strip()
+                break
         
-        # Enhanced email pattern - look in both original and processed text
+        # Email pattern for clean format
         email_patterns = [
-            r"[\w\.-]+@[\w\.-]+\.\w+",  # Standard email
-            r"Email:\s*([\w\.-]+@[\w\.-]+\.\w+)",  # After Email: label
+            r"Email:\s*([\w\.-]+@[\w\.-]+\.\w+)",  # Email: label format
+            r"[\w\.-]+@[\w\.-]+\.\w+",  # Standard email anywhere in text
         ]
         
         email = None
         for pattern in email_patterns:
-            email_match = re.search(pattern, processed_text)
+            email_match = re.search(pattern, text)
             if email_match:
                 email = email_match.group(1).strip() if email_match.groups() else email_match.group(0).strip()
                 break
         
-        # Enhanced phone patterns - look for numbers after processing symbols
+        # Phone pattern for clean format
         phone_patterns = [
-            r"Phone:\s*([\d\-\.\(\)\s]+)",  # After "Phone:" label
-            r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",  # US format
-            r"\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",  # International
-            r"(?:seven|eight|nine|zero|one|two|three|four|five|six)\.osf",  # Handle word numbers
+            r"Phone:\s*([\d\-\.\(\)\s]+)",  # Phone: label format
+            r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",  # US format anywhere
         ]
         
         phone = None
         for pattern in phone_patterns:
-            phone_match = re.search(pattern, processed_text, re.IGNORECASE)
+            phone_match = re.search(pattern, text)
             if phone_match:
-                phone_text = phone_match.group(1).strip() if phone_match.groups() else phone_match.group(0).strip()
-                # Convert word numbers to digits
-                word_to_digit = {
-                    'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
-                    'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9'
-                }
-                for word, digit in word_to_digit.items():
-                    phone_text = re.sub(f'{word}\\.osf', digit, phone_text, flags=re.IGNORECASE)
-                phone_text = re.sub(r'\.osf', '', phone_text)  # Remove any remaining .osf
-                if re.search(r'\d', phone_text):  # Only if we found some digits
-                    phone = phone_text
-                    break
+                phone = phone_match.group(1).strip() if phone_match.groups() else phone_match.group(0).strip()
+                break
         
-        url_match = re.findall(r"https?://(?:www\.)?[\w./-]+", processed_text)
+        # Extract any URLs present
+        url_match = re.findall(r"https?://(?:www\.)?[\w./-]+", text)
 
         return {
             "name": name,
-            "email": email_match.group(0).strip() if email_match else None,
+            "email": email,
             "phone": phone,
             "urls": url_match
         }
 
     def extract_professional_summary(self, text):
-        """Extract professional summary with multiple pattern attempts"""
+        """Extract professional summary from clean, standardized format"""
         summary_patterns = [
-            r"(?:Professional\s+)?Summary\s*[:\-]?\s*\n(.*?)(?:\n(?:[A-Z][A-Z\s]+|EXPERIENCE|SKILLS|EDUCATION)|$)",
-            r"(?:Professional\s+)?Objective\s*[:\-]?\s*\n(.*?)(?:\n(?:[A-Z][A-Z\s]+|EXPERIENCE|SKILLS|EDUCATION)|$)",
-            r"PROFESSIONAL\s+SUMMARY\s*\n(.*?)(?:\n[A-Z][A-Z\s]+|$)",
-            r"About\s*[:\-]?\s*\n(.*?)(?:\n(?:[A-Z][A-Z\s]+|EXPERIENCE|SKILLS|EDUCATION)|$)",
+            # Standard label format
+            r"Summary:\s*\n(.*?)(?:\n(?:Skills:|Experience:|Education:|$))",
+            # Alternative formats
+            r"(?:Professional\s+)?(?:Summary|Summary of Qualifications|Objective)\s*[:\-]?\s*\n(.*?)(?:\n(?:Skills:|Experience:|Education:|$))",
         ]
         
         for pattern in summary_patterns:
             summary_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
             if summary_match and summary_match.group(1).strip():
                 summary = summary_match.group(1).strip()
-                # Clean up the summary - remove extra whitespace and formatting
+                # Clean up the summary - remove extra whitespace
                 summary = re.sub(r'\n+', ' ', summary)
                 summary = re.sub(r'\s+', ' ', summary)
                 return summary
@@ -313,124 +278,155 @@ class ParsedResume():
         return None
 
     def parse_experience_entry(self, text):
-        """Parse work experience with better field extraction"""
-        # Try multiple patterns for experience entries
+        """Parse work experience from clean, standardized format"""
+        # Simple patterns for the clean format produced by the prompt
         patterns = [
-            r"(?P<position>.+?)\s*\|\s*(?P<company>.+?)\s*\|\s*(?P<dates>[\d\s\-–Present]+)",
-            r"(?P<position>.+?)\s*—\s*(?P<company>.+?)\s*\|\s*(?P<dates>[\d\s\-–Present]+)",
-            r"(?P<position>.+?)\s*at\s*(?P<company>.+?)\s*\((?P<dates>[\d\s\-–Present]+)\)",
-            r"(?P<company>.+?)\s*—\s*(?P<position>.+?)\s*\((?P<dates>[\d\s\-–Present]+)\)",
-            r"(?P<title>.+?)\n(?P<company>.+?) \| (?P<start>\w+\s+\d{4})\s*[-–]\s*(?P<end>\w+\s+\d{4}|Present)",
+            # Standard format: Job Title\nCompany, Location | Start - End
+            r"(?P<position>.+?)\n(?P<company>.+?)\s*\|\s*(?P<dates>[\w\s\d\-–Present]+)",
+            # Alternative: Company | Job Title | Dates
+            r"(?P<company>.+?)\s*\|\s*(?P<position>.+?)\s*\|\s*(?P<dates>[\d\s\-–Present]+)",
         ]
         
         for pattern in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 # Extract bullet points from the text
                 bullet_points = []
                 lines = text.split('\n')
                 for line in lines:
                     line = line.strip()
-                    if line.startswith('•') or line.startswith('-') or line.startswith('*'):
-                        bullet_points.append(line[1:].strip())
+                    if line.startswith('• ') or line.startswith('- '):
+                        bullet_text = line[2:].strip()
+                        bullet_points.append(bullet_text)
                 
-                # Handle different match groups based on pattern
-                if 'start' in match.groupdict() and 'end' in match.groupdict():
-                    # Pattern with separate start/end dates
-                    return ExperienceEntry(
-                        company=match.group("company").strip(),
-                        position=match.group("title").strip(),
-                        start_date=match.group("start").strip(),
-                        end_date=match.group("end").strip(),
-                        bullet_points=bullet_points
-                    )
-                else:
-                    # Pattern with combined dates
-                    dates = match.group("dates").strip() if "dates" in match.groupdict() else ""
-                    start_date, end_date = "", ""
-                    if dates:
-                        # Try to split dates
-                        date_parts = re.split(r'\s*[-–]\s*', dates)
-                        if len(date_parts) >= 2:
-                            start_date = date_parts[0].strip()
-                            end_date = date_parts[1].strip()
-                        else:
-                            start_date = dates
-                    
-                    return ExperienceEntry(
-                        company=match.group("company").strip(),
-                        position=match.group("position").strip(),
-                        start_date=start_date,
-                        end_date=end_date,
-                        bullet_points=bullet_points
-                    )
+                # Parse dates
+                dates = match.group("dates").strip()
+                start_date, end_date = "", ""
+                if dates:
+                    # Split on dash or –
+                    date_parts = re.split(r'\s*[-–]\s*', dates, 1)
+                    start_date = date_parts[0].strip()
+                    end_date = date_parts[1].strip() if len(date_parts) > 1 else ""
+                
+                return ExperienceEntry(
+                    company=match.group("company").strip(),
+                    position=match.group("position").strip(),
+                    start_date=start_date,
+                    end_date=end_date,
+                    bullet_points=bullet_points
+                )
+        
+        return None
         
         return None
 
     def parse_project_entry(self, text):
-        m = re.search(r"(?P<title>.+?)\n(?:• .+\n?)+", text)
-        if m:
-            bullets = re.findall(r"• (.+)", text)
-            return ProjectEntry(
-                title=m.group("title").strip(),
-                description="",
-                bullet_points=bullets
-            )
+        """Parse project entry from clean format"""
+        # Look for project title followed by bullet points
+        lines = text.strip().split('\n')
+        if lines:
+            title = lines[0].strip()
+            bullets = []
+            for line in lines[1:]:
+                line = line.strip()
+                if line.startswith('• ') or line.startswith('- '):
+                    bullets.append(line[2:].strip())
+            
+            if title:
+                return ProjectEntry(
+                    title=title,
+                    description="",
+                    bullet_points=bullets
+                )
         return None
 
     def parse_volunteer_entry(self, text):
-        m = re.search(r"(?P<role>.+?)\n(?P<organization>.+?) \| (?P<start>\w+\s+\d{4})\s*[-–]\s*(?P<end>\w+\s+\d{4}|Present)", text)
-        if m:
+        """Parse volunteer entry from clean format"""
+        # Look for Role, Organization | Start - End pattern
+        pattern = r"(?P<role>.+?),\s*(?P<organization>.+?)\s*\|\s*(?P<dates>[\w\s\d\-–Present]+)"
+        match = re.search(pattern, text)
+        if match:
+            dates = match.group("dates").strip()
+            start_date, end_date = "", ""
+            if dates:
+                date_parts = re.split(r'\s*[-–]\s*', dates, 1)
+                start_date = date_parts[0].strip()
+                end_date = date_parts[1].strip() if len(date_parts) > 1 else ""
+            
             bullets = re.findall(r"• (.+)", text)
             return VolunteerExperienceEntry(
-                organization=m.group("organization").strip(),
-                role=m.group("role").strip(),
-                start_date=m.group("start").strip(),
-                end_date=m.group("end").strip(),
+                organization=match.group("organization").strip(),
+                role=match.group("role").strip(),
+                start_date=start_date,
+                end_date=end_date,
                 bullet_points=bullets
             )
         return None
 
     def parse_skill_set(self, text):
-        """Parse skills with better extraction"""
-        # Look for various skills section patterns
-        skills_patterns = [
-            r"(?:Technical\s+)?Skills\s*[:\-]?\s*\n(.*?)(?:\n(?:[A-Z][A-Z\s]+|$))",
-            r"TECHNICAL\s+SKILLS\s*\n(.*?)(?:\n[A-Z][A-Z\s]+|$)",
-            r"Skills\s*[:\-]?\s*\n(.*?)(?:\n(?:[A-Z][A-Z\s]+|$))",
-            r"Skills:\n((?:.+\n)+?)\n\n",  # Original pattern
-        ]
+        """Parse skills from clean, standardized format with optional categories"""
+        # Pattern for the clean format
+        skills_pattern = r"Skills:\s*\n(.*?)(?:\n(?:Experience:|Education:|Projects:|$))"
         
+        technical_skills = []
+        soft_skills = []
         all_skills = []
         
-        for pattern in skills_patterns:
-            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-            if match:
-                skills_text = match.group(1).strip()
-                # Extract skills from bullet points or comma-separated lists
-                lines = skills_text.split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith('•') or line.startswith('-') or line.startswith('*'):
-                        # Bullet point format
-                        skill_line = line[1:].strip()
-                        if ':' in skill_line:
-                            # Format like "• Programming Languages: JavaScript, Python"
-                            skills_part = skill_line.split(':', 1)[1].strip()
-                            skills = [s.strip() for s in skills_part.split(',') if s.strip()]
-                            all_skills.extend(skills)
+        match = re.search(skills_pattern, text, re.DOTALL | re.IGNORECASE)
+        if match:
+            skills_text = match.group(1).strip()
+            lines = skills_text.split('\n')
+            
+            current_category = None
+            
+            for line in lines:
+                line = line.strip()
+                
+                # Check if this line is a category header
+                if line.endswith(':') and not line.startswith('•'):
+                    current_category = line.lower()
+                    continue
+                
+                # Handle bullet points
+                if line.startswith('• ') or line.startswith('- '):
+                    skill_line = line[2:].strip()
+                    if skill_line:
+                        # Categorize based on current category
+                        if current_category and 'technical' in current_category:
+                            technical_skills.append(skill_line)
+                        elif current_category and ('soft' in current_category or 'interpersonal' in current_category):
+                            soft_skills.append(skill_line)
                         else:
+                            # If no category or unrecognized category, add to general skills
                             all_skills.append(skill_line)
-                    elif line and not line.isupper():
-                        # Plain text line, might be comma-separated
-                        if ',' in line:
-                            skills = [s.strip() for s in line.split(',') if s.strip()]
+                
+                elif line and not line.isupper() and not line.endswith(':'):
+                    # Plain text line, might be comma-separated
+                    if ',' in line:
+                        skills = [s.strip() for s in line.split(',') if s.strip()]
+                        if current_category and 'technical' in current_category:
+                            technical_skills.extend(skills)
+                        elif current_category and ('soft' in current_category or 'interpersonal' in current_category):
+                            soft_skills.extend(skills)
+                        else:
                             all_skills.extend(skills)
+                    else:
+                        if current_category and 'technical' in current_category:
+                            technical_skills.append(line)
+                        elif current_category and ('soft' in current_category or 'interpersonal' in current_category):
+                            soft_skills.append(line)
                         else:
                             all_skills.append(line)
-                break
         
-        return SkillSet(technical=all_skills, soft_skills=[]) if all_skills else None
+        # Return structured skills if we found any
+        if technical_skills or soft_skills or all_skills:
+            # If we have categorized skills, use them; otherwise use all_skills as technical
+            if technical_skills or soft_skills:
+                return SkillSet(technical=technical_skills, soft_skills=soft_skills)
+            else:
+                return SkillSet(technical=all_skills, soft_skills=[])
+        
+        return None
 
     def serialize(self):
         """Serialize the parsed resume data to match the template structure"""
@@ -517,7 +513,15 @@ class ParsedResume():
                 "bullet_points": v.bullet_points
             })
         
-        # Flatten skills for template - template expects a simple list
+        # Prepare skills data - keep categorized structure for template
+        skills_data = {}
+        if self.skills:
+            skills_data = {
+                "technical": self.skills.technical,
+                "soft_skills": self.skills.soft_skills
+            }
+        
+        # Also create a flat list for backward compatibility
         all_skills = []
         if self.skills:
             all_skills.extend(self.skills.technical)
@@ -542,6 +546,112 @@ class ParsedResume():
             "experience_section": experience_formatted,
             "projects": projects_formatted,
             "volunteer_experience": volunteer_formatted,
-            "skills": unique_skills  # Template expects flat list, not nested object
+            "skills": skills_data,  # Use categorized structure
+            "all_skills": unique_skills  # Flat list for backward compatibility
         }
         return {"candidate": data}
+
+    def parse_experience_section(self, exp_section_text):
+        """Parse multiple experience entries from the experience section"""
+        experience_entries = []
+        
+        # Find lines that start with ** and contain job titles and dates
+        # Use a simpler approach: find lines with **Job Title** followed by any date-like content
+        job_lines = []
+        lines = exp_section_text.split('\n')
+        
+        for i, line in enumerate(lines):
+            line = line.strip()
+            # Look for lines that start with ** and contain job titles
+            if line.startswith('**') and '**' in line[2:]:
+                # Extract job title and date info
+                parts = line.split('**', 2)  # Split on first two ** occurrences
+                if len(parts) >= 3:
+                    job_title = parts[1].strip()
+                    date_info = parts[2].strip()
+                    job_lines.append((i, job_title, date_info))
+        
+        # Process each job entry
+        for j, (line_idx, job_title, date_info) in enumerate(job_lines):
+            # Find the start and end of this job entry
+            start_line = line_idx
+            
+            # Find end line (start of next job or end of section)
+            if j + 1 < len(job_lines):
+                end_line = job_lines[j + 1][0]
+            else:
+                end_line = len(lines)
+            
+            # Extract all lines for this job entry
+            job_entry_lines = lines[start_line:end_line]
+            job_entry_text = '\n'.join(job_entry_lines)
+            
+            # Parse this individual entry
+            exp_entry = self.parse_individual_experience_entry(job_entry_text, job_title, date_info)
+            if exp_entry:
+                experience_entries.append(exp_entry)
+        
+        return experience_entries
+
+    def parse_individual_experience_entry(self, entry_text, job_title, date_info):
+        """Parse a single experience entry given the title and date info"""
+        # Convert word numbers in dates first
+        word_to_digit = {
+            'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+            'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9'
+        }
+        
+        processed_date = date_info
+        # Convert date word numbers to digits
+        for word, digit in word_to_digit.items():
+            processed_date = re.sub(f'/{word}\\.osf', digit, processed_date, flags=re.IGNORECASE)
+        processed_date = re.sub(r'/\.osf', '', processed_date)  # Clean up
+        
+        # Fix date formatting issues (e.g., "023" -> "2023")
+        processed_date = re.sub(r'\b0(\d{2})\b', r'20\1', processed_date)
+        
+        # Extract start and end dates
+        start_date, end_date = "", ""
+        if '–' in processed_date or '-' in processed_date:
+            date_parts = re.split(r'\s*[-–]\s*', processed_date)
+            if len(date_parts) >= 2:
+                start_date = date_parts[0].strip()
+                end_date = date_parts[1].strip()
+        else:
+            start_date = processed_date.strip()
+        
+        # Extract company information (usually on the line after job title)
+        lines = entry_text.split('\n')
+        company = ""
+        
+        # Look for company line (usually the second non-empty line)
+        non_empty_lines = [line.strip() for line in lines if line.strip()]
+        if len(non_empty_lines) >= 2:
+            # Skip the title line, get the next line which should be company
+            potential_company = non_empty_lines[1]
+            # Check if it looks like a company line (not a bullet point)
+            if not potential_company.startswith('*   ') and not potential_company.startswith('•'):
+                company = potential_company
+        
+        # Extract bullet points
+        bullet_points = []
+        for line in lines:
+            line = line.strip()
+            if line.startswith('*   ') or line.startswith('• ') or line.startswith('- '):
+                # Handle markdown list items with bold
+                bullet_text = line[4:].strip() if line.startswith('*   ') else line[2:].strip()
+                # Remove markdown bold from bullet points
+                bullet_text = re.sub(r'\*\*(.*?)\*\*', r'\1', bullet_text)
+                bullet_points.append(bullet_text)
+        
+        # Clean up job title and company
+        clean_job_title = re.sub(r'\*\*(.*?)\*\*', r'\1', job_title)
+        clean_company = re.sub(r'\*\*(.*?)\*\*', r'\1', company)
+        
+        return ExperienceEntry(
+            company=clean_company,
+            position=clean_job_title,
+            start_date=start_date,
+            end_date=end_date,
+            bullet_points=bullet_points
+        )
