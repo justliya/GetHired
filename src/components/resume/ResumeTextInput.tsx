@@ -12,8 +12,8 @@ const ResumeTextInput: React.FC<ResumeTextInputProps> = ({
   onSwitchToManual
 }) => {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-3">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Resume Text
         </label>
@@ -30,7 +30,7 @@ const ResumeTextInput: React.FC<ResumeTextInputProps> = ({
         value={resumeText}
         onChange={(e) => onResumeTextChange(e.target.value)}
         disabled={resumeInputMethod !== 'manual'}
-        className={`w-full p-3 border rounded-md h-64 resize-none dark:bg-gray-700 dark:text-white ${
+        className={`w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg h-64 resize-none bg-white dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 transition-colors ${
           resumeInputMethod !== 'manual' 
             ? 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 cursor-not-allowed' 
             : ''

@@ -380,25 +380,29 @@ Join our team and help build the next generation of web applications that serve 
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Resume Text Area */}
-          <ResumeTextInput
-            resumeText={resumeText}
-            resumeInputMethod={resumeInputMethod}
-            onResumeTextChange={setResumeText}
-            onSwitchToManual={handleSwitchToManual}
-          />
+          <div className="flex flex-col">
+            <ResumeTextInput
+              resumeText={resumeText}
+              resumeInputMethod={resumeInputMethod}
+              onResumeTextChange={setResumeText}
+              onSwitchToManual={handleSwitchToManual}
+            />
+          </div>
 
           {/* Job Description Area */}
-          <JobDescriptionInput
-            jobDescription={jobDescription}
-            userJobs={userJobs}
-            showJobSelector={showJobSelector}
-            onJobDescriptionChange={setJobDescription}
-            onToggleJobSelector={handleToggleJobSelector}
-            onLoadJobFromListing={handleLoadJobFromListing}
-            onLoadSampleJob={loadSampleJobDescription}
-          />
+          <div className="flex flex-col">
+            <JobDescriptionInput
+              jobDescription={jobDescription}
+              userJobs={userJobs}
+              showJobSelector={showJobSelector}
+              onJobDescriptionChange={setJobDescription}
+              onToggleJobSelector={handleToggleJobSelector}
+              onLoadJobFromListing={handleLoadJobFromListing}
+              onLoadSampleJob={loadSampleJobDescription}
+            />
+          </div>
         </div>
 
         <div className="flex items-center justify-center">

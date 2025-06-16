@@ -21,7 +21,7 @@ const JobDescriptionInput: React.FC<JobDescriptionInputProps> = ({
   onLoadSampleJob
 }) => {
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-3">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Job Description
@@ -82,12 +82,14 @@ const JobDescriptionInput: React.FC<JobDescriptionInputProps> = ({
         </div>
       )}
 
-      <textarea
-        value={jobDescription}
-        onChange={(e) => onJobDescriptionChange(e.target.value)}
-        className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg h-64 resize-none bg-white dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 transition-colors"
-        placeholder="Paste the job description here, or use the buttons above to load from your saved jobs or try a sample job description..."
-      />
+      <div className="flex-1">
+        <textarea
+          value={jobDescription}
+          onChange={(e) => onJobDescriptionChange(e.target.value)}
+          className="w-full h-64 p-4 border border-gray-300 dark:border-gray-600 rounded-lg resize-none bg-white dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 transition-colors"
+          placeholder="Paste the job description here, or use the buttons above to load from your saved jobs or try a sample job description..."
+        />
+      </div>
     </div>
   );
 };
