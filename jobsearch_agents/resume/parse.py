@@ -279,11 +279,13 @@ class ParsedResume():
 
     def parse_experience_entry(self, text):
         """Parse work experience from clean, standardized format"""
-        # Simple patterns for the clean format produced by the prompt
+        # Handle various format variations
         patterns = [
             # Standard format: Job Title\nCompany, Location | Start - End
-            r"(?P<position>.+?)\n(?P<company>.+?)\s*\|\s*(?P<dates>[\w\s\d\-–Present]+)",
-            # Alternative: Company | Job Title | Dates
+            r"(?P<position>.+?)\n(?P<company>.+?)\s*\|\s*(?P<dates>[\w\s\d\-–Present|]+)",
+            # Alternative with Remote: Company, Location | Remote | Start - End  
+            r"(?P<position>.+?)\n(?P<company>.+?)\s*\|\s*Remote\s*\|\s*(?P<dates>[\w\s\d\-–Present]+)",
+            # Company | Job Title | Dates format
             r"(?P<company>.+?)\s*\|\s*(?P<position>.+?)\s*\|\s*(?P<dates>[\d\s\-–Present]+)",
         ]
         
@@ -299,17 +301,22 @@ class ParsedResume():
                         bullet_text = line[2:].strip()
                         bullet_points.append(bullet_text)
                 
-                # Parse dates
+                # Parse dates - handle both - and – characters
                 dates = match.group("dates").strip()
                 start_date, end_date = "", ""
                 if dates:
-                    # Split on dash or –
+                    # Split on both types of dashes
                     date_parts = re.split(r'\s*[-–]\s*', dates, 1)
                     start_date = date_parts[0].strip()
                     end_date = date_parts[1].strip() if len(date_parts) > 1 else ""
                 
+                # Clean up company field to remove extra location info
+                company = match.group("company").strip()
+                # Remove trailing location info like ", Ann Arbor, MI"
+                company = re.sub(r',\s*[A-Za-z\s]+,\s*[A-Z]{2}$', '', company)
+                
                 return ExperienceEntry(
-                    company=match.group("company").strip(),
+                    company=company.strip(),
                     position=match.group("position").strip(),
                     start_date=start_date,
                     end_date=end_date,
@@ -552,44 +559,33 @@ class ParsedResume():
         return {"candidate": data}
 
     def parse_experience_section(self, exp_section_text):
-        """Parse multiple experience entries from the experience section"""
+        """Parse multiple experience entries from the clean formatted experience section"""
         experience_entries = []
         
-        # Find lines that start with ** and contain job titles and dates
-        # Use a simpler approach: find lines with **Job Title** followed by any date-like content
-        job_lines = []
+        # Split the section by double newlines to separate individual job entries
+        job_entries = []
+        current_entry = []
         lines = exp_section_text.split('\n')
         
-        for i, line in enumerate(lines):
+        for line in lines:
             line = line.strip()
-            # Look for lines that start with ** and contain job titles
-            if line.startswith('**') and '**' in line[2:]:
-                # Extract job title and date info
-                parts = line.split('**', 2)  # Split on first two ** occurrences
-                if len(parts) >= 3:
-                    job_title = parts[1].strip()
-                    date_info = parts[2].strip()
-                    job_lines.append((i, job_title, date_info))
+            if not line:  # Empty line
+                if current_entry:
+                    job_entries.append('\n'.join(current_entry))
+                    current_entry = []
+                continue
+            current_entry.append(line)
         
-        # Process each job entry
-        for j, (line_idx, job_title, date_info) in enumerate(job_lines):
-            # Find the start and end of this job entry
-            start_line = line_idx
-            
-            # Find end line (start of next job or end of section)
-            if j + 1 < len(job_lines):
-                end_line = job_lines[j + 1][0]
-            else:
-                end_line = len(lines)
-            
-            # Extract all lines for this job entry
-            job_entry_lines = lines[start_line:end_line]
-            job_entry_text = '\n'.join(job_entry_lines)
-            
-            # Parse this individual entry
-            exp_entry = self.parse_individual_experience_entry(job_entry_text, job_title, date_info)
-            if exp_entry:
-                experience_entries.append(exp_entry)
+        # Add the last entry if there is one
+        if current_entry:
+            job_entries.append('\n'.join(current_entry))
+        
+        # Parse each job entry
+        for entry_text in job_entries:
+            if entry_text.strip():
+                exp_entry = self.parse_experience_entry(entry_text)
+                if exp_entry:
+                    experience_entries.append(exp_entry)
         
         return experience_entries
 
