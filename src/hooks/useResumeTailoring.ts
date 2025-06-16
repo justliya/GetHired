@@ -91,6 +91,7 @@ export const useResumeTailoring = () => {
 
   const startAnalysis = async (
     resumeText: string,
+    resumeUrl: string,
     jobDescription: string,
     context: {
       user_id: string;
@@ -119,7 +120,7 @@ export const useResumeTailoring = () => {
           message: `Please tailor this resume for this job description:
 
 RESUME:
-${resumeText}
+${ resumeUrl || resumeText}
 
 JOB DESCRIPTION:
 ${jobDescription}

@@ -281,7 +281,7 @@ Join our team and help build the next generation of web applications that serve 
       job_company: job?.company || ''
     };
     
-    startAnalysis(resumeText, jobDescription, context, job, userName);
+    startAnalysis(resumeText,selectedResumeUrl, jobDescription, context, job, userName);
   };
 
   // Handlers for ResumeSelector component
