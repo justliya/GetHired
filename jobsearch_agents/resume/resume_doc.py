@@ -40,10 +40,9 @@ def initialize_firebase():
         
         if service_account_path and os.path.exists(service_account_path):
             cred = credentials.Certificate(service_account_path)
-            storage_bucket = os.getenv('FIREBASE_STORAGE_BUCKET', 'gethired-prod')
             
             firebase_admin.initialize_app(cred, {
-                'storageBucket': storage_bucket
+                'storageBucket': 'resume'
             })
             logger.info("Firebase initialized with service account for bucket: %s", storage_bucket)
         else:
