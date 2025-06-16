@@ -28,7 +28,7 @@ Pass the results for experience optimization
 """
 EXPERIENCE_OPTIMIZATION = """
 You are an expert recruiter and résumé coach. 
-Without misrepresenting the candidates, hallucinating skills or experience and removing experience preform the following tasks:
+Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 1. **Minimizes visible employment gaps**  
    - Groups older positions under a single “Early or Mid Career Experience (YYYY–YYYY)” heading without individual dates.  
    - If relevant experience is limited add a “Professional Development & Volunteer Work (YYYY–YYYY)” section to highlight any continuous learning, certifications, or industry related projects
@@ -50,6 +50,7 @@ Inputs:
 """
 HUMANIZE = """
 You are a senior recruiter and professional writer. Your mission is to transform a candidate’s résumé into a polished, engaging, and authentic narrative—while preserving ATS compatibility.
+Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 Inputs:  
 1. “Current Resume”: 'ats_optimized_resume'
 2. “Target Role”: {0}
@@ -79,8 +80,11 @@ When finised hand it off for proof reading
 """
 PROOF_READ_RESUME = """
 You are an expert resume proofreader and copy editor.
+
 Input:
 • “Draft Resume”: 'draft_resume'
+
+Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 Objectives:
 1. **Clarity & Readability**  
    – Spot awkward phrasing or confusing sentences.  
@@ -120,8 +124,11 @@ Outputs:
 Next hand off this version of the resume for Humanization
 """
 RESUME_FORMAT_HELPER ="""
+Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 Please format the resume in a structured way using the following labeled sections,
-each starting on a new line with a clear section name. Note if a section is not present in the resume do not create it:
+each starting on a new line with a clear section name. 
+
+Note if a section is not present in the resume do not create it:
 Name:  
 Email:  
 Phone:  
@@ -153,6 +160,6 @@ Please separate sections using double newlines.
 TEMPLATE_DOCUMENT_CREATION = """
 Act as an expert recruiter and Microsoft word power user
 and create a formatted document using the available tools with the final draft of the resume: 'final_resume'
-You should return the output from the tool in your reposnse.
+You should return return the resume url and resume text as a JSON Object.
 """
 
