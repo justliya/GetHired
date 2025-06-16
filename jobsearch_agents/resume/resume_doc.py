@@ -288,13 +288,11 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         
         logger.info("🎉 Resume created successfully for %s (user: %s)", job_position_title, user_id)
         
-        # Return the data in the expected format for the agent response
         return {
             "resume_text": text,
             "document_url": download_url,
-            "download_url": download_url,  # Also provide as download_url for compatibility
+            "download_url": download_url, 
             "filename": filename,
-            "status": "success",
             "message": f"Resume successfully created and uploaded for {job_position_title}"
         }
         
