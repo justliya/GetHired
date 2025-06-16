@@ -36,7 +36,7 @@ RUN npm install @gannonh/firebase-mcp
 
 COPY . .
 
-COPY ../template ./template
+COPY ../../template ./template
 
 EXPOSE ${PORT}
 
