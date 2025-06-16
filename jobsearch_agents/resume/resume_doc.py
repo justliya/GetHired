@@ -163,7 +163,22 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
                 logger.debug("  Experience %d: %s at %s (%s)", i+1, exp.get("role"), exp.get("company"), exp.get("dates"))
         
         if candidate.get("skills"):
-            logger.debug("  Skills: %s", candidate.get("skills", [])[:10])  # Show first 10 skills
+            skills_data = candidate.get("skills", {})
+            if hasattr(skills_data, 'technical'):
+                # SkillSet object
+                technical_count = len(skills_data.technical) if skills_data.technical else 0
+                soft_count = len(skills_data.soft_skills) if skills_data.soft_skills else 0
+                logger.debug("  Skills: %d technical, %d soft skills", technical_count, soft_count)
+            elif isinstance(skills_data, dict):
+                # Dictionary format
+                technical_skills = skills_data.get("technical", [])
+                soft_skills = skills_data.get("soft_skills", [])
+                logger.debug("  Skills: %d technical, %d soft skills", len(technical_skills), len(soft_skills))
+            elif isinstance(skills_data, list):
+                # List format (legacy)
+                logger.debug("  Skills: %d total skills", len(skills_data))
+            else:
+                logger.debug("  Skills: Unknown format - %s", type(skills_data))
         
         # Use templateResumeDocV2.docx from the template directory
         # Try multiple possible paths for different environments
@@ -201,6 +216,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         template_context["candidate"] = candidate_data["candidate"]
         
         # Handle skills properly - extract from SkillSet structure
+        candidate = candidate_data["candidate"]  # Define candidate for easier access
         skills_data = candidate.get("skills", {})
         if hasattr(skills_data, 'technical'):
             # SkillSet object

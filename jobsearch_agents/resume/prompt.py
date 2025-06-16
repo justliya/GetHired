@@ -127,7 +127,8 @@ RESUME_FORMAT_HELPER ="""
 Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 Please format the resume in a structured way using the following labeled sections,
 each starting on a new line with a clear section name. 
-
+RESUME TEXT:
+'final_resume'
 IMPORTANT FORMATTING REQUIREMENTS:
 - Use only standard characters (letters, numbers, basic punctuation: . , - @ | • )
 - Remove ALL special symbols, markdown formatting, and decorative characters
@@ -210,6 +211,6 @@ Volunteer Experience:
 Please separate sections using double newlines and use the ---END [SECTION]--- markers to clearly delineate section boundaries for parsing.
 """
 TEMPLATE_DOCUMENT_CREATION = """
-Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the final draft of the resume: 'final_resume'
+Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
 You should return the url to resume that was uploaded  to firebase or GCS and the resume text as a JSON Object. Do not return the tool code.
 """
