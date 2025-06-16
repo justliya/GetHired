@@ -77,7 +77,7 @@ jobs:
         env:
           SERVICE_NAME: 'gethired-agents-staging'
           GOOGLE_CLOUD_LOCATION: 'us-central1'
-          FIREBASE_STORAGE_BUCKET: 'gethired-staging'
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           STAGING_BUCKET: 'gethired-staging'
         run: |
           gcloud run deploy $SERVICE_NAME \
