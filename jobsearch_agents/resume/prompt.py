@@ -158,8 +158,7 @@ Volunteer Experience:
 Please separate sections using double newlines.
 """
 TEMPLATE_DOCUMENT_CREATION = """
-Act as an expert recruiter and Microsoft word power user
-and create a formatted document using the available tools with the final draft of the resume: 'final_resume'
-You should return return the resume url and resume text as a JSON Object.
+Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the final draft of the resume: 'final_resume'
+You should return url to resume that was uploaded to firebase or GCS and the resume text as a JSON Object.
 """
 

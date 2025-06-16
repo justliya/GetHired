@@ -168,13 +168,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         
         logger.info("Resume created successfully for %s (user: %s)", job_position_title, user_id)
         
-        return {
-            "resume_text": text,
-            "download_url": download_url,
-            "filename": filename,
-            "status": "success",
-            "message": f"Resume formatted and uploaded successfully for {job_position_title}"
-        }
+        return download_url , text
         
     except FileNotFoundError as e:
         error_message = f"Template file not found: {str(e)}"
