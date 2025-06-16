@@ -46,7 +46,7 @@ export const useResumeTailoring = () => {
           try {
             const parsed = JSON.parse(jsonMatch[0]);
             resumeText = parsed.resume_text || parsed.final_resume || parsed.tailored_resume_text || '';
-            resumeUrl = parsed.download_url || parsed.tailored_resume_url || '';
+            resumeUrl = parsed.document_url || parsed.download_url || parsed.tailored_resume_url || '';
             filename = parsed.filename || '';
           } catch (e) {
             console.warn('Failed to parse JSON from message:', e);
@@ -62,7 +62,7 @@ export const useResumeTailoring = () => {
       // Also check the data field for structured information
       if (responseData) {
         resumeText = resumeText || (responseData.resume_text as string) || (responseData.final_resume as string) || (responseData.tailored_resume_text as string) || '';
-        resumeUrl = resumeUrl || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || '';
+        resumeUrl = resumeUrl || (responseData.document_url as string) || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || '';
         filename = filename || (responseData.filename as string) || '';
       }
       
