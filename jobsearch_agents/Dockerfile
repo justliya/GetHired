@@ -16,19 +16,21 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY jobsearch_agents/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY package*.json ./
+COPY jobsearch_agents/package*.json ./
 
 RUN npm install
 
 RUN npm install @gannonh/firebase-mcp
 
-COPY . .
+# Copy the template directory from project root
+COPY template/ ./template/
 
-COPY ../../template ./template
+# Copy the jobsearch_agents source code
+COPY jobsearch_agents/ .
 
 EXPOSE ${PORT}
 

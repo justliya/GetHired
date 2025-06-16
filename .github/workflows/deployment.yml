@@ -37,13 +37,13 @@ jobs:
 
       - name: Build and Push Docker Image
         id: build
-        working-directory: ./jobsearch_agents
+        working-directory: ${{ github.workspace }}
         run: |
-          # Build Docker image
+          # Build Docker image from project root to access template directory
           IMAGE_NAME="gcr.io/$GOOGLE_CLOUD_PROJECT/gethired-agents"
           IMAGE_TAG="${{ github.sha }}"
           
-          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+          docker build -f jobsearch_agents/Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} .
           docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
           
           # Configure docker to use gcloud credentials
