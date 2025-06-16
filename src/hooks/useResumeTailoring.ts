@@ -54,7 +54,7 @@ export const useResumeTailoring = () => {
             const parsed = JSON.parse(jsonMatch[0]);
             console.log('✅ Parsed JSON:', parsed);
             resumeText = parsed.resume_text || parsed.final_resume || parsed.tailored_resume_text || '';
-            resumeUrl = parsed.document_url || parsed.download_url || parsed.tailored_resume_url || '';
+            resumeUrl = parsed.document_url || parsed.download_url || parsed.resume_url || '';
             filename = parsed.filename || '';
             console.log('🎯 Extracted from JSON - URL:', resumeUrl, 'Text length:', resumeText.length, 'Filename:', filename);
           } catch (e) {
