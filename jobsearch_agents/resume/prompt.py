@@ -159,6 +159,6 @@ Please separate sections using double newlines.
 """
 TEMPLATE_DOCUMENT_CREATION = """
 Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the final draft of the resume: 'final_resume'
-You should return url to resume that was uploaded to firebase or GCS and the resume text as a JSON Object.
+You should return the url to resume that was uploaded  to firebase or GCS and the resume text as a JSON Object. Do not return the tool code.
 """
 
