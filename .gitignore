@@ -27,3 +27,4 @@ dist-ssr
 docs/
 serviceAccount*.json
 .vercel
+.env
