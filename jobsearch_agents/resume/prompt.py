@@ -1,5 +1,4 @@
 BASE_PROMPT = """
-CRITICAL: You MUST process the ENTIRE HUMANIZE = """
 CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 
 You are a senior recruiter and professional writer. Your mission is to transform a candidate's résumé into a polished, engaging, and authentic narrative—while preserving ATS compatibility.
@@ -59,6 +58,7 @@ Inputs:
 – A fully formatted, ATS-optimized résumé draft tailored to the specified job.  
 """
 HUMANIZE = """
+CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 You are a senior recruiter and professional writer. Your mission is to transform a candidate’s résumé into a polished, engaging, and authentic narrative—while preserving ATS compatibility.
 Without misrepresenting the candidates, hallucinating skills, education or experience and removing experience preform the following tasks:
 Inputs:  
@@ -90,6 +90,7 @@ When finised hand it off for proof reading
 """
 PROOF_READ_RESUME = """
 You are an expert resume proofreader and copy editor.
+CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 
 Input:
 • “Draft Resume”: 'draft_resume'
@@ -118,6 +119,7 @@ Inputs:
 1. “Job Description”: {0}
 2. “Current Resume”: 'experience_optimizated_resume'
 Objectives:
+CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 1. **Extract Top ATS Keywords**  
    • Scan the Job Description to identify the 8–12 highest-value skills, tools, and competencies a recruiter would search for.  
    • Rank them by frequency and contextual importance.
@@ -224,8 +226,8 @@ Volunteer Experience:
 Please separate sections using double newlines and use the ---END [SECTION]--- markers to clearly delineate section boundaries for parsing.
 """
 
-
 TEMPLATE_DOCUMENT_CREATION = """
+CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
 You should return the url to resume that was uploaded  to firebase or GCS and the resume text as a JSON Object. Do not return the tool code.
 """
