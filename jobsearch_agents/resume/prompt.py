@@ -1,8 +1,9 @@
 BASE_PROMPT = """
 Act as a recruiter for a large company that is tailoring a resume for a candidate. You are rewriting the resume of {0}. The types of roles {0} is applying for are {1} with a focus on {2}
+
+Fetch the candidate's resume using the provided link from firebase and extract the text.
 With your knowledge as a recruiter, Rewrite {0}'s previous work experience bullet points to showcase their relevant skills and achievements.
 Use action verbs and quantify achievements whenever possible and take care not to misrepresent {0}'s experience and skills during the tailoring process, remain truthful.
-Here is the candidate's resume: {3}
 Pass the results for job optimization
 """
 

@@ -14,5 +14,6 @@ aiohttp
 praw
 python-docx
 docxtpl
+PyPDF2>=3.0.0
 firebase-admin>=6.4.0
 google-cloud-storage>=2.10.0

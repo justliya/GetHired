@@ -1,15 +1,18 @@
+import os 
+
 from google.adk.agents.llm_agent import Agent
 from google.adk.agents import SequentialAgent
-
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
 from . import prompt
-from .resume_doc import create_formatted_resume
-from contextlib import AsyncExitStack
+from .resume_doc import create_formatted_resume, download_and_extract_resume_text
 
+from contextlib import AsyncExitStack
 
 base_resume_cleanup =  Agent(
     model="gemini-2.0-flash",
     name="base_resume_cleanup",
     instruction = prompt.BASE_PROMPT,
+    tools=[download_and_extract_resume_text],
     output_key="base_resume",
     )
 
