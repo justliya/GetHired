@@ -112,8 +112,6 @@ class TaskManager:
                 runner_generator = self.runner.run_async(
                     user_id=user_id, session_id=session_id, new_message=request_content
                 )
-
-                # Create a task to process events with timeout
                 async def process_events_with_timeout():
                     nonlocal final_message, raw_events
 
@@ -136,14 +134,12 @@ class TaskManager:
                         logger.error(f"Error processing events: {e}")
                         raise
 
-                # Apply timeout to the event processing
                 await asyncio.wait_for(
                     process_events_with_timeout(), timeout=self.timeout
                 )
 
             except asyncio.TimeoutError:
                 logger.error(f"Agent execution timed out after {self.timeout} seconds")
-                # Clean up the generator if it exists
                 if runner_generator is not None:
                     try:
                         await runner_generator.aclose()
@@ -158,7 +154,6 @@ class TaskManager:
 
             except asyncio.CancelledError:
                 logger.info("Task was cancelled")
-                # Clean up the generator if it exists
                 if runner_generator is not None:
                     try:
                         await runner_generator.aclose()
