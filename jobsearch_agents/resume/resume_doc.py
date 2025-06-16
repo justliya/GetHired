@@ -249,6 +249,16 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
             "volunteer_work": candidate.get("volunteer_experience", [])
         })
         
+        # Create a flat skills list for template compatibility
+        all_skills_list = []
+        all_skills_list.extend(technical_skills)
+        all_skills_list.extend(soft_skills)
+        
+        # Update candidate.skills to include both structured and flat formats
+        template_context["candidate"]["skills_flat"] = all_skills_list
+        template_context["candidate"]["technical_skills"] = technical_skills
+        template_context["candidate"]["soft_skills"] = soft_skills
+        
         logger.info("🎨 Rendering template with context...")
         logger.debug("📝 Template context keys: %s", list(template_context.keys()))
         
