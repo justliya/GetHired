@@ -163,10 +163,9 @@ class ParsedResume():
                 self.volunteer_experience.append(vol_entry)
 
         # Extract skills if present
-        if "Technical Skills" in text and "Soft Skills" in text:
-            skills = self.parse_skill_set(text)
-            if skills:
-                self.skills = skills
+        skills = self.parse_skill_set(text)
+        if skills:
+            self.skills = skills
 
     def match_resume_text(self, regex: Pattern[str], text):
         m = regex.search(text)
@@ -211,39 +210,80 @@ class ParsedResume():
         return None
 
     def extract_contact_info(self, text):
-        """Extract contact information with better pattern matching"""
+        """Extract contact information with better pattern matching, including special formatting"""
+        # First, handle special formatting with symbols like /phone/, /linkedin/, /envelope_alt
+        processed_text = text
+        
+        # Replace special symbols with readable text
+        symbol_replacements = {
+            r'/phone/': 'Phone: ',
+            r'/linkedin/': 'LinkedIn: ',
+            r'/envelope_alt/': 'Email: ',
+            r'/envelope/': 'Email: ',
+            r'\.osf': '',  # Remove .osf extensions
+            r'\.': '.',    # Normalize dots
+        }
+        
+        for symbol, replacement in symbol_replacements.items():
+            processed_text = re.sub(symbol, replacement, processed_text, flags=re.IGNORECASE)
+        
         # Try multiple name patterns
         name_patterns = [
-            r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",  # Traditional FirstName LastName
-            r"^(.+?)(?:\n|Email:|Phone:|Contact:)",  # Everything before contact details
-            r"^(.+?)(?:\s+\w+@\w+)",  # Everything before email
+            r"^([A-Z][a-z']+(?:\s+[A-Z][a-z']+)+)(?=\n)",  # Traditional FirstName LastName followed by newline
+            r"^(.+?)(?=\n(?:Phone:|Email:|Contact:|/phone/|/envelope))",  # Everything before contact details on next line
+            r"^(.+?)(?:\s+\w+@\w+)",  # Everything before email on same line
         ]
         
         name = None
         for pattern in name_patterns:
-            name_match = re.search(pattern, text, re.IGNORECASE)
+            name_match = re.search(pattern, processed_text, re.IGNORECASE)
             if name_match and name_match.group(1).strip():
-                name = name_match.group(1).strip()
+                candidate_name = name_match.group(1).strip()
+                # Clean up any remaining symbols
+                candidate_name = re.sub(r'[/\\]', '', candidate_name)
+                if len(candidate_name) > 1 and not candidate_name.isdigit():
+                    name = candidate_name
+                    break
+        
+        # Enhanced email pattern - look in both original and processed text
+        email_patterns = [
+            r"[\w\.-]+@[\w\.-]+\.\w+",  # Standard email
+            r"Email:\s*([\w\.-]+@[\w\.-]+\.\w+)",  # After Email: label
+        ]
+        
+        email = None
+        for pattern in email_patterns:
+            email_match = re.search(pattern, processed_text)
+            if email_match:
+                email = email_match.group(1).strip() if email_match.groups() else email_match.group(0).strip()
                 break
         
-        # Enhanced email pattern
-        email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", text)
-        
-        # Enhanced phone patterns
+        # Enhanced phone patterns - look for numbers after processing symbols
         phone_patterns = [
+            r"Phone:\s*([\d\-\.\(\)\s]+)",  # After "Phone:" label
             r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",  # US format
             r"\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",  # International
-            r"Phone:\s*([\d\-\.\(\)\s]+)",  # After "Phone:" label
+            r"(?:seven|eight|nine|zero|one|two|three|four|five|six)\.osf",  # Handle word numbers
         ]
         
         phone = None
         for pattern in phone_patterns:
-            phone_match = re.search(pattern, text)
+            phone_match = re.search(pattern, processed_text, re.IGNORECASE)
             if phone_match:
-                phone = phone_match.group(1).strip() if phone_match.groups() else phone_match.group(0).strip()
-                break
+                phone_text = phone_match.group(1).strip() if phone_match.groups() else phone_match.group(0).strip()
+                # Convert word numbers to digits
+                word_to_digit = {
+                    'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+                    'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9'
+                }
+                for word, digit in word_to_digit.items():
+                    phone_text = re.sub(f'{word}\\.osf', digit, phone_text, flags=re.IGNORECASE)
+                phone_text = re.sub(r'\.osf', '', phone_text)  # Remove any remaining .osf
+                if re.search(r'\d', phone_text):  # Only if we found some digits
+                    phone = phone_text
+                    break
         
-        url_match = re.findall(r"https?://(?:www\.)?[\w./-]+", text)
+        url_match = re.findall(r"https?://(?:www\.)?[\w./-]+", processed_text)
 
         return {
             "name": name,

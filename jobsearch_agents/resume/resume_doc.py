@@ -144,12 +144,26 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         logger.info("  - Name: %s", candidate.get("name"))
         logger.info("  - Email: %s", candidate.get("email"))
         logger.info("  - Phone: %s", candidate.get("phone"))
+        logger.info("  - Link: %s", candidate.get("link"))
         logger.info("  - Summary length: %d", len(candidate.get("professional_summary") or ""))
         logger.info("  - Education entries: %d", len(candidate.get("education", [])))
         logger.info("  - Experience entries: %d", len(candidate.get("experience_section", [])))
         logger.info("  - Projects: %d", len(candidate.get("projects", [])))
         logger.info("  - Certifications: %d", len(candidate.get("certifications", [])))
-        logger.info("  - Technical skills: %d", len(candidate.get("skills", {}).get("technical", [])))
+        logger.info("  - Skills count: %d", len(candidate.get("skills", [])))
+        
+        # Log detailed candidate data for debugging
+        logger.debug("🔍 Detailed candidate info:")
+        if candidate.get("education"):
+            for i, edu in enumerate(candidate.get("education", [])):
+                logger.debug("  Education %d: %s at %s (%s)", i+1, edu.get("degree"), edu.get("school"), edu.get("year"))
+        
+        if candidate.get("experience_section"):
+            for i, exp in enumerate(candidate.get("experience_section", [])):
+                logger.debug("  Experience %d: %s at %s (%s)", i+1, exp.get("role"), exp.get("company"), exp.get("dates"))
+        
+        if candidate.get("skills"):
+            logger.debug("  Skills: %s", candidate.get("skills", [])[:10])  # Show first 10 skills
         
         # Use templateResumeDocV2.docx from the template directory
         # Try multiple possible paths for different environments
@@ -180,8 +194,11 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         doc = DocxTemplate(str(template_path))
         
         # Prepare the context for template rendering
-        # The template expects variables to be available directly
-        template_context = candidate_data["candidate"]
+        # The template expects variables to be available directly AND as 'candidate'
+        template_context = candidate_data["candidate"].copy()
+        
+        # Add the candidate object itself for templates that expect {{ candidate.name }}
+        template_context["candidate"] = candidate_data["candidate"]
         
         # Add some additional helper variables that might be useful in the template
         template_context.update({
@@ -193,8 +210,8 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
             "education_list": candidate.get("education", []),
             "project_list": candidate.get("projects", []),
             "certification_list": candidate.get("certifications", []),
-            "technical_skills": candidate.get("skills", {}).get("technical", []),
-            "soft_skills": candidate.get("skills", {}).get("soft_skills", []),
+            "technical_skills": candidate.get("skills", []),
+            "soft_skills": [],
             "volunteer_work": candidate.get("volunteer_experience", [])
         })
         
