@@ -11,7 +11,6 @@ import firebase_admin
 from firebase_admin import credentials, storage
 from google.cloud import storage as gcs
 
-# Optional imports for helper function
 try:
     import requests
 except ImportError:
@@ -33,7 +32,6 @@ logger = logging.getLogger(__name__)
 def initialize_firebase():
     """Initialize Firebase Admin SDK if not already initialized"""
     try:
-        # Check if any apps are already initialized
         firebase_admin.get_app()
         logger.debug("Firebase already initialized")
     except ValueError:
@@ -133,10 +131,24 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         candidate = ParsedResume(text).serialize()
         
         # Use templateResumeDocV2.docx from the template directory
-        template_path = Path(__file__).parent.parent.parent / "template" / "templateResumeDocV2.docx"
+        # Try multiple possible paths for different environments
+        possible_paths = [
+            # Docker container path
+            Path(__file__).parent.parent / "template" / "templateResumeDocV2.docx",
+            # Local development path
+            Path(__file__).parent.parent.parent / "template" / "templateResumeDocV2.docx",
+            # Absolute path in Docker
+            Path("/app/template/templateResumeDocV2.docx")
+        ]
         
-        if not template_path.exists():
-            raise FileNotFoundError(f"Template file not found at: {template_path}")
+        template_path = None
+        for path in possible_paths:
+            if path.exists():
+                template_path = path
+                break
+        
+        if not template_path:
+            raise FileNotFoundError(f"Template file not found. Tried paths: {[str(p) for p in possible_paths]}")
             
         logger.info("Using template: %s", template_path)
         
@@ -367,7 +379,7 @@ def download_and_extract_resume_text(storage_url: str) -> str:
                     logger.info("Successfully loaded resume from: %s", resume_path)
             else:
                 logger.warning("Resume file not found: %s", resume_path)
-        except Exception as e:
+        except (OSError, IOError, UnicodeDecodeError) as e:
             logger.error("Error reading resume file %s: %s", resume_path, str(e))
     
     # Load job description content
@@ -379,7 +391,7 @@ def download_and_extract_resume_text(storage_url: str) -> str:
                     logger.info("Successfully loaded job description from: %s", job_desc_path)
             else:
                 logger.warning("Job description file not found: %s", job_desc_path)
-        except Exception as e:
+        except (OSError, IOError, UnicodeDecodeError) as e:
             logger.error("Error reading job description file %s: %s", job_desc_path, str(e))
     
     return resume_content, job_desc_content

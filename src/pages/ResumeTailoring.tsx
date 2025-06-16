@@ -1,12 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Edit, Copy, Upload, FileText, Download, ExternalLink, ChevronDown, Loader2, ArrowLeft
-} from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
 import { getUserResumes, uploadResume, getJobListings, getUserData } from '../services/firebaseService';
+import { useResumeTailoring } from '../hooks/useResumeTailoring';
+import {
+  ResumeSelector,
+  JobDescriptionInput,
+  ResumeTextInput,
+  DocumentViewer,
+  SuggestedChanges,
+  DownloadBanner,
+  DebugPanel,
+  DocumentUnavailable
+} from '../components/resume';
 import type { Resume } from '../models/UserData';
 import type { JobListing } from '../types';
 
@@ -17,34 +26,17 @@ interface Job {
   [key: string]: unknown;
 }
 
-interface SuggestedChange {
-  section: string;
-  original: string;
-  suggested: string;
-  reason: string;
-}
-
-interface TailoringData {
-  suggestedChanges?: SuggestedChange[];
-  coverLetter?: string;
-  tailoredResumeUrl?: string;
-  tailoredResumeText?: string;
-  [key: string]: unknown;
-}
-
 const ResumeTailoring = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isAnalyzing, tailoringData, startAnalysis, copySuggestion, setTailoringData } = useResumeTailoring();
 
   // Main state
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [resumeText, setResumeText] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [activeTab, setActiveTab] = useState<'resume' | 'coverLetter'>('resume');
   const [job, setJob] = useState<Job | null>(null);
-  const [tailoringData, setTailoringData] = useState<TailoringData | null>(null);
   
   // Resume selection state
   const [userResumes, setUserResumes] = useState<(Resume & { id: string })[]>([]);
@@ -122,7 +114,10 @@ const ResumeTailoring = () => {
             setJobDescription(jobData.description || '');
           }
           if (tailoringSnap.exists()) {
-            setTailoringData(tailoringSnap.data() as TailoringData);
+            const data = tailoringSnap.data();
+            if (data) {
+              setTailoringData(data);
+            }
           }
         }
       } catch (err) {
@@ -133,7 +128,7 @@ const ResumeTailoring = () => {
     };
 
     fetchData();
-  }, [jobId, user?.uid, user?.displayName]);
+  }, [jobId, user?.uid, user?.displayName, setTailoringData]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -272,125 +267,46 @@ Join our team and help build the next generation of web applications that serve 
     setShowJobSelector(false);
   };
 
-  const startAnalysis = async () => {
-    if (!resumeText || !jobDescription) return;
+  // Handler for the Tailor Resume button  
+  const handleStartAnalysis = () => {
+    const context = {
+      user_id: user?.uid || 'anonymous',
+      firebase_uid: user?.uid,
+      is_anonymous: user?.isAnonymous || false,
+      task: 'resume_tailoring',
+      user_name: userName || user?.displayName || '',
+      resume_storage_url: selectedResumeUrl || '',
+      job_description: jobDescription,
+      job_title: job?.title || '',
+      job_company: job?.company || ''
+    };
+    
+    startAnalysis(resumeText, jobDescription, context, job, userName);
+  };
 
-    setIsAnalyzing(true);
-    try {
-      const response = await fetch('https://gethired-agents-staging-104139545590.us-central1.run.app/run', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Please tailor this resume for this job description:
-
-RESUME:
-${resumeText}
-
-JOB DESCRIPTION:
-${jobDescription}
-`,
-          context: {
-            user_id: user?.uid || 'anonymous',
-            firebase_uid: user?.uid,
-            is_anonymous: user?.isAnonymous || false,
-            task: 'resume_tailoring',
-            user_name: userName || user?.displayName || '',
-            resume_storage_url: selectedResumeUrl || '',
-            job_description: jobDescription,
-            job_title: job?.title || '',
-            job_company: job?.company || ''
-          },
-          session_id: `resume-${Date.now()}`
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      // Parse the AI response to extract tailoring suggestions
-      const suggestions = parseAIResponse(result.message || result.data);
-      
-      setTailoringData({
-        suggestedChanges: suggestions.changes || [
-          {
-            section: 'Professional Summary',
-            original: 'Generic summary from your resume',
-            suggested: 'AI-generated targeted summary based on job requirements',
-            reason: 'Aligns better with the specific role requirements mentioned in the job description'
-          }
-        ],
-        coverLetter: suggestions.coverLetter || result.message,
-        tailoredResumeUrl: suggestions.resumeUrl || result.tailored_resume_url || undefined,
-        tailoredResumeText: suggestions.resumeText || result.tailored_resume_text || undefined
-      });
-      
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      
-      setTailoringData({
-        suggestedChanges: [
-          {
-            section: 'Professional Summary',
-            original: 'Experienced software developer',
-            suggested: 'Experienced full-stack developer with expertise in React and Node.js',
-            reason: 'Matches the specific technologies mentioned in the job description'
-          },
-          {
-            section: 'Skills',
-            original: 'JavaScript, HTML, CSS',
-            suggested: 'JavaScript, React, Node.js, TypeScript, HTML, CSS, MongoDB',
-            reason: 'Added specific technologies and frameworks mentioned in the job requirements'
-          }
-        ],
-        coverLetter: `Dear Hiring Manager,
-
-I am excited to apply for the ${job?.title || 'position'} at ${job?.company || 'your company'}. Based on the job description, I believe my experience aligns well with your requirements.
-
-Best regards,
-${userName || 'Your Name'}`,
-        tailoredResumeUrl: undefined
-      });
-    } finally {
-      setIsAnalyzing(false);
+  // Handlers for ResumeSelector component
+  const handleResumeSelect = (resumeId: string) => {
+    setSelectedResumeId(resumeId);
+    if (resumeId) {
+      handleLoadResumeText(resumeId);
+    } else {
+      setResumeInputMethod('manual');
+      setSelectedResumeUrl('');
+      setResumeText('');
     }
   };
 
-  // Helper function to parse AI response
-  const parseAIResponse = (response: string) => {
-    try {
-      // Try to extract JSON if present
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return parsed;
-      }
-      
-      // Otherwise return text response
-      return {
-        changes: [],
-        coverLetter: response
-      };
-    } catch (error) {
-      console.error('Failed to parse AI response:', error);
-      return {
-        changes: [],
-        coverLetter: response
-      };
-    }
+  // Handlers for ResumeTextInput component  
+  const handleSwitchToManual = () => {
+    setResumeInputMethod('manual');
+    setSelectedResumeId('');
+    setSelectedResumeUrl('');
+    setResumeText('');
   };
 
-  const copySuggestion = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      console.log('Text copied to clipboard');
-    } catch (err) {
-      console.error('Failed to copy text:', err);
-    }
+  // Handlers for JobDescriptionInput component
+  const handleToggleJobSelector = () => {
+    setShowJobSelector(!showJobSelector);
   };
 
   const title = job?.title || '';
@@ -435,85 +351,16 @@ ${userName || 'Your Name'}`,
       </div>
 
       {/* Resume Selection Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Select Your Resume
-          </h2>
-          {resumeInputMethod !== 'manual' && (
-            <div className="flex items-center px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded-full">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm text-green-700 dark:text-green-300">
-                {resumeInputMethod === 'upload' ? 'File Uploaded' : 'Resume Loaded'}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-4 mb-4">
-          {/* Upload Resume Button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isUploading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4 mr-2" />
-            )}
-            Upload Resume
-          </button>
-
-          {/* Use Saved Resume Dropdown */}
-          {userResumes.length > 0 && (
-            <div className="relative">
-              <select
-                value={selectedResumeId}
-                onChange={(e) => {
-                  setSelectedResumeId(e.target.value);
-                  if (e.target.value) {
-                    handleLoadResumeText(e.target.value);
-                  } else {
-                    setResumeInputMethod('manual');
-                    setSelectedResumeUrl('');
-                    setResumeText('');
-                  }
-                }}
-                className="px-4 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-              >
-                <option value="">Select a saved resume</option>
-                {userResumes.map((resume) => (
-                  <option key={resume.id} value={resume.id}>
-                    {resume.metadata?.title || 'Untitled Resume'} 
-                    {resume.metadata?.isOriginal && ' (Original)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Sample Resume Button */}
-          <button
-            onClick={loadSampleResume}
-            className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            Load Sample Resume
-          </button>
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-
-        {isLoadingResumes && (
-          <div className="text-gray-500 dark:text-gray-400">Loading your resumes...</div>
-        )}
-      </div>
+      <ResumeSelector
+        userResumes={userResumes}
+        selectedResumeId={selectedResumeId}
+        isUploading={isUploading}
+        isLoadingResumes={isLoadingResumes}
+        resumeInputMethod={resumeInputMethod}
+        onFileUpload={handleFileUpload}
+        onResumeSelect={handleResumeSelect}
+        onLoadSampleResume={loadSampleResume}
+      />
 
       {/* Main Tailoring Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
@@ -523,99 +370,28 @@ ${userName || 'Your Name'}`,
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Resume Text Area */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Resume Text
-              </label>
-              {resumeInputMethod !== 'manual' && (
-                <button
-                  onClick={() => {
-                    setResumeInputMethod('manual');
-                    setSelectedResumeId('');
-                    setSelectedResumeUrl('');
-                    setResumeText('');
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Switch to manual input
-                </button>
-              )}
-            </div>
-            <textarea
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              disabled={resumeInputMethod !== 'manual'}
-              className={`w-full p-3 border rounded-md h-64 resize-none dark:bg-gray-700 dark:text-white ${
-                resumeInputMethod !== 'manual' 
-                  ? 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 cursor-not-allowed' 
-                  : ''
-              }`}
-              placeholder={
-                resumeInputMethod === 'manual' 
-                  ? "Paste your current resume text here or upload a file above..."
-                  : "Resume loaded from file. Use 'Switch to manual input' to edit manually."
-              }
-            />
-          </div>
+          <ResumeTextInput
+            resumeText={resumeText}
+            resumeInputMethod={resumeInputMethod}
+            onResumeTextChange={setResumeText}
+            onSwitchToManual={handleSwitchToManual}
+          />
 
           {/* Job Description Area */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Job Description
-              </label>
-              <div className="flex gap-2">
-                {userJobs.length > 0 && (
-                  <button
-                    onClick={() => setShowJobSelector(!showJobSelector)}
-                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center transition-colors"
-                  >
-                    <FileText className="w-4 h-4 mr-1" />
-                    Load from saved jobs ({userJobs.length})
-                    <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${showJobSelector ? 'rotate-180' : ''}`} />
-                  </button>
-                )}
-                <button
-                  onClick={loadSampleJobDescription}
-                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
-                >
-                  <FileText className="w-4 h-4 mr-1" />
-                  Load Sample Job
-                </button>
-              </div>
-            </div>
-
-            {showJobSelector && (
-              <div className="mb-4 border border-gray-300 dark:border-gray-600 rounded-md max-h-32 overflow-y-auto bg-white dark:bg-gray-800 shadow-lg z-10 relative">
-                {userJobs.map((jobListing) => (
-                  <button
-                    key={jobListing.id}
-                    onClick={() => handleLoadJobFromListing(jobListing)}
-                    className="w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-600 last:border-b-0 transition-colors"
-                  >
-                    <div className="font-medium text-sm text-gray-900 dark:text-white">{jobListing.title}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{jobListing.company}</div>
-                    {jobListing.location && (
-                      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">{jobListing.location}</div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              className="w-full p-3 border rounded-md h-64 resize-none dark:bg-gray-700 dark:text-white"
-              placeholder="Paste the job description here or load from saved jobs..."
-            />
-          </div>
+          <JobDescriptionInput
+            jobDescription={jobDescription}
+            userJobs={userJobs}
+            showJobSelector={showJobSelector}
+            onJobDescriptionChange={setJobDescription}
+            onToggleJobSelector={handleToggleJobSelector}
+            onLoadJobFromListing={handleLoadJobFromListing}
+            onLoadSampleJob={loadSampleJobDescription}
+          />
         </div>
 
         <div className="flex items-center justify-between">
           <button
-            onClick={startAnalysis}
+            onClick={handleStartAnalysis}
             disabled={!resumeText || !jobDescription || isAnalyzing}
             className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
           >
@@ -641,92 +417,35 @@ ${userName || 'Your Name'}`,
       {/* Results Section */}
       {tailoringData && (
         <div>
-          {/* Download Tailored Resume */}
+          {/* Download Banner */}
           {tailoringData.tailoredResumeUrl && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Download className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                  <span className="font-medium text-green-800 dark:text-green-200">
-                    Your tailored resume is ready!
-                  </span>
-                </div>
-                <a
-                  href={tailoringData.tailoredResumeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                  <ExternalLink className="w-4 h-4 ml-2" />
-                </a>
-              </div>
-            </div>
+            <DownloadBanner resumeUrl={tailoringData.tailoredResumeUrl} />
           )}
 
           {/* Resume Changes Tab */}
           {activeTab === 'resume' && (
             <div className="space-y-6">
-              {/* Tailored Resume Text Display */}
-              {tailoringData.tailoredResumeText && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                      Tailored Resume Text
-                    </h3>
-                    <button
-                      onClick={() => copySuggestion(tailoringData.tailoredResumeText!)}
-                      className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-md flex items-center text-sm"
-                    >
-                      <Copy className="w-4 h-4 mr-1" /> Copy All
-                    </button>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md whitespace-pre-line max-h-96 overflow-y-auto">
-                    {tailoringData.tailoredResumeText}
-                  </div>
-                </div>
-              )}
+              {/* Debug Panel (Development Only) */}
+              <DebugPanel tailoringData={tailoringData} />
+
+              {/* Document Viewer or Unavailable Message */}
+              {tailoringData.tailoredResumeText ? (
+                <DocumentViewer
+                  resumeText={tailoringData.tailoredResumeText}
+                  resumeUrl={tailoringData.tailoredResumeUrl}
+                  job={job}
+                  onCopyText={copySuggestion}
+                />
+              ) : tailoringData.tailoredResumeUrl ? (
+                <DocumentUnavailable resumeUrl={tailoringData.tailoredResumeUrl} />
+              ) : null}
 
               {/* Suggested Changes */}
               {tailoringData.suggestedChanges && tailoringData.suggestedChanges.length > 0 && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 space-y-6">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    Suggested Resume Changes
-                  </h3>
-                  {tailoringData.suggestedChanges.map((change: SuggestedChange, index: number) => (
-                    <div key={index} className="border rounded-lg overflow-hidden">
-                      <div className="p-3 bg-gray-50 dark:bg-gray-700">
-                        <div className="flex items-center">
-                          <Edit className="w-5 h-5 mr-2" />
-                          <h4 className="font-medium text-gray-900 dark:text-white">{change.section}</h4>
-                        </div>
-                      </div>
-                      <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-md">
-                          <div className="text-sm font-medium text-gray-500 mb-2">Original</div>
-                          <div className="text-gray-700 dark:text-gray-300">{change.original}</div>
-                        </div>
-                        <div className="relative bg-blue-50 dark:bg-blue-900 p-3 rounded-md">
-                          <div className="text-sm font-medium text-blue-600 mb-2">Suggested</div>
-                          <div className="text-gray-700 dark:text-gray-300">{change.suggested}</div>
-                          <button
-                            onClick={() => copySuggestion(change.suggested)}
-                            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md mx-4 mb-4">
-                        <div className="font-medium text-yellow-700 dark:text-yellow-300 mb-1">
-                          Why this change?
-                        </div>
-                        <div className="text-sm text-yellow-600 dark:text-yellow-400">{change.reason}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <SuggestedChanges
+                  changes={tailoringData.suggestedChanges}
+                  onCopyText={copySuggestion}
+                />
               )}
             </div>
           )}

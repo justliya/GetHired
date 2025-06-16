@@ -33,7 +33,10 @@ RUN npm install
 # Install the Firebase MCP package globally
 RUN npm install @gannonh/firebase-mcp
 
+
 COPY . .
+
+COPY ../template ./template
 
 EXPOSE ${PORT}
 
