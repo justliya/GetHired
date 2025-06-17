@@ -13,6 +13,11 @@ import Auth from './pages/Auth';
 import { auth, onAuthStateChanged } from './firebase';
 import { updateUserPreferences, getUserPreferences } from './services/firebaseService';
 import UserPreferencesModal from "./components/ui/UserPreferencesModal";
+import { 
+  shouldShowPreferencesModal, 
+  markPreferencesModalSeen, 
+  handlePreferencesSubmissionSuccess 
+} from './utils/onboardingUtils';
 
 function App() {
   const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
@@ -35,13 +40,20 @@ function App() {
           
           setCurrentPage('dashboard');
           
-          // Only show preferences modal for new users without preferences
-          if (!hasCustomPreferences) {
+          // Use utility function to determine if we should show the modal
+          const shouldShow = shouldShowPreferencesModal(user.uid, hasCustomPreferences || false);
+          
+          if (shouldShow) {
             setIsNewUser(true);
+            // Mark that they've seen the modal
+            markPreferencesModalSeen(user.uid);
             // Delay showing modal to ensure smooth transition
             setTimeout(() => {
               setShowUserPrefs(true);
             }, 500);
+          } else {
+            setIsNewUser(false);
+            setShowUserPrefs(false);
           }
         } catch (error) {
           console.error('Error checking user preferences:', error);
@@ -88,9 +100,10 @@ function App() {
               show={showUserPrefs} 
               onHide={() => {
                 setShowUserPrefs(false);
-                // If user closes modal without saving and they're new, show a reminder
-                if (isNewUser) {
-                  console.log('Remember to set your preferences for better job matches!');
+                setIsNewUser(false);
+                // If user closes modal without saving, we still consider they've seen it
+                if (auth.currentUser) {
+                  markPreferencesModalSeen(auth.currentUser.uid);
                 }
               }}
               onSubmit={async (formData) => {
@@ -130,11 +143,13 @@ function App() {
                     throw new Error(result.error || 'Failed to update preferences');
                   }
                   
+                  // Handle successful submission with utility function
+                  handlePreferencesSubmissionSuccess(userId);
+                  
                   setShowUserPrefs(false);
                   setIsNewUser(false);
                   
-                  // Optionally show success message
-                  console.log('Preferences saved successfully!');
+                  // Success message will be handled by the SuccessModal in UserPreferencesModal
                 } catch (error) {
                   console.error('Failed to save preferences:', error);
                   // You might want to show an error toast here

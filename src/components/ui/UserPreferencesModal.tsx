@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import type { ChangeEvent } from 'react';
 import { User } from '../../context/UserContext';
 import ChipInput from './ChipInput';
 import RangeSlider from './RangeSlider';
+import SuccessModal from './SuccessModal';
 import type { 
     JobPreferences, 
     SalaryRange, 
@@ -15,6 +15,7 @@ import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getUserResumes, uploadResume, updateUserPreferences } from '../../services/firebaseService';
+import { handlePreferencesSubmissionSuccess } from '../../utils/onboardingUtils';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead';
@@ -78,6 +79,7 @@ interface ResumeData extends Resume {
 const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHide, onSubmit }) => {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [resumes, setResumes] = useState<ResumeData[]>([]);
+    const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
     const [formData, setFormData] = useState<FormDataType>({
         resumeFile: null,
         currentRole: '',
@@ -117,19 +119,6 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                     ...prev.preferences.searchSchedule,
                     ...scheduleUpdate
                 }
-            }
-        }));
-    };
-
-    const handleInputChange = (
-        field: keyof PreferencesData,
-        value: string | string[] | number | boolean
-    ) => {
-        setFormData(prev => ({
-            ...prev,
-            preferences: {
-                ...prev.preferences,
-                [field]: value
             }
         }));
     };
@@ -183,7 +172,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
             try {
                 const result = await getUserResumes(user.uid);
                 if (result.success && result.data) {
-                    setResumes(result.data.map((r: any) => ({ ...r, id: r.id })));
+                    setResumes(result.data.map((r: Resume & { id: string }) => ({ ...r, id: r.id })));
                     if (result.data.length > 0 && !selectedResumeId) {
                         setSelectedResumeId(result.data[0].id);
                     }
@@ -270,8 +259,14 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
             if (result.success) {
                 // Update local user state with new preferences
                 setUser(prev => prev ? { ...prev, jobPreferences: preferencesToSave } : prev);
+                
+                // Handle successful submission with utility function
+                handlePreferencesSubmissionSuccess(user.uid);
+                
                 onSubmit({ ...formData });
-                onHide();
+                
+                // Show success modal with confetti
+                setShowSuccessModal(true);
             } else {
                 setResumeError('Failed to save preferences.');
             }
@@ -779,7 +774,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
     if (!show) return null;
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+        <>
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
             <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
                 {/* Close button */}
                 <div className="absolute top-0 right-0 pt-4 pr-4">
@@ -825,6 +821,31 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                 </div>
             </div>
         </div>
+        
+        {/* Success Modal */}
+        <SuccessModal
+            show={showSuccessModal}
+            onHide={() => {
+                setShowSuccessModal(false);
+                onHide();
+            }}
+            title="Success! 🎉"
+            message={
+                formData.preferences.searchSchedule.enabled 
+                    ? "Your preferences have been saved! We're now searching for jobs and you can expect to receive an email with findings soon."
+                    : "Your preferences have been saved successfully! You can now search for jobs that match your criteria."
+            }
+            actionButton={{
+                text: "Start Job Search",
+                onClick: () => {
+                    setShowSuccessModal(false);
+                    onHide();
+                    // Navigate to job search page
+                    window.location.href = '/job-listings';
+                }
+            }}
+        />
+        </>
     );
 };
 
