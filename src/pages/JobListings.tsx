@@ -2,14 +2,7 @@
 // pages/JobListings.tsx
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-} from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { signInAnonymously } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -21,7 +14,6 @@ import { saveListingsToUserProfile } from "../hooks/JobSave";
 import JobHeader from "../components/JobHeader";
 import JobFilters from "../components/JobFilters";
 import JobResults from "../components/JobResults";
-import ChatBot from "../components/ChatBot";
 
 import type { JobListing } from "../types";
 
@@ -35,15 +27,7 @@ interface SessionData {
   lastUpdated: string;
 }
 
-interface ChatMessage {
-  id: number;
-  role: "user" | "assistant";
-  content: string;
-  jobs?: JobListing[];
-}
-
-const API_BASE_URL =
-  "https://gethired-agents-104139545590.us-central1.run.app";
+const API_BASE_URL = "https://gethired-agents-104139545590.us-central1.run.app";
 
 const JobListings = () => {
   const navigate = useNavigate();
@@ -60,10 +44,9 @@ const JobListings = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [showChatBot, setShowChatBot] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [sessionStarted, setSessionStarted] = useState(false);
 
   // 1) Sign in anonymously if needed
   useEffect(() => {
@@ -100,6 +83,7 @@ const JobListings = () => {
       setLocationFilter(data.filters.locationFilter);
       setStatusFilter(data.filters.statusFilter);
       setUseAgentJobs(data.agentJobs.length > 0);
+      setSessionStarted(data.agentJobs.length > 0);
     }
 
     // Override with Firestore if available
@@ -113,6 +97,7 @@ const JobListings = () => {
         setLocationFilter(data.filters.locationFilter);
         setStatusFilter(data.filters.statusFilter);
         setUseAgentJobs(data.agentJobs.length > 0);
+        setSessionStarted(data.agentJobs.length > 0);
       }
     }
 
@@ -126,24 +111,31 @@ const JobListings = () => {
     }
   }, [loading, loadSessionData]);
 
-  // Save session + profile
-  const handleSave = async () => {
+  // Auto-save session data whenever agentJobs changes
+  const autoSaveSession = useCallback(async (jobs: JobListing[]) => {
     const payload: SessionData = {
-      agentJobs,
+      agentJobs: jobs,
       searchQuery,
       filters: { locationFilter, statusFilter },
       lastUpdated: new Date().toISOString(),
     };
 
-    // a) sessionStorage
+    // Save to sessionStorage
     sessionStorage.setItem(sessionStorageKey, JSON.stringify(payload));
 
-    // b) Firestore sessions
+    // Save to Firestore if user is authenticated
     if (user?.uid) {
       const sessRef = doc(db, "users", user.uid, "sessions", sessionId);
       await setDoc(sessRef, payload, { merge: true });
+    }
+  }, [sessionStorageKey, user, sessionId, searchQuery, locationFilter, statusFilter]);
 
-      // c) Profile jobListings
+  // Manual save function
+  const handleSave = async () => {
+    await autoSaveSession(agentJobs);
+    
+    // Also save to profile
+    if (user?.uid) {
       await saveListingsToUserProfile(
         user.uid,
         useAgentJobs ? agentJobs : profileJobs
@@ -160,8 +152,10 @@ const JobListings = () => {
     const updated = arr.map((j) =>
       j.id === job.id ? { ...j, favorite: !j.favorite } : j
     );
+    
     if (useAgentJobs) {
       setAgentJobs(updated);
+      await autoSaveSession(updated);
     } else {
       setProfileJobs(updated);
     }
@@ -190,8 +184,7 @@ const JobListings = () => {
   // Parse job listings from assistant reply
   const parseJobListings = (text: string): JobListing[] => {
     try {
-      const block =
-        /```json([\s\S]*?)```/.exec(text)?.[1] || /{[\s\S]*}/.exec(text)?.[0];
+      const block = /```json([\s\S]*?)```/.exec(text)?.[1] || /{[\s\S]*}/.exec(text)?.[0];
       if (!block) return [];
       const data = JSON.parse(block);
       const arr = Array.isArray(data) ? data : data.jobs ?? [];
@@ -213,54 +206,102 @@ const JobListings = () => {
     }
   };
 
-  // ChatBot send/receive
-  const handleSendMessage = async (message: string) => {
-    setChatMessages((m) => [...m, { id: Date.now(), role: "user", content: message }]);
-    setIsTyping(true);
+  // Start autonomous session
+  const handleStartSession = async () => {
+    setIsLoading(true);
+    setSessionStarted(true);
+    
+    try {
+      const res = await fetch(`${API_BASE_URL}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "${userId}",
+          context: {
+            user_id: userId,
+            firebase_uid: user?.uid,
+            is_anonymous: user?.isAnonymous,
+          },
+          session_id: sessionId,
+        }),
+      });
+      
+      if (!res.ok) throw new Error(res.statusText);
+      
+      setConfirmation("Session started successfully!");
+      setTimeout(() => setConfirmation(""), 2000);
+    } catch (err: any) {
+      console.error("Error starting session:", err);
+      setConfirmation(`Error starting session: ${err.message}`);
+      setTimeout(() => setConfirmation(""), 3000);
+      setSessionStarted(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Search for jobs autonomously
+  const handleSearchJobs = async () => {
+    if (!sessionStarted) {
+      setConfirmation("Please start a session first!");
+      setTimeout(() => setConfirmation(""), 2000);
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
       const res = await fetch(`${API_BASE_URL}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, context: { user_id: userId, firebase_uid: user?.uid, is_anonymous: user?.isAnonymous }, session_id: sessionId }),
+        body: JSON.stringify({
+          message: "find me jobs",
+          context: {
+            user_id: userId,
+            firebase_uid: user?.uid,
+            is_anonymous: user?.isAnonymous,
+          },
+          session_id: sessionId,
+        }),
       });
+
       if (!res.ok) throw new Error(res.statusText);
+      
       const { message: reply, data } = await res.json();
-
       const newJobs = Array.isArray(data?.jobs) ? data.jobs : parseJobListings(reply);
+      
       if (newJobs.length) {
-        setAgentJobs((prev) => [...prev, ...newJobs]);
+        const updatedJobs = [...agentJobs, ...newJobs];
+        setAgentJobs(updatedJobs);
         setUseAgentJobs(true);
+        
+        // Auto-save to session storage
+        await autoSaveSession(updatedJobs);
+        
+        setConfirmation(`Found ${newJobs.length} new jobs and saved automatically!`);
+        setTimeout(() => setConfirmation(""), 3000);
+      } else {
+        setConfirmation("No new jobs found.");
+        setTimeout(() => setConfirmation(""), 2000);
       }
-
-      setChatMessages((m) => [...m, { id: Date.now() + 1, role: "assistant", content: reply, jobs: newJobs }]);
     } catch (err: any) {
-      setChatMessages((m) => [...m, { id: Date.now() + 1, role: "assistant", content: `Error: ${err.message}` }]);
+      console.error("Error searching jobs:", err);
+      setConfirmation(`Error searching jobs: ${err.message}`);
+      setTimeout(() => setConfirmation(""), 3000);
     } finally {
-      setIsTyping(false);
+      setIsLoading(false);
     }
   };
 
-  // Initial ChatBot prompt
-  useEffect(() => {
-    if (showChatBot && chatMessages.length === 0 && !loading) {
-      const init = ` Hello! Please return ONLY a JSON object with job listings in this format:
-{
-  "jobs": [
-    {
-      "title": "Job Title",
-      "company": "Company Name",
-      "location": "City, State",
-      "salary": "$XX,XXX - $XX,XXX",
-      "description": "Job description",
-      "qualifications": ["skill1", "skill2"],
-      "datePosted": "YYYY-MM-DD"
-    }
-  ]
-};`;
-      void handleSendMessage(init);
-    }
-  }, [showChatBot, loading]);
+  // Reset session
+  const handleNewSession = () => {
+    setAgentJobs([]);
+    setUseAgentJobs(false);
+    setSessionStarted(false);
+    sessionStorage.removeItem(sessionStorageKey);
+    setConfirmation("New session started!");
+    setTimeout(() => setConfirmation(""), 2000);
+  };
 
   if (loading) return <div className="py-12 text-center text-gray-600">Initializing auth…</div>;
   if (error) return <div className="py-12 text-center text-red-600">Auth Error: {error.message}</div>;
@@ -279,31 +320,80 @@ const JobListings = () => {
       <JobHeader
         useAgentJobs={useAgentJobs}
         agentJobsCount={agentJobs.length}
-        user={user ? { isAnonymous: user.isAnonymous, email: user.email || undefined, uid: user.uid } : null}
+        user={user ? {
+          isAnonymous: user.isAnonymous,
+          email: user.email || undefined,
+          uid: user.uid
+        } : null}
         onToggleAgentJobs={() => setUseAgentJobs(v => !v)}
-        showChatBot={showChatBot}
-        onToggleChat={() => setShowChatBot(v => !v)}
-        onNewChat={() => { setChatMessages([]); setAgentJobs([]); setUseAgentJobs(false); }}
+        showChatBot={false}
+        onToggleChat={() => {}}
+        onNewChat={handleNewSession}
         onSave={handleSave}
       />
 
+      {/* Autonomous Agent Controls */}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Autonomous Job Agent</h2>
+        <div className="flex flex-wrap gap-3">
+          {!sessionStarted ? (
+            <button
+              onClick={handleStartSession}
+              disabled={isLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-6 py-2 rounded-md font-medium transition-colors"
+            >
+              {isLoading ? "Starting Session..." : "Start Session"}
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleSearchJobs}
+                disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-6 py-2 rounded-md font-medium transition-colors"
+              >
+                {isLoading ? "Searching Jobs..." : "Search Jobs"}
+              </button>
+              <button
+                onClick={handleNewSession}
+                disabled={isLoading}
+                className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 text-white px-6 py-2 rounded-md font-medium transition-colors"
+              >
+                New Session
+              </button>
+            </>
+          )}
+        </div>
+        {sessionStarted && (
+          <p className="text-sm text-green-600 mt-2">
+            ✓ Session active - Jobs will be automatically saved to session storage
+          </p>
+        )}
+      </div>
+
       {confirmation && (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="bg-green-100 text-green-800 p-2 rounded mb-4 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          className="bg-green-100 text-green-800 p-2 rounded mb-4 text-center"
+        >
           {confirmation}
         </motion.div>
       )}
 
-      <JobFilters searchQuery={searchQuery} onSearchChange={handleSearchChange} onClear={handleClearFilters} />
+      <JobFilters
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        onClear={handleClearFilters}
+      />
 
       <AnimatePresence>
-        <JobResults jobs={filteredJobs} onResearch={job => navigate(`/company-research/${job.id}`)} onFavoriteToggle={handleFavoriteToggle} />
+        <JobResults
+          jobs={filteredJobs}
+          onResearch={job => navigate(`/company-research/${job.id}`)}
+          onFavoriteToggle={handleFavoriteToggle}
+        />
       </AnimatePresence>
-
-      {showChatBot && (
-        <div className="mt-6">
-          <ChatBot title="JobBot" description="Your AI-powered job assistant" messages={chatMessages} isTyping={isTyping} onSendMessage={handleSendMessage} />
-        </div>
-      )}
     </div>
   );
 };
