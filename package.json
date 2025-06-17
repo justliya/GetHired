@@ -11,15 +11,11 @@
   },
   "dependencies": {
     "@mailchimp/mailchimp_marketing": "^3.0.80",
+    "@mailchimp/mailchimp_marketing": "^3.0.80",
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "@react-pdf-viewer/toolbar": "^3.12.0",
-<<<<<<< HEAD
     "canvas-confetti": "^1.9.3",
-=======
-    "@types/react-router-dom": "^5.3.3",
->>>>>>> f8d0986 (feat: Add reusable Button and Card components; update JobCard with new features)
-    "@types/react-router-dom": "^5.3.3",
     "firebase": "^11.9.1",
     "framer-motion": "^10.16.4",
     "lodash": "^4.17.21",

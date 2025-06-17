@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Test script for MailChimp integration
-Tests only the direct MailChimp API service
+Comprehensive test script for MailChimp integration
+Tests both direct API and Firebase extension methods
 """
 
 import asyncio
@@ -14,6 +14,7 @@ from typing import Dict, Any, List
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from mailchimp_service import MailChimpService
+from firebase_mailchimp_service import FirebaseMailChimpService
 
 # Sample test data
 SAMPLE_JOBS = [
@@ -53,9 +54,9 @@ SAMPLE_PREFERENCES = {
     "jobType": "Full-time"
 }
 
-async def test_mailchimp_api():
+async def test_direct_mailchimp():
     """Test direct MailChimp API service"""
-    print("🧪 Testing MailChimp API Service...")
+    print("🧪 Testing Direct MailChimp API Service...")
     
     try:
         service = MailChimpService()
@@ -82,18 +83,69 @@ async def test_mailchimp_api():
             print(f"  Email result: {json.dumps(email_result, indent=2)}")
             
             if email_result.get('success'):
-                print("  ✅ MailChimp API test passed")
+                print("  ✅ Direct MailChimp API test passed")
                 return True
             else:
                 print("  ❌ Email sending failed")
                 return False
         else:
             print("  ℹ️  Set TEST_EMAIL environment variable to test email sending")
-            print("  ✅ MailChimp API connection test passed")
+            print("  ✅ Direct MailChimp API connection test passed")
             return True
             
     except Exception as e:
-        print(f"  ❌ MailChimp API test failed: {e}")
+        print(f"  ❌ Direct MailChimp API test failed: {e}")
+        return False
+
+async def test_firebase_mailchimp():
+    """Test Firebase MailChimp extension service"""
+    print("🧪 Testing Firebase MailChimp Extension Service...")
+    
+    try:
+        service = FirebaseMailChimpService()
+        
+        # Test connection
+        print("  📡 Testing connection...")
+        connection_result = await service.test_connection()
+        print(f"  Connection result: {json.dumps(connection_result, indent=2)}")
+        
+        if not connection_result.get('success'):
+            print("  ❌ Connection test failed")
+            return False
+        
+        # Test email queuing (if you want to actually queue)
+        test_email = os.getenv('TEST_EMAIL')
+        if test_email:
+            print(f"  📧 Testing email queuing for {test_email}...")
+            email_result = await service.send_job_notification_email(
+                user_email=test_email,
+                user_name="Test User",
+                jobs=SAMPLE_JOBS,
+                search_preferences=SAMPLE_PREFERENCES
+            )
+            print(f"  Email result: {json.dumps(email_result, indent=2)}")
+            
+            if email_result.get('success'):
+                print("  ✅ Firebase MailChimp extension test passed")
+                
+                # Check document status
+                doc_id = email_result.get('document_id')
+                if doc_id:
+                    print(f"  📄 Checking document status for {doc_id}...")
+                    status_result = service.get_email_status(doc_id)
+                    print(f"  Status result: {json.dumps(status_result, indent=2)}")
+                
+                return True
+            else:
+                print("  ❌ Email queuing failed")
+                return False
+        else:
+            print("  ℹ️  Set TEST_EMAIL environment variable to test email queuing")
+            print("  ✅ Firebase MailChimp extension connection test passed")
+            return True
+            
+    except Exception as e:
+        print(f"  ❌ Firebase MailChimp extension test failed: {e}")
         return False
 
 def test_template_loading():
@@ -101,7 +153,7 @@ def test_template_loading():
     print("🧪 Testing Email Template Loading...")
     
     try:
-        service = MailChimpService()
+        service = FirebaseMailChimpService()  # Both services use same template loading
         templates = service.templates
         
         print(f"  📄 Loaded {len(templates)} templates:")
@@ -142,6 +194,8 @@ def check_environment():
     optional_vars = {
         'MAILCHIMP_FROM_EMAIL': 'MailChimp From Email',
         'MAILCHIMP_FROM_NAME': 'MailChimp From Name',
+        'USE_MAILCHIMP_FIREBASE_EXTENSION': 'Use Firebase Extension',
+        'MAILCHIMP_EXTENSION_COLLECTION': 'Firebase Extension Collection',
         'TEST_EMAIL': 'Test Email Address'
     }
     
@@ -150,7 +204,7 @@ def check_environment():
     for var, desc in required_vars.items():
         value = os.getenv(var)
         if value:
-            print(f"    ✅ {var} ({desc}): {'*' * min(len(value), 10)}")
+            print(f"    ✅ {var} ({desc}): {'*' * len(value)}")
         else:
             print(f"    ❌ {var} ({desc}): Not set")
             all_required_present = False
@@ -160,11 +214,15 @@ def check_environment():
         value = os.getenv(var)
         if value:
             if var == 'MAILCHIMP_API_KEY':
-                print(f"    ✅ {var} ({desc}): {'*' * min(len(value), 10)}")
+                print(f"    ✅ {var} ({desc}): {'*' * len(value)}")
             else:
                 print(f"    ✅ {var} ({desc}): {value}")
         else:
             print(f"    ➖ {var} ({desc}): Not set (optional)")
+    
+    # Check Firebase extension mode
+    use_extension = os.getenv('USE_MAILCHIMP_FIREBASE_EXTENSION', 'false').lower() == 'true'
+    print(f"  🔧 Configuration Mode: {'Firebase Extension' if use_extension else 'Direct API'}")
     
     return all_required_present
 
@@ -185,21 +243,37 @@ async def main():
     template_ok = test_template_loading()
     print()
     
-    # Test MailChimp API
-    api_ok = await test_mailchimp_api()
-    print()
+    # Test services based on configuration
+    use_extension = os.getenv('USE_MAILCHIMP_FIREBASE_EXTENSION', 'false').lower() == 'true'
     
-    print("🏁 Test Results Summary:")
+    if use_extension:
+        print("🔧 Firebase Extension mode enabled - testing Firebase service")
+        firebase_ok = await test_firebase_mailchimp()
+    else:
+        print("🔧 Direct API mode enabled - testing direct service")
+        direct_ok = await test_direct_mailchimp()
+        print()
+        
+        # Also test Firebase extension for completeness
+        print("🔧 Also testing Firebase extension service...")
+        firebase_ok = await test_firebase_mailchimp()
+    
+    print("\n🏁 Test Results Summary:")
     print(f"  Environment: {'✅' if env_ok else '❌'}")
     print(f"  Templates: {'✅' if template_ok else '❌'}")
-    print(f"  MailChimp API: {'✅' if api_ok else '❌'}")
+    
+    if use_extension:
+        print(f"  Firebase Extension: {'✅' if firebase_ok else '❌'}")
+    else:
+        print(f"  Direct API: {'✅' if direct_ok else '❌'}")
+        print(f"  Firebase Extension: {'✅' if firebase_ok else '❌'}")
 
 if __name__ == "__main__":
     # Load environment variables from .env.local if it exists
     env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local')
     if os.path.exists(env_file):
         print(f"📁 Loading environment from {env_file}")
-        with open(env_file, 'r', encoding='utf-8') as f:
+        with open(env_file, 'r') as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:

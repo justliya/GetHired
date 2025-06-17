@@ -28,23 +28,44 @@ jobs:
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Deploy Cloud Tasks Scheduler
-      working-directory: cloud_tasks
-      env:
-        SERVICE_NAME: gethired-scheduler
-        REGION: us-central1
-        QUEUE_NAME: scheduled-searches
-      run: |
-        ./deploy.sh $GOOGLE_CLOUD_PROJECT
-
-    - name: Verify deployment
-      env:
-        SERVICE_NAME: gethired-scheduler
-        REGION: us-central1
-      run: |
-        SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
-          --region=$REGION \
-          --project=$GOOGLE_CLOUD_PROJECT \
-          --format="value(status.url)")
-        echo "✅ Scheduler deployed at: $SERVICE_URL"
-        echo "🔗 Health check: $SERVICE_URL/api/v1/health"
+      - name: Build and Deploy Cloud Tasks Scheduler
+        working-directory: cloud_tasks
+        env:
+          SERVICE_NAME: gethired-scheduler
+          REGION: us-central1
+          QUEUE_NAME: scheduled-searches
+        run: |
+          IMAGE_NAME="gcr.io/$GOOGLE_CLOUD_PROJECT/$SERVICE_NAME"
+          IMAGE_TAG="${{ github.sha }}"
+          
+          # Build Docker image
+          echo "🐳 Building Docker image..."
+          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+          docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+          
+          # Configure docker and push
+          echo "📤 Pushing to Container Registry..."
+          gcloud auth configure-docker gcr.io -q
+          docker push ${IMAGE_NAME}:${IMAGE_TAG}
+          docker push ${IMAGE_NAME}:latest
+          
+          # Deploy to Cloud Run
+          echo "☁️ Deploying to Cloud Run..."
+          gcloud run deploy $SERVICE_NAME \
+            --project=$GOOGLE_CLOUD_PROJECT \
+            --region=$REGION \
+            --image=${IMAGE_NAME}:${IMAGE_TAG} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --memory=512Mi \
+            --cpu=1 \
+            --max-instances=10 \
+            --set-env-vars="GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,CLOUD_TASKS_LOCATION=$REGION,CLOUD_TASKS_QUEUE=$QUEUE_NAME,MAILCHIMP_API_KEY=${{ secrets.MAILCHIMP_API_KEY }},MAILCHIMP_SERVER_PREFIX=${{ secrets.MAILCHIMP_SERVER_PREFIX }},MAILCHIMP_LIST_ID=${{ secrets.MAILCHIMP_LIST_ID }},USE_MAILCHIMP_FIREBASE_EXTENSION=${{ secrets.USE_MAILCHIMP_FIREBASE_EXTENSION }},MAILCHIMP_USERS_COLLECTION=${{ secrets.MAILCHIMP_USERS_COLLECTION }},MAILCHIMP_EVENTS_COLLECTION=${{ secrets.MAILCHIMP_EVENTS_COLLECTION }},MAILCHIMP_FROM_EMAIL=${{ secrets.MAILCHIMP_FROM_EMAIL }},MAILCHIMP_FROM_NAME=${{ secrets.MAILCHIMP_FROM_NAME }},FIREBASE_FUNCTIONS_URL=${{ secrets.FIREBASE_FUNCTIONS_URL }}"
+          
+          # Verify deployment
+          SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
+            --region=$REGION \
+            --project=$GOOGLE_CLOUD_PROJECT \
+            --format="value(status.url)")
+          echo "✅ Scheduler deployed at: $SERVICE_URL"
+          echo "🔗 Health check: $SERVICE_URL/api/v1/health"

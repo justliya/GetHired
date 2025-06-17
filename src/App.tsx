@@ -13,13 +13,11 @@ import Auth from './pages/Auth';
 import { auth, onAuthStateChanged } from './firebase';
 import { updateUserPreferences, getUserPreferences } from './services/firebaseService';
 import UserPreferencesModal from "./components/ui/UserPreferencesModal";
-import SuccessModal from "./components/ui/SuccessModal";
 import { 
   shouldShowPreferencesModal, 
   markPreferencesModalSeen, 
   handlePreferencesSubmissionSuccess 
 } from './utils/onboardingUtils';
-import type { ScheduledSearch } from './services/scheduledSearchService';
 
 function App() {
   const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
@@ -43,18 +41,13 @@ function App() {
           
           setCurrentPage('dashboard');
           
-          // Use utility function to determine if we should show the modal
-          const shouldShow = shouldShowPreferencesModal(user.uid, hasCustomPreferences || false);
-          
-          if (shouldShow) {
-            // Mark that they've seen the modal
-            markPreferencesModalSeen(user.uid);
+          // Only show preferences modal for new users without preferences
+          if (!hasCustomPreferences) {
+            setIsNewUser(true);
             // Delay showing modal to ensure smooth transition
             setTimeout(() => {
               setShowUserPrefs(true);
             }, 500);
-          } else {
-            setShowUserPrefs(false);
           }
         } catch (error) {
           console.error('Error checking user preferences:', error);
@@ -107,10 +100,9 @@ function App() {
               } : undefined}
               onHide={() => {
                 setShowUserPrefs(false);
-                setEditingSchedule(null);
-                // If user closes modal without saving, we still consider they've seen it
-                if (auth.currentUser) {
-                  markPreferencesModalSeen(auth.currentUser.uid);
+                // If user closes modal without saving and they're new, show a reminder
+                if (isNewUser) {
+                  console.log('Remember to set your preferences for better job matches!');
                 }
               }}
               onSubmit={async (formData) => {
@@ -156,10 +148,8 @@ function App() {
                   setShowUserPrefs(false);
                   setEditingSchedule(null);
                   
-                  // Small delay to ensure smooth transition between modals
-                  setTimeout(() => {
-                    setShowSuccessModal(true);
-                  }, 300);
+                  // Optionally show success message
+                  console.log('Preferences saved successfully!');
                 } catch (error) {
                   console.error('Failed to save preferences:', error);
                   // You might want to show an error toast here
