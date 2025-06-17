@@ -15,6 +15,8 @@ import {
 } from 'firebase/firestore';
 import type { JobPreferences, SearchSchedule } from '../models/UserData';
 
+const COLLECTION_NAME = 'scheduledSearches';
+
 const getCurrentUserId = () => {
   const user = auth.currentUser;
   if (!user) {
@@ -54,18 +56,33 @@ export const testFirebaseConnection = async (): Promise<{
       };
     }
 
-    const testQuery = query(
-      collection(db, COLLECTION_NAME),
-      where('userId', '==', user.uid)
-    );
-    
-    await getDocs(testQuery);
-    
-    return {
-      success: true,
-      authenticated: true,
-      userId: user.uid
-    };
+    // Simple test - try to create a query (doesn't execute until we call getDocs)
+    // This will fail gracefully if rules aren't set up yet
+    try {
+      const testQuery = query(
+        collection(db, COLLECTION_NAME),
+        where('userId', '==', user.uid)
+      );
+      
+      await getDocs(testQuery);
+      
+      return {
+        success: true,
+        authenticated: true,
+        userId: user.uid
+      };
+    } catch (firestoreError) {
+      // If it's a permission error, that's expected without rules
+      if (firestoreError instanceof Error && firestoreError.message.includes('permission')) {
+        return {
+          success: false,
+          authenticated: true,
+          userId: user.uid,
+          error: 'Firestore rules not configured yet - add security rules to Firebase Console'
+        };
+      }
+      throw firestoreError;
+    }
   } catch (error) {
     return {
       success: false,
@@ -101,8 +118,6 @@ export interface ScheduleUpdateRequest {
   schedule?: SearchSchedule;
   status?: 'active' | 'paused' | 'disabled';
 }
-
-const COLLECTION_NAME = 'scheduledSearches';
 
 const retryFirebaseOperation = async <T>(
   operation: () => Promise<T>,
@@ -150,36 +165,46 @@ export const createScheduledSearch = async (request: ScheduleCreateRequest): Pro
       updatedAt: serverTimestamp() as Timestamp,
     };
 
-    const docRef = await retryFirebaseOperation(() => 
-      addDoc(collection(db, COLLECTION_NAME), scheduledSearch)
-    );
-    
-    const cloudTaskResult = await createCloudTask(docRef.id, request.schedule);
-    
-    const finalResult: ScheduledSearch = {
-      id: docRef.id,
-      ...scheduledSearch,
-    };
+    try {
+      const docRef = await retryFirebaseOperation(() => 
+        addDoc(collection(db, COLLECTION_NAME), scheduledSearch)
+      );
+      
+      const cloudTaskResult = await createCloudTask(docRef.id, request.schedule);
+      
+      const finalResult: ScheduledSearch = {
+        id: docRef.id,
+        ...scheduledSearch,
+      };
 
-    if (cloudTaskResult.success && cloudTaskResult.taskId) {
-      try {
-        await retryFirebaseOperation(() => 
-          updateDoc(docRef, {
-            cloudTaskId: cloudTaskResult.taskId,
-            nextRunAt: cloudTaskResult.nextRunAt
-          })
-        );
-        
-        finalResult.cloudTaskId = cloudTaskResult.taskId;
-        finalResult.nextRunAt = cloudTaskResult.nextRunAt;
-      } catch (updateError) {
-        console.warn('Failed to update document with Cloud Task info:', updateError);
+      if (cloudTaskResult.success && cloudTaskResult.taskId) {
+        try {
+          await retryFirebaseOperation(() => 
+            updateDoc(docRef, {
+              cloudTaskId: cloudTaskResult.taskId,
+              nextRunAt: cloudTaskResult.nextRunAt
+            })
+          );
+          
+          finalResult.cloudTaskId = cloudTaskResult.taskId;
+          finalResult.nextRunAt = cloudTaskResult.nextRunAt;
+        } catch (updateError) {
+          console.warn('Failed to update document with Cloud Task info:', updateError);
+        }
+      } else {
+        console.warn('Failed to create Cloud Task:', cloudTaskResult.error);
       }
-    } else {
-      console.warn('Failed to create Cloud Task:', cloudTaskResult.error);
-    }
 
-    return { success: true, data: finalResult };
+      return { success: true, data: finalResult };
+    } catch (firestoreError) {
+      if (firestoreError instanceof Error && firestoreError.message.includes('permission')) {
+        return { 
+          success: false, 
+          error: 'Firebase security rules not configured. Please add the rules from firestore-security-rules.txt to your Firebase Console.' 
+        };
+      }
+      throw firestoreError;
+    }
   } catch (error) {
     console.error('Error creating scheduled search:', error);
     

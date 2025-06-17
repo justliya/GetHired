@@ -98,7 +98,7 @@ const ScheduleStatusDisplay: React.FC<ScheduleStatusDisplayProps> = ({
       // Handle Firestore Timestamp
       let date: Date;
       if (nextRunAt && typeof nextRunAt === 'object' && 'toDate' in nextRunAt) {
-        date = (nextRunAt as any).toDate();
+        date = (nextRunAt as Timestamp).toDate();
       } else {
         date = new Date(nextRunAt as string);
       }
@@ -120,7 +120,7 @@ const ScheduleStatusDisplay: React.FC<ScheduleStatusDisplayProps> = ({
     try {
       let date: Date;
       if (lastRunAt && typeof lastRunAt === 'object' && 'toDate' in lastRunAt) {
-        date = (lastRunAt as any).toDate();
+        date = (lastRunAt as Timestamp).toDate();
       } else {
         date = new Date(lastRunAt as string);
       }
