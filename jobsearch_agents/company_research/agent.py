@@ -14,13 +14,11 @@ async def create_agent():
 
     exit_stack = AsyncExitStack()
 
-
     tools = MCPToolset(
         connection_params=StreamableHTTPServerParams(
-            url="https://gethired-mcp.onrender.com/jobsearch-mcp",
+            url="https://gethired-mcp.onrender.com/jobsearch-mcp/",
         ),
         tool_filter=[
-            # Company Research Tools
             "search_companies",
             "get_company_overview",
             "get_company_reviews",
@@ -36,10 +34,9 @@ async def create_agent():
 
     exit_stack.push_async_callback(cleanup)
 
-
     agent_instance = Agent(
         name="company_research",
-        description="Perform extensive research on companies and provide comprehensive intelligence reports",
+        description="Perform extensive research on companies and provide comprehensive insightful reports",
         instruction=prompt.COMPANY_RESEARCH_AGENT_PROMPT,
         model="gemini-2.0-flash-001",
         tools=[tools],

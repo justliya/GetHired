@@ -149,10 +149,11 @@
 
 	cd jobsearch_agents
 
+	pip install -r requirements.txt
+
 	export GOOGLE_GENAI_USE_VERTEXAI=True
 	export GOOGLE_CLOUD_PROJECT=<YOUR_PROJECT>
 	export GOOGLE_CLOUD_LOCATION=us-central1
-
 
 ## Running the agent server for testing
 
