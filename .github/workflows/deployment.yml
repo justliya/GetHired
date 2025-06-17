@@ -38,7 +38,7 @@ jobs:
       - name: Insert env var after os.environ.copy()
         working-directory: ${{ github.workspace }}
         run: |
-          if grep -q "env = os.environ.copy()" job_coach/agent.py; then
+          if grep -q "env = os.environ.copy()" jobsearch_agents/job_coach/agent.py; then
             sed -i '/env = os.environ.copy()/a\
             env["SERVICE_ACCOUNT_KEY_PATH"] = env.get("FIREBASE_SERVICE_ACCOUNT_KEY", "")
             ' job_coach/agent.py
