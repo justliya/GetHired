@@ -28,6 +28,13 @@
 - Sends reminders for follow-ups and interview prep
 - Logs progress in Firestore
 
+### ⏰ Scheduled Search System
+- Automated job searches with customizable schedules (daily/weekly/monthly)
+- Smart email notifications with job results
+- Cloud Tasks integration for reliable scheduling
+- Timezone-aware with quiet hours support
+- See [SCHEDULED_SEARCH_README.md](SCHEDULED_SEARCH_README.md) for detailed documentation
+
 ## Coordinator Agent
 ---
 
@@ -176,5 +183,3 @@
 **URL should look like this in browser**
 
 	http://0.0.0.0:8003/docs
-
-

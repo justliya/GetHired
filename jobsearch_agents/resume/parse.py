@@ -1,6 +1,5 @@
 import re
 from re import Pattern
-
 class EducationEntry:
     def __init__(self, degree, school, start_date=None, end_date=None, details=None):
         self.degree = degree
@@ -16,13 +15,11 @@ class ExperienceEntry:
         self.start_date = start_date
         self.end_date = end_date
         self.bullet_points = bullet_points or []
-
 class ProjectEntry:
     def __init__(self, title, description=None, bullet_points=None):
         self.title = title
         self.description = description
         self.bullet_points = bullet_points or []
-
 class VolunteerExperienceEntry:
     def __init__(self, organization, role, start_date, end_date=None, bullet_points=None):
         self.organization = organization
@@ -30,12 +27,10 @@ class VolunteerExperienceEntry:
         self.start_date = start_date
         self.end_date = end_date
         self.bullet_points = bullet_points or []
-
 class SkillSet:
     def __init__(self, technical=None, soft_skills=None):
         self.technical = technical or []
         self.soft_skills = soft_skills or []
-
 class ParsedResume():
     """
     ParsedResume is a class for extracting and structuring information from a resume text.

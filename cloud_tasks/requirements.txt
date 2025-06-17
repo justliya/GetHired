@@ -1,0 +1,7 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+google-cloud-tasks==2.14.1
+google-cloud-firestore==2.13.1
+pydantic==2.5.0
+requests==2.31.0
+pytz==2023.3
