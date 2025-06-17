@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
@@ -10,11 +10,9 @@ import {
   ResumeSelector,
   JobDescriptionInput,
   ResumeTextInput,
-  DocumentViewer,
+  EnhancedDocumentViewer,
   SuggestedChanges,
-  DownloadBanner,
-  DebugPanel,
-  DocumentUnavailable
+  DownloadBanner
 } from '../components/resume';
 import type { Resume } from '../models/UserData';
 import type { JobListing } from '../types';
@@ -364,53 +362,67 @@ Join our team and help build the next generation of web applications that serve 
 
       {/* Main Tailoring Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Resume & Job Description
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Resume & Job Description
+          </h2>
+          {!resumeText || !jobDescription ? (
+            <div className="flex items-center text-sm text-amber-600 dark:text-amber-400">
+              <div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div>
+              {!resumeText && !jobDescription ? 'Add resume and job description to continue' :
+               !resumeText ? 'Add resume content to continue' : 'Add job description to continue'}
+            </div>
+          ) : (
+            <div className="flex items-center text-sm text-green-600 dark:text-green-400">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+              Ready to tailor resume
+            </div>
+          )}
+        </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Resume Text Area */}
-          <ResumeTextInput
-            resumeText={resumeText}
-            resumeInputMethod={resumeInputMethod}
-            onResumeTextChange={setResumeText}
-            onSwitchToManual={handleSwitchToManual}
-          />
+          <div className="flex flex-col">
+            <ResumeTextInput
+              resumeText={resumeText}
+              resumeInputMethod={resumeInputMethod}
+              onResumeTextChange={setResumeText}
+              onSwitchToManual={handleSwitchToManual}
+            />
+          </div>
 
           {/* Job Description Area */}
-          <JobDescriptionInput
-            jobDescription={jobDescription}
-            userJobs={userJobs}
-            showJobSelector={showJobSelector}
-            onJobDescriptionChange={setJobDescription}
-            onToggleJobSelector={handleToggleJobSelector}
-            onLoadJobFromListing={handleLoadJobFromListing}
-            onLoadSampleJob={loadSampleJobDescription}
-          />
+          <div className="flex flex-col">
+            <JobDescriptionInput
+              jobDescription={jobDescription}
+              userJobs={userJobs}
+              showJobSelector={showJobSelector}
+              onJobDescriptionChange={setJobDescription}
+              onToggleJobSelector={handleToggleJobSelector}
+              onLoadJobFromListing={handleLoadJobFromListing}
+              onLoadSampleJob={loadSampleJobDescription}
+            />
+          </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-center">
           <button
             onClick={handleStartAnalysis}
             disabled={!resumeText || !jobDescription || isAnalyzing}
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+            className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center font-medium transition-all transform hover:scale-105 disabled:hover:scale-100"
           >
             {isAnalyzing ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing...
+                <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                Analyzing & Tailoring Resume...
               </>
             ) : (
-              'Tailor Resume'
+              <>
+                <FileText className="w-5 h-5 mr-3" />
+                Tailor My Resume
+              </>
             )}
           </button>
-          
-          {(!resumeText || !jobDescription) && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {!resumeText && !jobDescription ? 'Please add resume text and job description' :
-               !resumeText ? 'Please add resume text' : 'Please add job description'}
-            </span>
-          )}
         </div>
       </div>
 
@@ -425,19 +437,17 @@ Join our team and help build the next generation of web applications that serve 
           {/* Resume Changes Tab */}
           {activeTab === 'resume' && (
             <div className="space-y-6">
-              {/* Debug Panel (Development Only) */}
-              <DebugPanel tailoringData={tailoringData} />
-
-              {/* Document Viewer or Unavailable Message */}
-              {tailoringData.tailoredResumeText ? (
-                <DocumentViewer
-                  resumeText={tailoringData.tailoredResumeText}
-                  resumeUrl={tailoringData.tailoredResumeUrl}
+              {/* Document Viewer */}
+              {tailoringData.tailoredResumeUrl ? (
+                <EnhancedDocumentViewer
+                  documentUrl={tailoringData.tailoredResumeUrl}
                   job={job}
-                  onCopyText={copySuggestion}
+                  onDownload={() => {
+                    if (tailoringData.tailoredResumeUrl) {
+                      window.open(tailoringData.tailoredResumeUrl, '_blank');
+                    }
+                  }}
                 />
-              ) : tailoringData.tailoredResumeUrl ? (
-                <DocumentUnavailable resumeUrl={tailoringData.tailoredResumeUrl} />
               ) : null}
 
               {/* Suggested Changes */}

@@ -127,7 +127,58 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
     temp_file_path = None
     
     try:
-        candidate = ParsedResume(text).serialize()
+        logger.info("🚀 Starting resume creation for user %s, position: %s", user_id, job_position_title)
+        logger.debug("📄 Input resume text length: %d characters", len(text))
+        
+        # Parse the resume text
+        logger.info("🔍 Parsing resume text...")
+        parsed_resume = ParsedResume(text)
+        candidate_data = parsed_resume.serialize()
+        
+        logger.info("✅ Resume parsed successfully")
+        logger.debug("👤 Candidate data structure: %s", candidate_data)
+        
+        # Log the candidate data for debugging template issues
+        candidate = candidate_data.get("candidate", {})
+        logger.info("📋 Parsed candidate info:")
+        logger.info("  - Name: %s", candidate.get("name"))
+        logger.info("  - Email: %s", candidate.get("email"))
+        logger.info("  - Phone: %s", candidate.get("phone"))
+        logger.info("  - Link: %s", candidate.get("link"))
+        logger.info("  - Summary length: %d", len(candidate.get("professional_summary") or ""))
+        logger.info("  - Education entries: %d", len(candidate.get("education", [])))
+        logger.info("  - Experience entries: %d", len(candidate.get("experience_section", [])))
+        logger.info("  - Projects: %d", len(candidate.get("projects", [])))
+        logger.info("  - Certifications: %d", len(candidate.get("certifications", [])))
+        logger.info("  - Skills count: %d", len(candidate.get("skills", [])))
+        
+        # Log detailed candidate data for debugging
+        logger.debug("🔍 Detailed candidate info:")
+        if candidate.get("education"):
+            for i, edu in enumerate(candidate.get("education", [])):
+                logger.debug("  Education %d: %s at %s (%s)", i+1, edu.get("degree"), edu.get("school"), edu.get("year"))
+        
+        if candidate.get("experience_section"):
+            for i, exp in enumerate(candidate.get("experience_section", [])):
+                logger.debug("  Experience %d: %s at %s (%s)", i+1, exp.get("role"), exp.get("company"), exp.get("dates"))
+        
+        if candidate.get("skills"):
+            skills_data = candidate.get("skills", {})
+            if hasattr(skills_data, 'technical'):
+                # SkillSet object
+                technical_count = len(skills_data.technical) if skills_data.technical else 0
+                soft_count = len(skills_data.soft_skills) if skills_data.soft_skills else 0
+                logger.debug("  Skills: %d technical, %d soft skills", technical_count, soft_count)
+            elif isinstance(skills_data, dict):
+                # Dictionary format
+                technical_skills = skills_data.get("technical", [])
+                soft_skills = skills_data.get("soft_skills", [])
+                logger.debug("  Skills: %d technical, %d soft skills", len(technical_skills), len(soft_skills))
+            elif isinstance(skills_data, list):
+                # List format (legacy)
+                logger.debug("  Skills: %d total skills", len(skills_data))
+            else:
+                logger.debug("  Skills: Unknown format - %s", type(skills_data))
         
         # Use templateResumeDocV2.docx from the template directory
         # Try multiple possible paths for different environments
@@ -142,51 +193,126 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         
         template_path = None
         for path in possible_paths:
+            logger.debug("🔍 Checking template path: %s", path)
             if path.exists():
                 template_path = path
+                logger.info("✅ Found template at: %s", template_path)
                 break
         
         if not template_path:
             raise FileNotFoundError(f"Template file not found. Tried paths: {[str(p) for p in possible_paths]}")
             
-        logger.info("Using template: %s", template_path)
+        logger.info("📄 Using template: %s", template_path)
         
+        # Create the DocxTemplate and render with candidate data
+        logger.info("🔧 Loading DocxTemplate...")
         doc = DocxTemplate(str(template_path))
-        doc.render(candidate)
+        
+        # Prepare the context for template rendering
+        # The template expects variables to be available directly AND as 'candidate'
+        template_context = candidate_data["candidate"].copy()
+        
+        # Add the candidate object itself for templates that expect {{ candidate.name }}
+        template_context["candidate"] = candidate_data["candidate"]
+        
+        # Handle skills properly - extract from SkillSet structure
+        candidate = candidate_data["candidate"]  # Define candidate for easier access
+        skills_data = candidate.get("skills", {})
+        if hasattr(skills_data, 'technical'):
+            # SkillSet object
+            technical_skills = skills_data.technical or []
+            soft_skills = skills_data.soft_skills or []
+        elif isinstance(skills_data, dict):
+            # Dictionary format
+            technical_skills = skills_data.get("technical", [])
+            soft_skills = skills_data.get("soft_skills", [])
+        elif isinstance(skills_data, list):
+            # List format (all skills as technical)
+            technical_skills = skills_data
+            soft_skills = []
+        else:
+            technical_skills = []
+            soft_skills = []
+        
+        # Add some additional helper variables that might be useful in the template
+        template_context.update({
+            "full_name": candidate.get("name", ""),
+            "contact_email": candidate.get("email", ""),
+            "contact_phone": candidate.get("phone", ""),
+            "summary": candidate.get("professional_summary", ""),
+            "work_experience": candidate.get("experience_section", []),
+            "education_list": candidate.get("education", []),
+            "project_list": candidate.get("projects", []),
+            "certification_list": candidate.get("certifications", []),
+            "technical_skills": technical_skills,
+            "soft_skills": soft_skills,
+            "volunteer_work": candidate.get("volunteer_experience", [])
+        })
+        
+        # Create a flat skills list for template compatibility
+        all_skills_list = []
+        all_skills_list.extend(technical_skills)
+        all_skills_list.extend(soft_skills)
+        
+        # Update candidate.skills to include both structured and flat formats
+        template_context["candidate"]["skills_flat"] = all_skills_list
+        template_context["candidate"]["technical_skills"] = technical_skills
+        template_context["candidate"]["soft_skills"] = soft_skills
+        
+        logger.info("🎨 Rendering template with context...")
+        logger.debug("📝 Template context keys: %s", list(template_context.keys()))
+        
+        try:
+            doc.render(template_context)
+            logger.info("✅ Template rendered successfully")
+        except Exception as render_error:
+            logger.error("❌ Template rendering failed: %s", render_error)
+            logger.debug("🔍 Full template context: %s", template_context)
+            raise
         
         filename = create_unique_filename(job_position_title, user_id)
+        logger.info("📁 Generated filename: %s", filename)
         
         with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
             temp_file_path = temp_file.name
             doc.save(temp_file_path)
+            logger.info("💾 Document saved to temporary file: %s", temp_file_path)
         
+        # Check if the file was created and has content
+        if os.path.exists(temp_file_path):
+            file_size = os.path.getsize(temp_file_path)
+            logger.info("📊 Generated document size: %d bytes", file_size)
+            if file_size < 1000:  # Very small file might indicate rendering issues
+                logger.warning("⚠️  Generated document is very small (%d bytes), check template rendering", file_size)
+        else:
+            raise FileNotFoundError("Temporary document file was not created")
+        
+        logger.info("☁️  Uploading to Firebase Storage...")
         download_url = upload_to_firebase_storage(temp_file_path, filename, user_id)
         
         if not download_url:
-            logger.warning("Failed to upload to storage, returning local file info")
+            logger.warning("⚠️  Failed to upload to storage, returning local file info")
             download_url = f"local://{filename}"
+        else:
+            logger.info("✅ Upload successful: %s", download_url)
         
-        logger.info("Resume created successfully for %s (user: %s)", job_position_title, user_id)
+        logger.info("🎉 Resume created successfully for %s (user: %s)", job_position_title, user_id)
         
-        return download_url , text
+        return {
+            "resume_text": text,
+            "document_url": download_url,
+            "download_url": download_url, 
+            "filename": filename,
+            "message": f"Resume successfully created and uploaded for {job_position_title}"
+        }
         
     except FileNotFoundError as e:
         error_message = f"Template file not found: {str(e)}"
-        logger.error(error_message)
+        logger.error("❌ %s", error_message)
         
         return {
             "resume_text": text,
-            "download_url": "",
-            "filename": "",
-            "status": "error",
-            "message": error_message
-        }
-    except (OSError, IOError) as e:
-        error_message = f"File operation error: {str(e)}"
-        logger.error(error_message)
-        
-        return {
-            "resume_text": text,
+            "document_url": "",
             "download_url": "",
             "filename": "",
             "status": "error",
@@ -194,10 +320,12 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         }
     except Exception as e:
         error_message = f"Unexpected error creating formatted resume: {str(e)}"
-        logger.error(error_message)
+        logger.error("❌ %s", error_message)
+        logger.exception("Full error details:")
         
         return {
             "resume_text": text,
+            "document_url": "",
             "download_url": "",
             "filename": "",
             "status": "error",
@@ -208,9 +336,9 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.unlink(temp_file_path)
-                logger.debug("Cleaned up temporary file: %s", temp_file_path)
+                logger.debug("🧹 Cleaned up temporary file: %s", temp_file_path)
             except OSError as e:
-                logger.warning("Failed to delete temporary file %s: %s", temp_file_path, e)
+                logger.warning("⚠️  Failed to delete temporary file %s: %s", temp_file_path, e)
 
 
 def download_and_extract_resume_text(storage_url: str) -> str:

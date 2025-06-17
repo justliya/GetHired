@@ -28,10 +28,15 @@ export const useResumeTailoring = () => {
 
   // Helper function to parse AI response
   const parseAIResponse = (response: Record<string, unknown>) => {
+    console.log('🔍 Parsing AI response:', response);
+    
     try {
       // Handle AgentResponse format: { message, status, data, session_id }
       const responseData = response.data as Record<string, unknown> || {};
       const message = response.message as string || '';
+      
+      console.log('📝 Response data:', responseData);
+      console.log('💬 Response message:', message);
       
       // Try to extract structured data from the response
       let resumeText = '';
@@ -40,31 +45,69 @@ export const useResumeTailoring = () => {
       
       // Check if the message contains structured data
       if (message) {
+        console.log('🔎 Searching for JSON in message...');
         // Try to extract JSON from message if present
         const jsonMatch = message.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
+          console.log('📄 Found JSON in message:', jsonMatch[0]);
           try {
             const parsed = JSON.parse(jsonMatch[0]);
+            console.log('✅ Parsed JSON:', parsed);
             resumeText = parsed.resume_text || parsed.final_resume || parsed.tailored_resume_text || '';
-            resumeUrl = parsed.download_url || parsed.tailored_resume_url || '';
+            resumeUrl = parsed.document_url || parsed.download_url || parsed.resume_url || '';
             filename = parsed.filename || '';
+            console.log('🎯 Extracted from JSON - URL:', resumeUrl, 'Text length:', resumeText.length, 'Filename:', filename);
           } catch (e) {
-            console.warn('Failed to parse JSON from message:', e);
+            console.warn('❌ Failed to parse JSON from message:', e);
+          }
+        } else {
+          console.log('🔍 No JSON found in message, checking for direct URL patterns...');
+          // Look for URLs in the message
+          const urlPattern = /https?:\/\/[^\s]+/g;
+          const urls = message.match(urlPattern);
+          if (urls && urls.length > 0) {
+            console.log('🔗 Found URLs in message:', urls);
+            // Use the first URL that looks like a document
+            resumeUrl = urls.find(url => 
+              url.includes('storage.googleapis') || 
+              url.includes('firebase') || 
+              url.includes('.docx') || 
+              url.includes('.pdf')
+            ) || urls[0];
+            console.log('📎 Selected URL:', resumeUrl);
           }
         }
         
         // If no structured data found, treat the entire message as resume text
         if (!resumeText) {
           resumeText = message;
+          console.log('📄 Using entire message as resume text, length:', resumeText.length);
         }
       }
       
       // Also check the data field for structured information
       if (responseData) {
+        console.log('🔍 Checking responseData for additional fields...');
+        const originalResumeText = resumeText;
+        const originalResumeUrl = resumeUrl;
+        const originalFilename = filename;
+        
         resumeText = resumeText || (responseData.resume_text as string) || (responseData.final_resume as string) || (responseData.tailored_resume_text as string) || '';
-        resumeUrl = resumeUrl || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || '';
+        resumeUrl = resumeUrl || (responseData.document_url as string) || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || '';
         filename = filename || (responseData.filename as string) || '';
+        
+        if (resumeText !== originalResumeText || resumeUrl !== originalResumeUrl || filename !== originalFilename) {
+          console.log('🔄 Updated from responseData - URL:', resumeUrl, 'Text length:', resumeText.length, 'Filename:', filename);
+        }
       }
+      
+      console.log('🎯 Final extraction results:', {
+        resumeUrl,
+        resumeTextLength: resumeText.length,
+        filename,
+        hasChanges: Array.isArray(responseData.suggested_changes),
+        changesCount: Array.isArray(responseData.suggested_changes) ? responseData.suggested_changes.length : 0
+      });
       
       return {
         changes: Array.isArray(responseData.suggested_changes) ? responseData.suggested_changes as SuggestedChange[] : [],
@@ -76,7 +119,7 @@ export const useResumeTailoring = () => {
         rawResponse: response
       };
     } catch (error) {
-      console.error('Failed to parse AI response:', error);
+      console.error('❌ Failed to parse AI response:', error);
       return {
         changes: [],
         coverLetter: '',
@@ -135,25 +178,31 @@ ${jobDescription}
       }
 
       const result = await response.json();
-      console.log('Agent response:', result); // Debug log
-      console.log('Response structure:', {
+      console.log('🚀 Agent response received:', result);
+      console.log('📊 Response structure:', {
         hasMessage: !!result.message,
         hasData: !!result.data,
         hasStatus: !!result.status,
         messageType: typeof result.message,
-        dataType: typeof result.data
+        dataType: typeof result.data,
+        messageLength: result.message ? result.message.length : 0
       });
       
       // Parse the AI response to extract tailoring suggestions
       const suggestions = parseAIResponse(result);
-      console.log('Parsed suggestions:', suggestions); // Debug log
+      console.log('💡 Parsed suggestions:', suggestions);
       
-      setTailoringData({
+      const newTailoringData = {
         suggestedChanges: suggestions.changes,
         coverLetter: suggestions.coverLetter || result.message || '',
         tailoredResumeUrl: suggestions.resumeUrl,
         tailoredResumeText: suggestions.resumeText
-      });
+      };
+      
+      console.log('📋 Setting tailoring data:', newTailoringData);
+      console.log('🔗 Resume URL being set:', newTailoringData.tailoredResumeUrl);
+      
+      setTailoringData(newTailoringData);
       
     } catch (error) {
       console.error('Analysis failed:', error);

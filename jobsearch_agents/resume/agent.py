@@ -46,13 +46,20 @@ humanize_resume_agent =  Agent(
 
 proof_reader_agent =  Agent(
     model="gemini-2.0-flash",
-    name="humanize_resume_agent",
+    name="proof_reader_agent",
     instruction = prompt.PROOF_READ_RESUME,
     output_key='final_resume'
     )
+
+resume_formatted_agent = Agent(
+    model="gemini-2.0-flash",
+    name="resume_formatted_agent",
+    instruction = prompt.RESUME_FORMAT_HELPER,
+    output_key='formatted_resume'
+    )
 doc_creator_agent =  Agent(
     model="gemini-2.0-flash",
-    name="humanize_resume_agent",
+    name="doc_creator_agent",
     instruction = prompt.TEMPLATE_DOCUMENT_CREATION,
     tools=[
         create_formatted_resume
@@ -70,6 +77,7 @@ async def create_agent():
         ats_optimization_agent,
         humanize_resume_agent,
         proof_reader_agent,
+        resume_formatted_agent,
         doc_creator_agent,
         ],
     )
