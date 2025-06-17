@@ -24,11 +24,9 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
     if (show) {
       // Trigger confetti animation when modal opens
       const triggerConfetti = () => {
-        const count = 200; // Increased count for more dramatic effect
+        const count = 200;
         const defaults = {
-          origin: { y: 0.7 },
-          gravity: 0.6, // Even slower fall for longer visibility
-          drift: 0.2 // More drift for natural movement
+          origin: { y: 0.7 }
         };
 
         function fire(particleRatio: number, opts: confetti.Options) {
@@ -39,57 +37,36 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
           });
         }
 
-        // Extended staggered animation for longer effect
-        // First burst - small spread
         fire(0.25, {
-          spread: 30,
-          startVelocity: 30, // Slower start velocity
-          decay: 0.82, // Slower decay for much longer animation
+          spread: 26,
+          startVelocity: 55,
         });
 
-        // Second burst - medium spread (delayed)
-        setTimeout(() => {
-          fire(0.3, {
-            spread: 60,
-            startVelocity: 35,
-            decay: 0.84,
-            scalar: 0.9
-          });
-        }, 300);
+        fire(0.2, {
+          spread: 60,
+        });
 
-        // Third burst - wide spread (more delayed)
-        setTimeout(() => {
-          fire(0.25, {
-            spread: 100,
-            startVelocity: 28,
-            decay: 0.82,
-            scalar: 0.8
-          });
-        }, 600);
+        fire(0.35, {
+          spread: 100,
+          decay: 0.91,
+          scalar: 0.8
+        });
 
-        // Fourth burst - very wide spread (even more delayed)
-        setTimeout(() => {
-          fire(0.2, {
-            spread: 140,
-            startVelocity: 25,
-            decay: 0.8,
-            scalar: 1.1
-          });
-        }, 900);
+        fire(0.1, {
+          spread: 120,
+          startVelocity: 25,
+          decay: 0.92,
+          scalar: 1.2
+        });
 
-        // Final burst - maximum spread (most delayed)
-        setTimeout(() => {
-          fire(0.15, {
-            spread: 180,
-            startVelocity: 22,
-            decay: 0.78,
-            scalar: 1.2
-          });
-        }, 1200);
+        fire(0.1, {
+          spread: 120,
+          startVelocity: 45,
+        });
       };
 
-      // Longer delay before confetti starts
-      const confettiTimeout = setTimeout(triggerConfetti, 1000);
+      // Delay confetti slightly to ensure modal is visible
+      const confettiTimeout = setTimeout(triggerConfetti, 300);
       
       return () => clearTimeout(confettiTimeout);
     }
@@ -99,8 +76,11 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop - Remove onClick to prevent accidental closing */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" />
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        onClick={onHide}
+      />
       
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">

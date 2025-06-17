@@ -28,3 +28,4 @@ docs/
 serviceAccount*.json
 .vercel
 .env
+firestore-security-rules.txt
