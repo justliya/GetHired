@@ -15,8 +15,7 @@ import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getUserResumes, uploadResume, updateUserPreferences } from '../../services/firebaseService';
-import { handlePreferencesSubmissionSuccess, handleSchedulingAsync } from '../../utils/onboardingUtils';
-import { ENV } from '../../config/environment';
+import { handlePreferencesSubmissionSuccess } from '../../utils/onboardingUtils';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead';
@@ -89,7 +88,6 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 }) => {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [resumes, setResumes] = useState<ResumeData[]>([]);
-    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
     const [formData, setFormData] = useState<FormDataType>({
         resumeFile: null,
@@ -926,8 +924,6 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
             onHide={() => {
                 setShowSuccessModal(false);
                 onHide();
-                // Trigger job search API request after modal closes
-                handlePostSuccessJobSearch();
             }}
             title="Success! 🎉"
             message={
@@ -935,6 +931,15 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     ? "Your preferences have been saved! We're now searching for jobs and you can expect to receive an email with findings soon."
                     : "Your preferences have been saved successfully! You can now search for jobs that match your criteria."
             }
+            actionButton={{
+                text: "Start Job Search",
+                onClick: () => {
+                    setShowSuccessModal(false);
+                    onHide();
+                    // Navigate to job search page
+                    window.location.href = '/job-listings';
+                }
+            }}
         />
         </>
     );

@@ -13,13 +13,11 @@ import Auth from './pages/Auth';
 import { auth, onAuthStateChanged } from './firebase';
 import { updateUserPreferences, getUserPreferences } from './services/firebaseService';
 import UserPreferencesModal from "./components/ui/UserPreferencesModal";
-import SuccessModal from "./components/ui/SuccessModal";
 import { 
   shouldShowPreferencesModal, 
   markPreferencesModalSeen, 
   handlePreferencesSubmissionSuccess 
 } from './utils/onboardingUtils';
-import type { ScheduledSearch } from './services/scheduledSearchService';
 
 function App() {
   const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
@@ -47,6 +45,7 @@ function App() {
           const shouldShow = shouldShowPreferencesModal(user.uid, hasCustomPreferences || false);
           
           if (shouldShow) {
+            setIsNewUser(true);
             // Mark that they've seen the modal
             markPreferencesModalSeen(user.uid);
             // Delay showing modal to ensure smooth transition
@@ -54,6 +53,7 @@ function App() {
               setShowUserPrefs(true);
             }, 500);
           } else {
+            setIsNewUser(false);
             setShowUserPrefs(false);
           }
         } catch (error) {
@@ -107,7 +107,7 @@ function App() {
               } : undefined}
               onHide={() => {
                 setShowUserPrefs(false);
-                setEditingSchedule(null);
+                setIsNewUser(false);
                 // If user closes modal without saving, we still consider they've seen it
                 if (auth.currentUser) {
                   markPreferencesModalSeen(auth.currentUser.uid);
@@ -156,10 +156,7 @@ function App() {
                   setShowUserPrefs(false);
                   setEditingSchedule(null);
                   
-                  // Small delay to ensure smooth transition between modals
-                  setTimeout(() => {
-                    setShowSuccessModal(true);
-                  }, 300);
+                  // Success message will be handled by the SuccessModal in UserPreferencesModal
                 } catch (error) {
                   console.error('Failed to save preferences:', error);
                   // You might want to show an error toast here
