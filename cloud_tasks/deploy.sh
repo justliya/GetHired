@@ -12,14 +12,12 @@ show_usage() {
     echo "  SERVICE_NAME             Cloud Run service name (default: gethired-scheduler)"
     echo "  REGION                   Deployment region (default: us-central1)"
     echo "  QUEUE_NAME               Cloud Tasks queue name (default: scheduled-searches)"
-    echo "  GETHIRED_API_URL         GetHired API URL (default: https://your-gethired-api-url.com)"
     echo "  SKIP_BUILD               Skip Docker build (default: false)"
     echo "  SKIP_PUSH                Skip image push (default: false)"
     echo ""
     echo "Examples:"
     echo "  $0 my-project-id"
     echo "  SERVICE_NAME=my-scheduler $0 my-project-id"
-    echo "  GETHIRED_API_URL=https://api.gethired.com $0 my-project-id"
     echo "  SKIP_BUILD=true $0 my-project-id  # Use existing image"
 }
 
@@ -67,7 +65,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --platform managed \
     --region ${REGION} \
     --allow-unauthenticated \
-    --set-env-vars GOOGLE_CLOUD_PROJECT=${PROJECT_ID},CLOUD_TASKS_LOCATION=${REGION},CLOUD_TASKS_QUEUE=${QUEUE_NAME},GETHIRED_API_URL=${GETHIRED_API_URL:-https://your-gethired-api-url.com} \
+    --set-env-vars GOOGLE_CLOUD_PROJECT=${PROJECT_ID},CLOUD_TASKS_LOCATION=${REGION},CLOUD_TASKS_QUEUE=${QUEUE_NAME} \
     --memory 512Mi \
     --cpu 1 \
     --max-instances 10 \
