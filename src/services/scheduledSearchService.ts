@@ -66,25 +66,34 @@ export const createScheduledSearch = async (request: ScheduleCreateRequest): Pro
 
     const docRef = await addDoc(collection(db, COLLECTION_NAME), scheduledSearch);
     
-    // Create Cloud Task for this schedule
+    // Try to create Cloud Task for this schedule
     const cloudTaskResult = await createCloudTask(docRef.id, request.schedule);
     
-    if (cloudTaskResult.success && cloudTaskResult.taskId) {
-      // Update the document with the Cloud Task ID
-      await updateDoc(docRef, {
-        cloudTaskId: cloudTaskResult.taskId,
-        nextRunAt: cloudTaskResult.nextRunAt
-      });
-    }
-
-    const result = {
+    const finalResult: ScheduledSearch = {
       id: docRef.id,
       ...scheduledSearch,
-      cloudTaskId: cloudTaskResult.taskId,
-      nextRunAt: cloudTaskResult.nextRunAt
-    } as ScheduledSearch;
+    };
 
-    return { success: true, data: result };
+    if (cloudTaskResult.success && cloudTaskResult.taskId) {
+      try {
+        // Update the document with the Cloud Task ID
+        await updateDoc(docRef, {
+          cloudTaskId: cloudTaskResult.taskId,
+          nextRunAt: cloudTaskResult.nextRunAt
+        });
+        
+        finalResult.cloudTaskId = cloudTaskResult.taskId;
+        finalResult.nextRunAt = cloudTaskResult.nextRunAt;
+      } catch (updateError) {
+        console.warn('Failed to update document with Cloud Task info:', updateError);
+        // Continue anyway - the schedule was created successfully
+      }
+    } else {
+      console.warn('Failed to create Cloud Task:', cloudTaskResult.error);
+      // Continue anyway - the schedule was created successfully
+    }
+
+    return { success: true, data: finalResult };
   } catch (error) {
     console.error('Error creating scheduled search:', error);
     return { 
@@ -263,7 +272,7 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
 };
 
 // Cloud Task Management Functions
-const CLOUD_TASK_API_URL = process.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000/api/v1';
+const CLOUD_TASK_API_URL = import.meta.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000/api/v1';
 
 /**
  * Create a Cloud Task for scheduled job search
@@ -275,6 +284,15 @@ const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Pr
   error?: string;
 }> => {
   try {
+    // Check if Cloud Task API URL is available
+    if (!CLOUD_TASK_API_URL || CLOUD_TASK_API_URL === 'http://localhost:8000/api/v1') {
+      console.warn('Cloud Task API not configured or not available locally');
+      return {
+        success: false,
+        error: 'Cloud Task API not available - schedule saved without automation'
+      };
+    }
+
     const response = await fetch(`${CLOUD_TASK_API_URL}/tasks/schedule`, {
       method: 'POST',
       headers: {
