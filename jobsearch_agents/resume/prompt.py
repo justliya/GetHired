@@ -225,7 +225,6 @@ Volunteer Experience:
 
 Please separate sections using double newlines and use the ---END [SECTION]--- markers to clearly delineate section boundaries for parsing.
 """
-
 TEMPLATE_DOCUMENT_CREATION = """
 CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 Act as an expert recruiter and Microsoft word power user. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
