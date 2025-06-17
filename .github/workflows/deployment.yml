@@ -43,10 +43,10 @@ jobs:
             env["SERVICE_ACCOUNT_KEY_PATH"] = env.get("FIREBASE_SERVICE_ACCOUNT_KEY", "")
             ' job_coach/agent.py
             echo "Environment variable insertion completed"
-         else
-          echo "Target line not found in job_coach/agent.py"
-          exit 1
-         fi
+          else
+            echo "Target line not found in job_coach/agent.py"
+            exit 1
+          fi
       - name: Build and Push Docker Image
         id: build
         working-directory: ${{ github.workspace }}
