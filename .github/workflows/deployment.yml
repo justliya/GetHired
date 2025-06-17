@@ -41,6 +41,7 @@ jobs:
           if grep -q "env = os.environ.copy()" job_coach/agent.py; then
             sed -i '/env = os.environ.copy()/a\
             env["SERVICE_ACCOUNT_KEY_PATH"] = env.get("FIREBASE_SERVICE_ACCOUNT_KEY", "")
+            \    env["SERVICE_ACCOUNT_KEY_PATH"] = env.get("FIREBASE_SERVICE_ACCOUNT_KEY", "")
             ' job_coach/agent.py
             echo "Environment variable insertion completed"
           else
