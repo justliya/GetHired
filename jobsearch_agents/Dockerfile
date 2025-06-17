@@ -5,7 +5,7 @@ WORKDIR /app
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
-ENV TIMEOUT=90
+ENV TIMEOUT=300
 
 RUN apt-get update && apt-get install -y \
     curl \
