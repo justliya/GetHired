@@ -91,37 +91,6 @@ export const updateUserPreferences = async (userId: string, preferences: JobPref
       }
     }
     
-
-    // Handle scheduled search if enabled
-    if (preferences.searchSchedule?.enabled) {
-      try {
-        const { createScheduledSearch, getUserScheduledSearches, updateScheduledSearch } = await import('./scheduledSearchService');
-        
-        // Check if user already has a scheduled search
-        const existingSearches = await getUserScheduledSearches(userId);
-        
-        if (existingSearches.success && existingSearches.data && existingSearches.data.length > 0) {
-          // Update existing scheduled search
-          const existing = existingSearches.data[0];
-          await updateScheduledSearch({
-            scheduleId: existing.id!,
-            preferences,
-            schedule: preferences.searchSchedule
-          });
-        } else {
-          // Create new scheduled search
-          await createScheduledSearch({
-            userId,
-            preferences,
-            schedule: preferences.searchSchedule
-          });
-        }
-      } catch (scheduleError) {
-        console.error('Failed to update scheduled search:', scheduleError);
-        // Don't fail the entire preference update if scheduled search fails
-      }
-    }
-    
     return { success: true, data: preferences };
   } catch (error) {
     console.error('Failed to update user preferences:', error);
