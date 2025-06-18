@@ -20,7 +20,7 @@ const Layout = ({ children }: LayoutProps) => {
   
   const navigationItems = [
     { name: 'Dashboard', path: '/', icon: <Search className="w-5 h-5" /> },
-    { name: 'Job Listings', path: '/jobs', icon: <Briefcase className="w-5 h-5" /> },
+    { name: 'Job Search', path: '/jobs', icon: <Briefcase className="w-5 h-5" /> },
     { name: 'Company Research', path: '/company-research/new', icon: <Building2 className="w-5 h-5" /> },
     { name: 'Resume Tailoring', path: '/resume-tailoring/new', icon: <FileText className="w-5 h-5" /> },
     { name: 'Profile', path: '/profile', icon: <User className="w-5 h-5" /> },
