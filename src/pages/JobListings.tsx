@@ -1,6 +1,6 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Heart, Building2, MapPin, DollarSign, Calendar, Trash2, Search, CheckCircle, Clock, Loader2, AlertCircle } from 'lucide-react';
@@ -37,8 +37,9 @@ export default function JobListings() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const saveToStorageAndFirebase = async (updatedJobs: JobListing[]) => {
+  const saveToStorageAndFirebase = useCallback(async (updatedJobs: JobListing[]) => {
     try {
       // Save to sessionStorage
       sessionStorage.setItem(sessionStorageKey, JSON.stringify(updatedJobs));
@@ -56,7 +57,7 @@ export default function JobListings() {
       console.error('Failed to save jobs:', error);
       setError('Failed to save jobs. Please try again.');
     }
-  };
+  }, [user, sessionId, sessionStorageKey]);
 
   useEffect(() => {
     if (!user || authLoading) return;
@@ -68,6 +69,7 @@ export default function JobListings() {
         if (stored) {
           const parsedJobs = JSON.parse(stored);
           setJobs(parsedJobs);
+          await saveToStorageAndFirebase(parsedJobs);
         }
         
         // Then try to load from Firebase
@@ -79,6 +81,7 @@ export default function JobListings() {
           const savedJobs = data.jobs || [];
           if (savedJobs.length > 0) {
             setJobs(savedJobs);
+            await saveToStorageAndFirebase(savedJobs);
           }
         }
       } catch (error) {
@@ -88,7 +91,7 @@ export default function JobListings() {
     };
     
     loadJobs();
-  }, [user, authLoading, sessionId, sessionStorageKey]);
+  }, [user, authLoading, sessionId, sessionStorageKey, saveToStorageAndFirebase]);
 
   function parseJobListings(responseData: any): JobListing[] {
     console.log('Full response data:', responseData);
@@ -426,6 +429,10 @@ export default function JobListings() {
     }
   };
 
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
@@ -703,9 +710,27 @@ export default function JobListings() {
                   )}
                 </div>
 
-                <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-3 mb-4">
-                  {job.description}
-                </p>
+                {(() => {
+                  const desc = job.description;
+                  const isExpanded = expanded[job.id];
+                  const limit = 150;
+                  const shouldTruncate = desc.length > limit;
+                  return (
+                    <div className="mb-4">
+                      <p className="text-gray-700 dark:text-gray-300 text-sm">
+                        {shouldTruncate && !isExpanded ? `${desc.slice(0, limit)}...` : desc}
+                      </p>
+                      {shouldTruncate && (
+                        <button
+                          onClick={() => toggleExpand(job.id)}
+                          className="mt-1 text-blue-600 hover:underline text-xs"
+                        >
+                          {isExpanded ? 'Show Less' : 'Read More'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Qualifications */}
                 {job.qualifications.length > 0 && (
