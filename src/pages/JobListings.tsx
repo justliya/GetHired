@@ -1,14 +1,16 @@
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import{ useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { Heart, Building2, MapPin, DollarSign, Calendar, Trash2, Search, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { Heart, Building2, MapPin, DollarSign, Calendar, Trash2, Search, CheckCircle, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
 
 // Types
 interface JobListing {
   id: string;
+  listingNumber?: number;
   title: string;
   company: string;
   location: string;
@@ -27,13 +29,14 @@ const API_BASE_URL = 'https://gethired-agents-104139545590.us-central1.run.app';
 
 export default function JobListings() {
   const [user, authLoading, authError] = useAuthState(auth);
-  const sessionId = useRef(`session-${uuidv4()}`).current;
+  const [sessionId] = useState(() => `conv-${uuidv4()}`);
   const sessionStorageKey = `session-${sessionId}`;
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   const saveToStorageAndFirebase = async (updatedJobs: JobListing[]) => {
     try {
@@ -87,6 +90,173 @@ export default function JobListings() {
     loadJobs();
   }, [user, authLoading, sessionId, sessionStorageKey]);
 
+  function parseJobListings(responseData: any): JobListing[] {
+    console.log('Full response data:', responseData);
+    
+    // Try to find job arrays in various response structures
+    const possibleJobArrays = [
+      responseData?.jobs,
+      responseData?.data?.jobs,
+      responseData?.listings,
+      Array.isArray(responseData) ? responseData : null,
+      responseData?.response
+    ].filter(arr => Array.isArray(arr) && arr.length > 0);
+    
+    for (const jobArray of possibleJobArrays) {
+      if (Array.isArray(jobArray) && jobArray.length > 0) {
+        return jobArray.map((job: any, index: number) => ({
+          id: `${sessionId}-${index}-${Date.now()}`,
+          listingNumber: job.listingNumber || job.listing_number || index + 1,
+          title: job.title || job.job_title || 'Job Title Not Available',
+          company: job.company || job.company_name || 'Company Not Specified',
+          location: job.location || job.job_location || 'Location Not Specified',
+          salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
+          datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
+          description: job.description || job.job_description || job.summary || 'No description available.',
+          qualifications: Array.isArray(job.qualifications) ? job.qualifications : 
+                         Array.isArray(job.requirements) ? job.requirements :
+                         Array.isArray(job.skills) ? job.skills :
+                         (job.qualifications || job.requirements || job.skills) ? 
+                         [job.qualifications || job.requirements || job.skills] : [],
+          benefits: Array.isArray(job.benefits) ? job.benefits : 
+                   (job.benefits) ? [job.benefits] : [],
+          url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
+          easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
+          favorite: false,
+          status: 'new' as const,
+        }));
+      }
+    }
+    
+    // Try to parse from message text if no direct jobs array found
+    const messageText = responseData?.message || responseData?.response || '';
+    if (messageText) {
+      const patterns = [
+        /```json\s*([\s\S]+?)```/,
+        /```([\s\S]+?)```/,
+        /\{[\s\S]*\}/,
+        /\[[\s\S]*\]/
+      ];
+      
+      for (const pattern of patterns) {
+        const match = messageText.match(pattern);
+        if (match) {
+          const raw = match[pattern.source.includes('```') ? 1 : 0];
+          try {
+            const parsedData = JSON.parse(raw);
+            const arr = Array.isArray(parsedData)
+              ? parsedData
+              : parsedData.jobs ?? parsedData.listings ?? parsedData.results ?? [];
+            
+            if (arr.length > 0) {
+              return arr.map((job: any, index: number) => ({
+                id: `${sessionId}-${index}-${Date.now()}`,
+                listingNumber: job.listingNumber || job.listing_number || index + 1,
+                title: job.title || job.job_title || 'Job Title Not Available',
+                company: job.company || job.company_name || 'Company Not Specified',
+                location: job.location || job.job_location || 'Location Not Specified',
+                salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
+                datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
+                description: job.description || job.job_description || job.summary || 'No description available.',
+                qualifications: Array.isArray(job.qualifications) ? job.qualifications : 
+                               Array.isArray(job.requirements) ? job.requirements :
+                               Array.isArray(job.skills) ? job.skills :
+                               (job.qualifications || job.requirements || job.skills) ? 
+                               [job.qualifications || job.requirements || job.skills] : [],
+                benefits: Array.isArray(job.benefits) ? job.benefits : 
+                         (job.benefits) ? [job.benefits] : [],
+                url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
+                easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
+                favorite: false,
+                status: 'new' as const,
+              }));
+            }
+          } catch (e) {
+            console.error('JSON parse error:', e);
+          }
+        }
+      }
+    }
+    
+    return [];
+  }
+
+  // Fixed API call function - only sends the data, not method/headers in body
+  const makeApiCall = async (endpoint: string, requestData: any) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); 
+    
+    try {
+      console.log('Making API call:', { endpoint, requestData });
+      setDebugInfo((prev: any) => ({ ...prev, lastRequest: { endpoint, requestData, timestamp: new Date().toISOString() } }));
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestData), // Only send the actual data
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      setDebugInfo((prev: any) => ({ 
+        ...prev, 
+        lastResponse: { 
+          status: response.status, 
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          timestamp: new Date().toISOString()
+        }
+      }));
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorText = await response.text();
+          console.log('Error response body:', errorText);
+          setDebugInfo((prev: any) => ({ ...prev, lastErrorBody: errorText }));
+          
+          // Try to parse as JSON for more details
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorJson.error || errorMessage;
+          } catch {
+            // If not JSON, use the text
+            if (errorText) errorMessage = errorText;
+          }
+        } catch (e) {
+          console.log('Could not read error response body:', e);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log('API Response:', result);
+      setDebugInfo((prev: any) => ({ ...prev, lastResult: result }));
+      
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.error('API call failed:', error);
+      
+      if (typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError') {
+        throw new Error('Request timed out after 5 minutes');
+      }
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error: Unable to connect to server. Check your internet connection and CORS settings.');
+      }
+      
+      throw error;
+    }
+  };
+
   const startSession = async () => {
     if (!user?.uid) {
       setError('Please log in to start a session.');
@@ -97,29 +267,18 @@ export default function JobListings() {
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/run`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          message: user.uid,
-          context: { user_id: user.uid },
-          session_id: sessionId,
-        }),
+      // Fixed: Send only the data that backend expects
+      const result = await makeApiCall(`${API_BASE_URL}/run`, {
+        message: `Initialize session for user ${user.uid}`,
+        context: { user_id: user.uid },
+        session_id: sessionId,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
       console.log('Session started:', result);
       setSessionStarted(true);
     } catch (error) {
       console.error('Failed to start session:', error);
-      setError('Failed to start session. Please check your connection and try again.');
+      setError(`Failed to start session: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -135,51 +294,41 @@ export default function JobListings() {
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/run`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          message: 'find me jobs',
-          context: { user_id: user.uid },
-          session_id: sessionId,
-        }),
+      // Fixed: Send only the data that backend expects
+      const result = await makeApiCall(`${API_BASE_URL}/run`, {
+        message: 'find me jobs',
+        context: { user_id: user.uid },
+        session_id: sessionId,
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
       
-      const result = await response.json();
       console.log('Jobs search result:', result);
       
-      // Parse jobs from API response
-      if (result.data && result.data.jobs && Array.isArray(result.data.jobs)) {
-        const newJobs: JobListing[] = result.data.jobs.map((job: any, index: number) => ({
-          id: `${sessionId}-${index}`,
-          listingNumber: job.listingNumber,
-          title: job.title || 'Job Title Not Available',
-          company: job.company || 'Company Not Specified',
-          location: job.location || 'Location Not Specified',
-          salary: job.salary || 'Salary Not Specified',
-          datePosted: job.datePosted || 'Recently Posted',
-          description: job.description || 'No description available.',
-          qualifications: Array.isArray(job.qualifications) ? job.qualifications : [],
-          benefits: Array.isArray(job.benefits) ? job.benefits : [],
-          jobLink: job.jobLink || job.url || '#',
-          easyApply: Boolean(job.easyApply),
-        }));
-        
+      // Parse jobs using the helper function
+      const newJobs = parseJobListings(result);
+      
+      if (newJobs.length > 0) {
+        console.log(`Successfully parsed ${newJobs.length} jobs:`, newJobs);
         setJobs(newJobs);
         await saveToStorageAndFirebase(newJobs);
+        setError(null);
       } else {
-        throw new Error('Invalid response format from API');
+        console.warn('No jobs found in response:', result);
+        
+        let errorMsg = 'No jobs found in the response.';
+        if (result.message) {
+          const preview = result.message.substring(0, 300);
+          errorMsg += ` Response preview: "${preview}${result.message.length > 300 ? '...' : ''}"`;
+        }
+        
+        setError(errorMsg);
       }
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
-      setError('Failed to fetch jobs. Please try again.');
+      setError(
+        `Failed to fetch jobs: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     } finally {
       setLoading(false);
     }
@@ -214,24 +363,13 @@ export default function JobListings() {
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/run`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          message: `${jobIndex + 1}`,
-          context: { user_id: user.uid },
-          session_id: sessionId,
-        }),
+      // Fixed: Send only the data that backend expects
+      const result = await makeApiCall(`${API_BASE_URL}/run`, {
+        message: `${jobIndex + 1}`,
+        context: { user_id: user.uid },
+        session_id: sessionId,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
       console.log('Research result:', result);
       
       // Update job status to viewed after research
@@ -243,7 +381,7 @@ export default function JobListings() {
       
     } catch (error) {
       console.error('Failed to research job:', error);
-      setError('Failed to research job. Please try again.');
+      setError(`Failed to research job: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setActionLoading(null);
     }
@@ -270,32 +408,19 @@ export default function JobListings() {
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/run`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          message: 'COMPLETE',
-          context: { user_id: user.uid },
-          session_id: sessionId,
-        }),
+      // Fixed: Send only the data that backend expects - consistent format
+      const result = await makeApiCall(`${API_BASE_URL}/run`, {
+        message: 'COMPLETE',
+        context: { user_id: user.uid },
+        session_id: sessionId,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
       console.log('Session completed:', result);
-      
-      // Optionally reset session state
       setSessionStarted(false);
       
     } catch (error) {
       console.error('Failed to complete session:', error);
-      setError('Failed to complete session. Please try again.');
+      setError(`Failed to complete session: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -308,6 +433,33 @@ export default function JobListings() {
       case 'applied': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    }
+  };
+
+  // Test connection function
+  const testConnection = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+      
+      if (response.ok) {
+        setError('✅ Connection test successful!');
+      } else {
+        setError(`❌ Connection test failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      setError(
+        `❌ Connection test failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -369,22 +521,58 @@ export default function JobListings() {
           )}
         </div>
 
+        {/* Debug Info */}
+        {debugInfo && (
+          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-6 text-xs">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-semibold">Debug Information:</h3>
+              <button 
+                onClick={() => setDebugInfo(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+            <pre className="overflow-auto max-h-40 text-gray-700 dark:text-gray-300">
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+          </div>
+        )}
+
         {/* Error Display */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-            <div className="text-red-800 dark:text-red-200 text-sm">{error}</div>
-            <button 
-              onClick={() => setError(null)}
-              className="text-red-600 dark:text-red-400 text-xs underline mt-1"
-            >
-              Dismiss
-            </button>
+          <div className={`border rounded-lg p-4 mb-6 ${
+            error.startsWith('✅') 
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
+              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-sm">{error}</div>
+                <button 
+                  onClick={() => setError(null)}
+                  className="text-xs underline mt-1 opacity-75 hover:opacity-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
         {/* Control Panel */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
           <div className="flex flex-wrap gap-4 justify-center">
+            <button
+              onClick={testConnection}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertCircle className="w-4 h-4" />}
+              Test Connection
+            </button>
+
             <button
               onClick={startSession}
               disabled={loading || sessionStarted}
