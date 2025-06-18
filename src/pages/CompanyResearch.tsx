@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, deleteDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 import { db, auth } from "../firebase";
@@ -13,9 +13,6 @@ const CompanyResearch = () => {
   const [job, setJob] = useState<JobListing | null>(null);
   // Define a type for research data or use 'unknown' if not yet defined
   const [researchData, setResearchData] = useState<unknown>(null);
-  const [isResearching, setIsResearching] = useState(jobId === "new");
-  const [companyName, setCompanyName] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,16 +37,8 @@ const CompanyResearch = () => {
     fetchData();
   }, [jobId, user?.uid]);
 
-  const startResearch = () => {
-    setIsResearching(true);
-    setTimeout(() => {
-      setIsResearching(false);
-  
-    }, 3000);
-  };
-
-  const title = job?.title || jobTitle;
-  const company = job?.company || companyName;
+  const title = job?.title;
+  const company = job?.company;
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -60,33 +49,29 @@ const CompanyResearch = () => {
         </p>
       </div>
 
-      {jobId === "new" && !researchData ? (
+      {researchData ? (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4 dark:text-white">Research a New Company</h2>
-          <input
-            className="w-full mb-3 p-2 rounded-md border dark:bg-gray-700 dark:text-white"
-            placeholder="Company Name"
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-          />
-          <input
-            className="w-full mb-4 p-2 rounded-md border dark:bg-gray-700 dark:text-white"
-            placeholder="Job Title"
-            value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
-          />
+          <h2 className="text-xl font-semibold mb-4 dark:text-white">Company Research Details</h2>
+          <pre className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap">{JSON.stringify(researchData, null, 2)}</pre>
           <button
-            disabled={!companyName || isResearching}
-            onClick={startResearch}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+            onClick={async () => {
+              if (!user?.uid || !jobId) return;
+              try {
+                localStorage.removeItem("companyResearch");
+                const ref = doc(db, "users", user.uid, "companyResearch", jobId);
+                await deleteDoc(ref);
+                setResearchData(null);
+              } catch (err) {
+                console.error("Failed to delete company research:", err);
+              }
+            }}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md"
           >
-            {isResearching ? "Researching..." : "Start Research"}
+            Delete Research
           </button>
         </div>
       ) : (
-        <>
-
-        </>
+        <p className="text-gray-500 dark:text-gray-400">No company research available.</p>
       )}
     </div>
   );

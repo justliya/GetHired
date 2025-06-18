@@ -1,11 +1,17 @@
 
+
+import React from 'react';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { Heart, Building2, MapPin, DollarSign, Calendar, Trash2, Search, CheckCircle, Clock, Loader2, AlertCircle } from 'lucide-react';
+import { Search, CheckCircle, Clock, Loader2, AlertCircle } from 'lucide-react';
+import JobCard from '../components/JobCard';
+import Card from '../components/Card';
+import Button from '../components/Button';
 import { auth, db } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
+
 
 // Types
 interface JobListing {
@@ -23,6 +29,7 @@ interface JobListing {
   easyApply: boolean;
   favorite: boolean;
   status: 'new' | 'viewed' | 'applied' | 'rejected';
+  jobLink?: string;
 }
 
 const API_BASE_URL = 'https://gethired-agents-104139545590.us-central1.run.app';
@@ -42,12 +49,11 @@ export default function JobListings() {
     return stored === 'true';
   });
   const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const saveToStorageAndFirebase = async (updatedJobs: JobListing[]) => {
+  const saveToStorageAndFirebase = React.useCallback(async (updatedJobs: JobListing[]) => {
     try {
       // Save to sessionStorage
       sessionStorage.setItem(sessionStorageKey, JSON.stringify(updatedJobs));
@@ -65,7 +71,7 @@ export default function JobListings() {
       console.error('Failed to save jobs:', error);
       setError('Failed to save jobs. Please try again.');
     }
-  };
+  }, [user, sessionId, sessionStorageKey]);
 
   useEffect(() => {
     if (!user || authLoading) return;
@@ -103,7 +109,7 @@ export default function JobListings() {
     if (jobs.length > 0) {
       saveToStorageAndFirebase(jobs);
     }
-  }, [jobs]);
+  }, [jobs.length, saveToStorageAndFirebase]);
 
   function parseJobListings(responseData: any): JobListing[] {
     console.log('Full response data:', responseData);
@@ -456,19 +462,8 @@ export default function JobListings() {
     }
   };
 
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'viewed': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'applied': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-    }
-  };
+  
+ 
 
   // Test connection function
   const testConnection = async () => {
@@ -596,63 +591,63 @@ export default function JobListings() {
         )}
 
         {/* Control Panel */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+        <Card className="mb-8">
           <div className="flex flex-wrap gap-4 justify-center">
-            <button
+            <Button
               onClick={testConnection}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+              variant="secondary"
+              size="md"
+              icon={loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertCircle className="w-4 h-4" />}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertCircle className="w-4 h-4" />}
               Test Connection
-            </button>
+            </Button>
 
-            <button
+            <Button
               onClick={startSession}
               disabled={loading || sessionStarted}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-                sessionStarted
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50'
-              }`}
+              variant={sessionStarted ? 'success' : 'primary'}
+              size="md"
+              icon={
+                loading && !sessionStarted ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : sessionStarted ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  <Clock className="w-4 h-4" />
+                )
+              }
             >
-              {loading && !sessionStarted ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : sessionStarted ? (
-                <CheckCircle className="w-4 h-4" />
-              ) : (
-                <Clock className="w-4 h-4" />
-              )}
               {sessionStarted ? 'Session Active' : 'Start Session'}
-            </button>
+            </Button>
 
-            <button
+            <Button
               onClick={searchJobs}
               disabled={!sessionStarted || loading}
-              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+              variant="success"
+              size="md"
+              icon={
+                loading && sessionStarted ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )
+              }
             >
-              {loading && sessionStarted ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Search className="w-4 h-4" />
-              )}
               Search Jobs
-            </button>
+            </Button>
 
-            <button
+            <Button
               onClick={completeSession}
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+              variant="secondary"
+              size="md"
+              icon={loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
             >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4" />
-              )}
               Complete Session
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
 
         {/* Job Stats */}
         {jobs.length > 0 && (
@@ -685,130 +680,14 @@ export default function JobListings() {
         {/* Job Listings Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {jobs.map((job) => (
-            <div
+            <JobCard
               key={job.id}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group"
-            >
-              {/* Card Header */}
-              <div className="p-6 pb-4">
-                <div className="flex justify-between items-start mb-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(job.status)}`}>
-                    {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-                  </span>
-                  <button
-                    onClick={() => handleFavorite(job.id)}
-                    className={`p-2 rounded-full transition-all ${
-                      job.favorite
-                        ? 'text-red-500 bg-red-50 dark:bg-red-900/20'
-                        : 'text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-                    }`}
-                  >
-                    <Heart className={`w-5 h-5 ${job.favorite ? 'fill-current' : ''}`} />
-                  </button>
-                </div>
-
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 line-clamp-2">
-                  {job.title}
-                </h3>
-
-                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 mb-2">
-                  <Building2 className="w-4 h-4" />
-                  <span className="text-sm font-medium">{job.company}</span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{job.location}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{job.datePosted}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 mb-4">
-                  <DollarSign className="w-4 h-4 text-green-600" />
-                  <span className="text-green-600 font-semibold">{job.salary}</span>
-                  {job.easyApply && (
-                    <span className="ml-auto bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium">
-                      Easy Apply
-                    </span>
-                  )}
-                </div>
-
-                {(() => {
-                  const desc = job.description;
-                  const isExpanded = expanded[job.id];
-                  const limit = 150;
-                  const shouldTruncate = desc.length > limit;
-                  return (
-                    <div className="mb-4">
-                      <p className="text-gray-700 dark:text-gray-300 text-sm">
-                        {shouldTruncate && !isExpanded ? `${desc.slice(0, limit)}...` : desc}
-                      </p>
-                      {shouldTruncate && (
-                        <button
-                          onClick={() => toggleExpand(job.id)}
-                          className="mt-1 text-blue-600 hover:underline text-xs"
-                        >
-                          {isExpanded ? 'Show Less' : 'Read More'}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Qualifications */}
-                {job.qualifications.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                      Key Requirements
-                    </h4>
-                    <div className="flex flex-wrap gap-1">
-                      {job.qualifications.slice(0, 3).map((qual, idx) => (
-                        <span
-                          key={idx}
-                          className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs"
-                        >
-                          {qual}
-                        </span>
-                      ))}
-                      {job.qualifications.length > 3 && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          +{job.qualifications.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Card Actions */}
-              <div className="px-6 pb-6">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleResearch(job.id)}
-                    disabled={actionLoading === job.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all disabled:opacity-50"
-                  >
-                    {actionLoading === job.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    Research
-                  </button>
-                  
-                  <button
-                    onClick={() => handleDelete(job.id)}
-                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+              job={job}
+              onFavoriteToggle={(jobObj) => handleFavorite(jobObj.id)}
+              onResearch={(jobObj) => handleResearch(jobObj.id)}
+              onTailorResume={(jobObj) => console.log('Tailor resume clicked for', jobObj.id)}
+              onDelete={(jobObj) => handleDelete(jobObj.id)}
+            />
           ))}
         </div>
 
