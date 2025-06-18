@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { Heart, Building2, MapPin, DollarSign, Calendar, Trash2, Search, CheckCircle, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
@@ -72,7 +72,6 @@ export default function JobListings() {
 
     const loadJobs = async () => {
       try {
-        // Try to rehydrate jobs from sessionStorage first (even if already mounted)
         const stored = sessionStorage.getItem(sessionStorageKey);
         if (stored) {
           const parsedJobs = JSON.parse(stored);
@@ -283,7 +282,7 @@ export default function JobListings() {
     setError(null);
   
     try {
-      // Fixed: Send only the data that backend expects
+      
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
         message: `Initialize session for user ${user.uid}`,
         context: { user_id: user.uid },
@@ -311,7 +310,7 @@ export default function JobListings() {
     setError(null);
     
     try {
-      // Fixed: Send only the data that backend expects
+      
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
         message: 'find me jobs',
         context: { user_id: user.uid },
@@ -320,7 +319,7 @@ export default function JobListings() {
       
       console.log('Jobs search result:', result);
       
-      // Parse jobs using the helper function
+      
       const newJobs = parseJobListings(result);
       
       if (newJobs.length > 0) {
@@ -353,11 +352,25 @@ export default function JobListings() {
 
   const handleFavorite = async (jobId: string) => {
     try {
-      const updatedJobs = jobs.map(job => 
+      const updatedJobs = jobs.map(job =>
         job.id === jobId ? { ...job, favorite: !job.favorite } : job
       );
       setJobs(updatedJobs);
       await saveToStorageAndFirebase(updatedJobs);
+
+      if (user?.uid) {
+        const favoritedJob = updatedJobs.find(job => job.id === jobId);
+        const favoriteRef = doc(db, 'users', user.uid, 'favorites', jobId);
+
+        if (favoritedJob?.favorite) {
+          await setDoc(favoriteRef, favoritedJob);
+        } else {
+          await deleteDoc(favoriteRef);
+         
+          const jobListingRef = doc(db, 'users', user.uid, 'jobListings', jobId);
+          await deleteDoc(jobListingRef);
+        }
+      }
     } catch (error) {
       console.error('Failed to update favorite:', error);
       setError('Failed to update favorite status.');
@@ -530,7 +543,7 @@ export default function JobListings() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            Job Search Dashboard
+            Job Search Agent
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
             Find your next career opportunity with AI-powered job matching
