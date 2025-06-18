@@ -1,6 +1,6 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Heart, Building2, MapPin, DollarSign, Calendar, Trash2, Search, CheckCircle, Clock, Loader2, AlertCircle } from 'lucide-react';
@@ -29,17 +29,25 @@ const API_BASE_URL = 'https://gethired-agents-104139545590.us-central1.run.app';
 
 export default function JobListings() {
   const [user, authLoading, authError] = useAuthState(auth);
-  const [sessionId] = useState(() => `conv-${uuidv4()}`);
+  const [sessionId] = useState(() => {
+    const existing = sessionStorage.getItem('active-session-id');
+    const newId = existing || `conv-${uuidv4()}`;
+    sessionStorage.setItem('active-session-id', newId);
+    return newId;
+  });
   const sessionStorageKey = `session-${sessionId}`;
   const [jobs, setJobs] = useState<JobListing[]>([]);
-  const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionStarted, setSessionStarted] = useState(() => {
+    const stored = sessionStorage.getItem(`session-started-${sessionId}`);
+    return stored === 'true';
+  });
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const saveToStorageAndFirebase = useCallback(async (updatedJobs: JobListing[]) => {
+  const saveToStorageAndFirebase = async (updatedJobs: JobListing[]) => {
     try {
       // Save to sessionStorage
       sessionStorage.setItem(sessionStorageKey, JSON.stringify(updatedJobs));
@@ -57,31 +65,30 @@ export default function JobListings() {
       console.error('Failed to save jobs:', error);
       setError('Failed to save jobs. Please try again.');
     }
-  }, [user, sessionId, sessionStorageKey]);
+  };
 
   useEffect(() => {
     if (!user || authLoading) return;
-    
+
     const loadJobs = async () => {
       try {
-        // First try to load from sessionStorage
+        // Try to rehydrate jobs from sessionStorage first (even if already mounted)
         const stored = sessionStorage.getItem(sessionStorageKey);
         if (stored) {
           const parsedJobs = JSON.parse(stored);
           setJobs(parsedJobs);
-          await saveToStorageAndFirebase(parsedJobs);
         }
-        
+
         // Then try to load from Firebase
         const userDocRef = doc(db, 'users', user.uid, 'sessions', sessionId);
         const snap = await getDoc(userDocRef);
-        
+
         if (snap.exists()) {
           const data = snap.data();
           const savedJobs = data.jobs || [];
-          if (savedJobs.length > 0) {
+          // Only update if jobs from sessionStorage weren't already set
+          if (savedJobs.length > 0 && (!stored || jobs.length === 0)) {
             setJobs(savedJobs);
-            await saveToStorageAndFirebase(savedJobs);
           }
         }
       } catch (error) {
@@ -89,9 +96,15 @@ export default function JobListings() {
         setError('Failed to load saved jobs.');
       }
     };
-    
+
     loadJobs();
-  }, [user, authLoading, sessionId, sessionStorageKey, saveToStorageAndFirebase]);
+  }, [user, authLoading, sessionId, sessionStorageKey]);
+
+  useEffect(() => {
+    if (jobs.length > 0) {
+      saveToStorageAndFirebase(jobs);
+    }
+  }, [jobs]);
 
   function parseJobListings(responseData: any): JobListing[] {
     console.log('Full response data:', responseData);
@@ -265,10 +278,10 @@ export default function JobListings() {
       setError('Please log in to start a session.');
       return;
     }
-    
+  
     setLoading(true);
     setError(null);
-    
+  
     try {
       // Fixed: Send only the data that backend expects
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
@@ -279,6 +292,7 @@ export default function JobListings() {
 
       console.log('Session started:', result);
       setSessionStarted(true);
+      sessionStorage.setItem(`session-started-${sessionId}`, 'true');
     } catch (error) {
       console.error('Failed to start session:', error);
       setError(`Failed to start session: ${error instanceof Error ? error.message : String(error)}`);
@@ -406,10 +420,10 @@ export default function JobListings() {
       setError('Please log in to complete session.');
       return;
     }
-    
+  
     setLoading(true);
     setError(null);
-    
+  
     try {
       // Fixed: Send only the data that backend expects - consistent format
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
@@ -420,7 +434,7 @@ export default function JobListings() {
 
       console.log('Session completed:', result);
       setSessionStarted(false);
-      
+      sessionStorage.removeItem(`session-started-${sessionId}`);
     } catch (error) {
       console.error('Failed to complete session:', error);
       setError(`Failed to complete session: ${error instanceof Error ? error.message : String(error)}`);
