@@ -1,0 +1,362 @@
+<mxfile host="app.diagrams.net" modified="2025-06-16T14:00:00.000Z" agent="5.0" version="24.7.16" type="device">
+  <diagram name="GetHired AI Platform" id="gethired-final">
+    <mxGraphModel dx="1422" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Background Layers -->
+        <mxCell id="bg-frontend" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E8;strokeColor=#43A047;strokeWidth=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="1320" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="bg-api" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FF9800;strokeWidth=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="220" width="1320" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="bg-agents" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="1320" height="280" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="bg-cloud" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#2196F3;strokeWidth=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="640" width="900" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="bg-external" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#F44336;strokeWidth=4;" vertex="1" parent="1">
+          <mxGeometry x="960" y="640" width="400" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- TITLE -->
+        <mxCell id="title" value="GetHired AI Platform - System Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=36;fontStyle=1;fontColor=#1A237E;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="400" y="20" width="600" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- LAYER TITLES -->
+        <mxCell id="l1-title" value="FRONTEND" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#1B5E20;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="60" y="90" width="150" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l2-title" value="API LAYER" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#E65100;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="60" y="230" width="150" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l3-title" value="AI AGENTS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="60" y="350" width="150" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l4-title" value="GOOGLE CLOUD" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#0D47A1;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="60" y="650" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l5-title" value="EXTERNAL APIs" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#B71C1C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="980" y="650" width="200" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- FRONTEND COMPONENTS -->
+        <mxCell id="react-auth" value="Auth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#43A047;strokeColor=#2E7D32;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="220" y="125" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="react-dash" value="Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#43A047;strokeColor=#2E7D32;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="320" y="125" width="100" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="react-jobs" value="Job Search" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#43A047;strokeColor=#2E7D32;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="440" y="125" width="100" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="react-company" value="Company Research" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#43A047;strokeColor=#2E7D32;fontSize=14;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="560" y="125" width="120" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="react-resume" value="Resume AI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#43A047;strokeColor=#2E7D32;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="700" y="125" width="100" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="react-profile" value="Profile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#43A047;strokeColor=#2E7D32;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="820" y="125" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="react-chat" value="AI ChatBot" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#43A047;strokeColor=#2E7D32;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="920" y="125" width="100" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Firebase -->
+        <mxCell id="firebase" value="Firebase Auth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF5722;strokeColor=#D84315;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="125" width="120" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- API LAYER -->
+        <mxCell id="fastapi" value="FastAPI Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9800;strokeColor=#F57C00;fontSize=18;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="220" y="250" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cors" value="CORS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFC107;strokeColor=#FF8F00;fontSize=16;fontStyle=1;fontColor=black;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="400" y="250" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="rest" value="REST API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9800;strokeColor=#F57C00;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="500" y="250" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a2a" value="A2A Protocol" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF6F00;strokeColor=#E65100;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="640" y="250" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- MAIN AI AGENTS -->
+        <mxCell id="coord-agent" value="COORDINATOR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#9C27B0;strokeColor=#7B1FA2;fontSize=18;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="220" y="390" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="job-coach" value="JOB COACH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#673AB7;strokeColor=#512DA8;fontSize=18;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="380" y="390" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="job-listing" value="JOB LISTING" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#673AB7;strokeColor=#512DA8;fontSize=18;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="520" y="390" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="company-research" value="COMPANY RESEARCH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#673AB7;strokeColor=#512DA8;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="660" y="390" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="resume-main" value="RESUME AI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#673AB7;strokeColor=#512DA8;fontSize=18;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="840" y="390" width="120" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- RESUME AI PIPELINE -->
+        <mxCell id="pipeline-title" value="8-Stage Resume AI Pipeline" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="220" y="470" width="800" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Pipeline stages -->
+        <mxCell id="stage1" value="1. Base Cleanup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="220" y="510" width="110" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stage2" value="2. Job Optimization" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="340" y="510" width="120" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stage3" value="3. Experience Opt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="470" y="510" width="120" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stage4" value="4. ATS Optimization" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="600" y="510" width="120" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stage5" value="5. Humanize" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="220" y="560" width="100" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stage6" value="6. Proof Reader" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="330" y="560" width="110" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stage7" value="7. Format Helper" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="450" y="560" width="110" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="stage8" value="8. Doc Creator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#9C27B0;fontSize=14;fontStyle=1;fontColor=#4A148C;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="570" y="560" width="110" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- GCP SERVICES -->
+        <mxCell id="cloud-run" value="Cloud Run&#xa;Container Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2196F3;strokeColor=#1976D2;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="80" y="690" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="vertex-ai" value="Vertex AI&#xa;Gemini Models" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4285F4;strokeColor=#1976D2;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="240" y="690" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="firestore" value="Firestore&#xa;Database" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9800;strokeColor=#F57C00;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="400" y="690" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="storage" value="Firebase&#xa;Storage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF5722;strokeColor=#D84315;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="540" y="690" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cloud-build" value="Cloud Build&#xa;CI/CD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34A853;strokeColor=#2E7D32;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="680" y="690" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="iam" value="IAM&#xa;Security" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EA4335;strokeColor=#D32F2F;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="820" y="690" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- EXTERNAL SERVICES -->
+        <mxCell id="linkedin" value="LinkedIn" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0077B5;strokeColor=#005885;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="980" y="690" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="indeed" value="Indeed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2557A7;strokeColor=#1E4B99;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1070" y="690" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="glassdoor" value="Glassdoor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0CAA41;strokeColor=#0A8A35;fontSize=16;fontStyle=1;fontColor=white;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="690" width="90" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="render-mcp" value="Render MCP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#46E3B7;strokeColor=#3DD49C;fontSize=16;fontStyle=1;fontColor=black;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="690" width="80" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- PERFORMANCE METRICS -->
+        <mxCell id="perf-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#9E9E9E;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="350" width="280" height="150" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="perf-title" value="Performance Specs" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#424242;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="360" width="240" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="perf-text" value="• Memory: 2-5Gi per service&#xa;• CPU: 2.0-4.0 cores&#xa;• Timeout: 60-90 seconds&#xa;• Autoscaling: 0-10 instances&#xa;• Response: &lt;3s average&#xa;• Uptime: 99.9% SLA" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=0;fontColor=#424242;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="395" width="240" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- KEY FEATURES -->
+        <mxCell id="feat-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E8;strokeColor=#43A047;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="520" width="280" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="feat-title" value="Key Features" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#2E7D32;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="530" width="240" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="feat-text" value="• AI-Powered Resume Tailoring&#xa;• Company Research Automation&#xa;• ATS Optimization&#xa;• Real-time Job Matching" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=0;fontColor=#2E7D32;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="565" width="240" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- ARROWS -->
+        <mxCell id="arrow1" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;strokeWidth=3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="react-jobs" target="fastapi">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="490" y="300" as="sourcePoint" />
+            <mxPoint x="540" y="250" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow2" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;strokeWidth=3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="fastapi" target="coord-agent">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="300" y="340" as="sourcePoint" />
+            <mxPoint x="350" y="290" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow3" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#666666;strokeWidth=3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="coord-agent" target="vertex-ai">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="290" y="480" as="sourcePoint" />
+            <mxPoint x="340" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Pipeline arrows -->
+        <mxCell id="p-arrow1" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage1" target="stage2">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="330" y="530" as="sourcePoint" />
+            <mxPoint x="380" y="480" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="p-arrow2" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage2" target="stage3">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="460" y="530" as="sourcePoint" />
+            <mxPoint x="510" y="480" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="p-arrow3" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage3" target="stage4">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="590" y="530" as="sourcePoint" />
+            <mxPoint x="640" y="480" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="p-arrow4" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage4" target="stage5">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="660" y="550" as="sourcePoint" />
+            <mxPoint x="270" y="560" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="660" y="575" />
+              <mxPoint x="270" y="575" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="p-arrow5" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage5" target="stage6">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="320" y="580" as="sourcePoint" />
+            <mxPoint x="370" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="p-arrow6" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage6" target="stage7">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="440" y="580" as="sourcePoint" />
+            <mxPoint x="490" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="p-arrow7" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="stage7" target="stage8">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="560" y="580" as="sourcePoint" />
+            <mxPoint x="610" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Agent Communication Lines -->
+        <mxCell id="a2a-line1" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;dashed=1;dashPattern=5 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="360" y="420" as="sourcePoint" />
+            <mxPoint x="380" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="a2a-line2" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;dashed=1;dashPattern=5 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="420" as="sourcePoint" />
+            <mxPoint x="520" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="a2a-line3" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;dashed=1;dashPattern=5 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="640" y="420" as="sourcePoint" />
+            <mxPoint x="660" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="a2a-line4" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;strokeColor=#9C27B0;strokeWidth=2;dashed=1;dashPattern=5 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="820" y="420" as="sourcePoint" />
+            <mxPoint x="840" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- External API arrows -->
+        <mxCell id="ext-arrow1" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#F44336;strokeWidth=2;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="linkedin" target="job-listing">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1020" y="680" as="sourcePoint" />
+            <mxPoint x="580" y="460" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1020" y="620" />
+              <mxPoint x="580" y="620" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend-title" value="LEGEND" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#424242;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="60" y="780" width="100" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-text" value="→ Data Flow   ⟷ A2A Communication   ⚡ Real-time Processing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=0;fontColor=#424242;fontFamily=Helvetica;" vertex="1" parent="1">
+          <mxGeometry x="60" y="810" width="600" height="25" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
