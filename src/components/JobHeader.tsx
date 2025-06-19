@@ -64,7 +64,7 @@ export default function JobHeader({
             onClick={onToggleAgentJobs}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md"
           >
-            {useAgentJobs ? "Show Sample Jobs" : `Show AI Jobs (${agentJobsCount})`}
+            {useAgentJobs ? "Show Saved Jobs" : `Show New Job Listings (${agentJobsCount})`}
           </button>
         )}
 
