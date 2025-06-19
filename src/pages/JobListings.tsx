@@ -31,16 +31,12 @@ interface JobListing {
   jobLink?: string;
 }
 
-const API_BASE_URL = 'https://gethired-agents-104139545590.us-central1.run.app';
+const API_BASE_URL = "https://gethired-agents-104139545590.us-central1.run.app";
 
-export default function JobListings() {
-  const [user, authLoading, authError] = useAuthState(auth);
-  const [sessionId] = useState(() => {
-    const existing = sessionStorage.getItem('active-session-id');
-    const newId = existing || `conv-${uuidv4()}`;
-    sessionStorage.setItem('active-session-id', newId);
-    return newId;
-  });
+const JobListings = () => {
+  const navigate = useNavigate();
+  const [user, loading, error] = useAuthState(auth);
+  const sessionId = useRef(`conv-${uuidv4()}`).current;
   const sessionStorageKey = `session-${sessionId}`;
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [sessionStarted, setSessionStarted] = useState(() => {
@@ -583,45 +579,27 @@ const handleResearch = async (jobId: string) => {
   //   }
   // };
 
-  // Show loading state while checking authentication
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Reset session
+  const handleNewSession = () => {
+    setAgentJobs([]);
+    setUseAgentJobs(false);
+    setSessionStarted(false);
+    sessionStorage.removeItem(sessionStorageKey);
+    setConfirmation("New session started!");
+    setTimeout(() => setConfirmation(""), 2000);
+  };
 
-  // Show error state if authentication failed
-  if (authError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 mb-4">Authentication Error</div>
-          <p className="text-gray-600 dark:text-gray-300">Please try refreshing the page.</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="py-12 text-center text-gray-600">Initializing auth…</div>;
+  if (error) return <div className="py-12 text-center text-red-600">Auth Error: {error.message}</div>;
 
-  // Show login required state
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Please log in to access job listings
-          </div>
-          <p className="text-gray-600 dark:text-gray-300">
-            You need to be authenticated to use this feature.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Display and filter jobs
+  const displayJobs = useAgentJobs ? agentJobs : profileJobs;
+  const filteredJobs = displayJobs.filter((job) => {
+    if (searchQuery && ![job.title, job.company].some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))) return false;
+    if (locationFilter.length && !locationFilter.includes(job.location)) return false;
+    if (statusFilter.length && !statusFilter.includes(job.status)) return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900">
@@ -796,33 +774,39 @@ const handleResearch = async (jobId: string) => {
             />
           ))}
         </div>
-
-        {/* Empty State */}
-        {jobs.length === 0 && !loading && (
-          <div className="text-center py-16">
-            <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No Jobs Found
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Start a session and search for jobs to see opportunities here.
-            </p>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-16">
-            <Loader2 className="w-16 h-16 text-blue-600 mx-auto mb-4 animate-spin" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              {sessionStarted ? 'Searching for Jobs...' : 'Starting Session...'}
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300">
-              Please wait while we process your request.
-            </p>
-          </div>
+        {sessionStarted && (
+          <p className="text-sm text-green-600 mt-2">
+            ✓ Session active - Jobs will be automatically saved to session storage
+          </p>
         )}
       </div>
+
+      {confirmation && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          className="bg-green-100 text-green-800 p-2 rounded mb-4 text-center"
+        >
+          {confirmation}
+        </motion.div>
+      )}
+
+      <JobFilters
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        onClear={handleClearFilters}
+      />
+
+      <AnimatePresence>
+        <JobResults
+          jobs={filteredJobs}
+          onResearch={job => navigate(`/company-research/${job.id}`)}
+          onFavoriteToggle={handleFavoriteToggle}
+        />
+      </AnimatePresence>
     </div>
   );
-}
+};
+
+export default JobListings;

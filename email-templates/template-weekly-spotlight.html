@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Weekly Career Spotlight</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #2d3748;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .hero-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="40" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="80" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+        
+        .logo {
+            width: 70px;
+            height: auto;
+            margin-bottom: 24px;
+            filter: brightness(0) invert(1);
+            position: relative;
+            z-index: 2;
+        }
+        
+        .hero-title {
+            color: #ffffff;
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 2;
+            letter-spacing: -0.5px;
+        }
+        
+        .hero-subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 18px;
+            position: relative;
+            z-index: 2;
+            font-weight: 400;
+        }
+        
+        .spotlight-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            display: inline-block;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .section-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        
+        .section-subtitle {
+            color: #718096;
+            font-size: 16px;
+        }
+        
+        .featured-job {
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .featured-job::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .featured-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+        
+        .job-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+            text-decoration: none;
+            display: block;
+        }
+        
+        .job-title:hover {
+            color: #667eea;
+        }
+        
+        .job-company {
+            font-size: 18px;
+            color: #4a5568;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+        
+        .job-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: #718096;
+        }
+        
+        .meta-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        
+        .job-description {
+            font-size: 15px;
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #ffffff;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .cta-container {
+            text-align: center;
+        }
+        
+        .apply-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 16px 32px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 16px;
+            display: inline-block;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .apply-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .more-jobs {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .job-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .job-list-item:last-child {
+            border-bottom: none;
+        }
+        
+        .job-list-content {
+            flex: 1;
+        }
+        
+        .job-list-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .job-list-title:hover {
+            color: #667eea;
+        }
+        
+        .job-list-company {
+            font-size: 14px;
+            color: #718096;
+        }
+        
+        .job-list-cta {
+            background: #667eea;
+            color: #ffffff;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .job-list-cta:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+        
+        .footer {
+            background: #f8fafc;
+            padding: 40px 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .footer-message {
+            color: #4a5568;
+            font-size: 16px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .footer-links {
+            margin-bottom: 20px;
+        }
+        
+        .footer-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 0 16px;
+            font-size: 14px;
+        }
+        
+        .footer-link:hover {
+            color: #5a67d8;
+        }
+        
+        .unsubscribe {
+            color: #a0aec0;
+            font-size: 12px;
+            text-decoration: none;
+        }
+        
+        .unsubscribe:hover {
+            color: #718096;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                margin: 0 10px;
+                border-radius: 12px;
+            }
+            
+            .hero-banner {
+                padding: 30px 20px;
+            }
+            
+            .hero-title {
+                font-size: 26px;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .featured-job {
+                padding: 20px;
+            }
+            
+            .job-meta {
+                grid-template-columns: 1fr;
+            }
+            
+            .job-list-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            
+            .footer {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero-banner">
+            <span class="spotlight-badge">Weekly Spotlight</span>
+            <svg class="logo" viewBox="0 0 2040 1908" xmlns="http://www.w3.org/2000/svg">
+                <path d="m0 0h2040v1908h-2040z" fill="currentColor"/>
+                <path d="m1286,37h140l35 1 7 1 6 7 7 24 18 73 8 35 6 25 3 5 10 2 21 6h7l7 2-2 2 13 3 2-1 16 5v1l-8-1 21 7-5-2 4-1 11 4-4 1 4 2 16 6 15 6-1 2 32 14 25 11-1-4h2l2 3 18-14 14-10 15-12 13-10 12-9 19-14 18-14 16-11 4-1v-2l4 1h2l5 2v3h4l11 8 13 11 3 2v2l4 2 16 13 1 4 7 4 4 1v2l4 2 10 9 11 8 5 6-1 1 6 3 10 11h4l4 3v2l4 2 10 8 5 5 3 2v2l2 1 25 25 11 9 1 5-6 12-6 10-15 26-17 32-14 25-8 11-9 10-14 15-15 15-7 8-9 10-14 15-9 10-7 7-7 8-7 7-7 8-15 16-8 9-5 3-4 1-23 1h-49l-5-3-12-14-12-13-8-8-8-7-13-11-14-11-20-15-27-18-25-15-16-8-17-8-32-13-30-10-27-8-30-7-28-4-22-2-19-1h-62l-25 2-31 5-44 11-32 10-21 8-21 9-27 13-21 12-24 15-23 16-14 11-14 12-12 11-13 12-15 15-7 8-8 8-11 14-9 12-10 13-10 15-12 19-9 16-12 23-9 19-8 21-7 20-7 22-6 25-7 36-4 37-2 40v15l2 16v11l-9 8-10 7-16 13-13 10-18 14-14 11-12 9-17 14-13 10-12 9-15 12-17 12-8 7-11 9-7 6-5-1-1 2-2-7-9-61-7-38-4-4-11-5-50-18-36-13-27-9-15-6-8-6v-22l4-65 4-46 6-51 8-56 4-8 4-3 18-4 38-5 41-6 27-3 29-5 4-2 22-55 15-33 15-29 10-17 12-19 14-24 1-3v-9l-13-26-10-17-6-12-12-22-14-26-4-7-2-1-3-9-3-6-2 1-1-4v-9h-2v5l-2-3-1-4v-7l-2-1 28-28 8-7 12-11 9-7v-3l4-2 5-3 1-4 5-1 10-10 8-7 7-7 8-7 10-9 22-18 13-11 11-9 13-10 13-9 22 14h3l7 5v3l14 10 5 3 4 1 1 4 5 1 2 2-1 1 18 13 6 1 1 4 17 12 14 10 12 9 4 2h6l38-18 39-16 20-8 37-12 15-5 15-4 12-4 8-5 3-7 8-31 10-42 9-41 7-30 6-11 3-3 3-1 16-1z" fill="currentColor"/>
+            </svg>
+            <h1 class="hero-title">Your Weekly Career Spotlight</h1>
+            <p class="hero-subtitle">Discover premium opportunities curated just for you</p>
+        </div>
+        
+        <div class="content">
+            <div class="section-header">
+                <h2 class="section-title">🌟 Featured Opportunity</h2>
+                <p class="section-subtitle">This week's hand-picked role that matches your aspirations</p>
+            </div>
+            
+            <div class="featured-job">
+                <span class="featured-badge">Top Match</span>
+                <a href="{{featuredJob.applyUrl}}" class="job-title">{{featuredJob.title}}</a>
+                <div class="job-company">{{featuredJob.company}}</div>
+                
+                <div class="job-meta">
+                    <div class="meta-item">
+                        <svg class="meta-icon" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2L3 7v11a2 2 0 002 2h4v-6h2v6h4a2 2 0 002-2V7l-7-5z"/>
+                        </svg>
+                        {{featuredJob.location}}
+                    </div>
+                    <div class="meta-item">
+                        <svg class="meta-icon" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8 5a1 1 0 100 2v6a1 1 0 001 1h1a5 5 0 10.9-9.9 1.021 1.021 0 00-.9-.1zm0 1a4 4 0 110 8 4 4 0 010-8z"/>
+                        </svg>
+                        {{featuredJob.salary}}
+                    </div>
+                    <div class="meta-item">
+                        <svg class="meta-icon" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                        {{featuredJob.type}}
+                    </div>
+                </div>
+                
+                <div class="job-description">{{featuredJob.description}}</div>
+                
+                <div class="cta-container">
+                    <a href="{{featuredJob.applyUrl}}" class="apply-button">Apply for This Role</a>
+                </div>
+            </div>
+            
+            <div class="more-jobs">
+                <div class="section-header">
+                    <h2 class="section-title">💼 More Opportunities</h2>
+                    <p class="section-subtitle">Additional roles that caught our attention</p>
+                </div>
+                
+                {{#each otherJobs}}
+                <div class="job-list-item">
+                    <div class="job-list-content">
+                        <a href="{{applyUrl}}" class="job-list-title">{{title}}</a>
+                        <div class="job-list-company">{{company}} • {{location}}</div>
+                    </div>
+                    <a href="{{applyUrl}}" class="job-list-cta">View Role</a>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p class="footer-message">Ready to accelerate your career journey?</p>
+            <div class="footer-links">
+                <a href="{{dashboardUrl}}" class="footer-link">Browse All Jobs</a>
+                <a href="{{profileUrl}}" class="footer-link">Update Preferences</a>
+                <a href="{{resumeUrl}}" class="footer-link">Optimize Resume</a>
+            </div>
+            <a href="{{unsubscribeUrl}}" class="unsubscribe">Unsubscribe from weekly digest</a>
+        </div>
+    </div>
+</body>
+</html>

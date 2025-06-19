@@ -47,7 +47,8 @@ async def create_scheduled_task(request: ScheduleRequest):
         result = scheduler.create_scheduled_task(
             schedule_id=request.scheduleId,
             schedule_config=request.schedule,
-            target_url=request.targetUrl
+            target_url=request.targetUrl,
+            agent_prompt=request.schedule.get('agent_prompt')
         )
         
         if result.get("success"):
