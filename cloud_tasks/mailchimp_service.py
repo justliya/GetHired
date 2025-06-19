@@ -357,3 +357,171 @@ class MailChimpService:
                 "success": False,
                 "error": str(e)
             }
+    
+    def load_canva_template(self, template_url: str) -> str:
+        """Load HTML template from Canva export or URL"""
+        try:
+            import requests
+            response = requests.get(template_url, timeout=30)
+            response.raise_for_status()
+            return response.text
+        except Exception as e:
+            logger.error(f"Failed to load Canva template from {template_url}: {e}")
+            return ""
+    
+    def _inject_job_listings_into_template(self, template_html: str, jobs: List[Dict[str, Any]]) -> str:
+        """Enhanced job listing injection with multiple insertion points"""
+        
+        # Job listing HTML generation
+        job_cards_html = self._generate_job_cards(jobs)
+        job_list_html = self._generate_job_list(jobs)
+        job_table_html = self._generate_job_table(jobs)
+        
+        # Multiple replacement patterns for different template styles
+        replacements = {
+            # Standard placeholders
+            '{{JOB_LISTINGS}}': job_cards_html,
+            '{{JOBS_LIST}}': job_list_html,
+            '{{JOBS_TABLE}}': job_table_html,
+            '{{JOB_COUNT}}': str(len(jobs)),
+            
+            # Canva-style placeholders (common export patterns)
+            '[JOB_LISTINGS]': job_cards_html,
+            '[JOBS_LIST]': job_list_html,
+            '[JOB_COUNT]': str(len(jobs)),
+            
+            # Text content placeholders
+            'REPLACE_WITH_JOBS': job_cards_html,
+            'INSERT_JOBS_HERE': job_cards_html,
+            'JOBS_PLACEHOLDER': job_cards_html,
+            
+            # Common template variables
+            '{job_listings}': job_cards_html,
+            '{jobs_list}': job_list_html,
+            '{job_count}': str(len(jobs)),
+            
+            # Date placeholders
+            '{{DATE}}': datetime.now().strftime('%B %d, %Y'),
+            '{{CURRENT_DATE}}': datetime.now().strftime('%B %d, %Y'),
+            '[DATE]': datetime.now().strftime('%B %d, %Y'),
+        }
+        
+        modified_template = template_html
+        for placeholder, replacement in replacements.items():
+            modified_template = modified_template.replace(placeholder, replacement)
+        
+        # Handle dynamic job insertion for templates with job containers
+        modified_template = self._handle_dynamic_job_containers(modified_template, jobs)
+        
+        return modified_template
+    
+    def _handle_dynamic_job_containers(self, template_html: str, jobs: List[Dict[str, Any]]) -> str:
+        """Handle templates with dynamic job containers (repeat sections)"""
+        import re
+        
+        # Pattern for job container sections that should be repeated
+        container_pattern = r'<!--\s*JOB_CONTAINER_START\s*-->(.*?)<!--\s*JOB_CONTAINER_END\s*-->'
+        
+        def replace_job_container(match):
+            container_template = match.group(1)
+            job_html_parts = []
+            
+            for i, job in enumerate(jobs):
+                job_html = container_template
+                job_html = job_html.replace('{{JOB_TITLE}}', job.get('title', 'Unknown'))
+                job_html = job_html.replace('{{JOB_COMPANY}}', job.get('company', 'Unknown'))
+                job_html = job_html.replace('{{JOB_LOCATION}}', job.get('location', 'Remote'))
+                job_html = job_html.replace('{{JOB_SALARY}}', job.get('salary', 'Competitive'))
+                job_html = job_html.replace('{{JOB_DESCRIPTION}}', job.get('description', '')[:200] + '...')
+                job_html = job_html.replace('{{JOB_URL}}', job.get('url', '#'))
+                job_html = job_html.replace('{{JOB_INDEX}}', str(i + 1))
+                job_html = job_html.replace('{{MATCH_SCORE}}', str(job.get('match_score', 80)))
+                
+                job_html_parts.append(job_html)
+            
+            return ''.join(job_html_parts)
+        
+        return re.sub(container_pattern, replace_job_container, template_html, flags=re.DOTALL)
+    
+    def _generate_job_cards(self, jobs: List[Dict[str, Any]]) -> str:
+        """Generate modern job cards HTML"""
+        cards_html = ['<div style="display: flex; flex-wrap: wrap; gap: 20px; margin: 20px 0;">']
+        
+        for job in jobs:
+            card_html = f'''
+            <div style="border: 1px solid #e1e5e9; border-radius: 12px; padding: 24px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); flex: 1; min-width: 300px; max-width: 400px;">
+                <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 12px;">
+                    <h3 style="margin: 0; color: #1a1a1a; font-size: 18px; font-weight: 600;">{job.get('title', 'Unknown')}</h3>
+                    <span style="background: #e8f5e8; color: #1a7a1a; padding: 4px 8px; border-radius: 16px; font-size: 12px; font-weight: 500;">{job.get('match_score', 80)}% Match</span>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <p style="margin: 0 0 8px 0; color: #4a5568; font-weight: 500; font-size: 16px;">{job.get('company', 'Unknown Company')}</p>
+                    <p style="margin: 0; color: #718096; font-size: 14px;">📍 {job.get('location', 'Remote')}</p>
+                    <p style="margin: 8px 0 0 0; color: #059669; font-weight: 500; font-size: 14px;">💰 {job.get('salary', 'Competitive')}</p>
+                </div>
+                <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 14px; line-height: 1.5;">{job.get('description', 'No description available.')[:150]}...</p>
+                <a href="{job.get('url', '#')}" style="display: inline-block; background: #3182ce; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">View Job</a>
+            </div>
+            '''
+            cards_html.append(card_html)
+        
+        cards_html.append('</div>')
+        return ''.join(cards_html)
+    
+    def _generate_job_list(self, jobs: List[Dict[str, Any]]) -> str:
+        """Generate simple job list HTML"""
+        list_html = ['<div style="margin: 20px 0;">']
+        
+        for i, job in enumerate(jobs, 1):
+            list_item = f'''
+            <div style="border-bottom: 1px solid #e2e8f0; padding: 20px 0;">
+                <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 8px;">
+                    <h4 style="margin: 0; color: #2d3748; font-size: 18px; font-weight: 600;">{i}. {job.get('title', 'Unknown')}</h4>
+                    <span style="color: #059669; font-weight: 500; font-size: 14px;">{job.get('match_score', 80)}% Match</span>
+                </div>
+                <p style="margin: 0 0 8px 0; color: #4a5568; font-weight: 500;">{job.get('company', 'Unknown')} • {job.get('location', 'Remote')}</p>
+                <p style="margin: 0 0 12px 0; color: #059669; font-weight: 500;">{job.get('salary', 'Competitive')}</p>
+                <p style="margin: 0 0 12px 0; color: #718096; font-size: 14px; line-height: 1.5;">{job.get('description', '')[:200]}...</p>
+                <a href="{job.get('url', '#')}" style="color: #3182ce; text-decoration: none; font-weight: 500;">Apply Now →</a>
+            </div>
+            '''
+            list_html.append(list_item)
+        
+        list_html.append('</div>')
+        return ''.join(list_html)
+    
+    def _generate_job_table(self, jobs: List[Dict[str, Any]]) -> str:
+        """Generate job table HTML for compact display"""
+        if not jobs:
+            return '<p>No jobs found.</p>'
+        
+        table_html = ['''
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: white;">
+            <thead>
+                <tr style="background: #f7fafc;">
+                    <th style="border: 1px solid #e2e8f0; padding: 12px; text-align: left; font-weight: 600; color: #2d3748;">Position</th>
+                    <th style="border: 1px solid #e2e8f0; padding: 12px; text-align: left; font-weight: 600; color: #2d3748;">Company</th>
+                    <th style="border: 1px solid #e2e8f0; padding: 12px; text-align: left; font-weight: 600; color: #2d3748;">Location</th>
+                    <th style="border: 1px solid #e2e8f0; padding: 12px; text-align: left; font-weight: 600; color: #2d3748;">Salary</th>
+                    <th style="border: 1px solid #e2e8f0; padding: 12px; text-align: center; font-weight: 600; color: #2d3748;">Match</th>
+                    <th style="border: 1px solid #e2e8f0; padding: 12px; text-align: center; font-weight: 600; color: #2d3748;">Apply</th>
+                </tr>
+            </thead>
+            <tbody>
+        ''']
+        
+        for job in jobs:
+            row_html = f'''
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: 500; color: #2d3748;">{job.get('title', 'Unknown')}</td>
+                <td style="border: 1px solid #e2e8f0; padding: 12px; color: #4a5568;">{job.get('company', 'Unknown')}</td>
+                <td style="border: 1px solid #e2e8f0; padding: 12px; color: #4a5568;">{job.get('location', 'Remote')}</td>
+                <td style="border: 1px solid #e2e8f0; padding: 12px; color: #059669; font-weight: 500;">{job.get('salary', 'Competitive')}</td>
+                <td style="border: 1px solid #e2e8f0; padding: 12px; text-align: center;"><span style="background: #e8f5e8; color: #1a7a1a; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;">{job.get('match_score', 80)}%</span></td>
+                <td style="border: 1px solid #e2e8f0; padding: 12px; text-align: center;"><a href="{job.get('url', '#')}" style="background: #3182ce; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 500;">Apply</a></td>
+            </tr>
+            '''
+            table_html.append(row_html)
+        
+        table_html.append('</tbody></table>')
+        return ''.join(table_html)
