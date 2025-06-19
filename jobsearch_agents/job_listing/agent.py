@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPServerParams
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
 from google.adk.tools.agent_tool import AgentTool
 from contextlib import AsyncExitStack
 from . import prompt
