@@ -1,6 +1,7 @@
 name: Deploy Agents to Cloud Run
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
