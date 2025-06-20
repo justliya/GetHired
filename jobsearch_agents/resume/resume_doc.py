@@ -96,7 +96,7 @@ def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> s
 def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> str:
     """Direct Google Cloud Storage upload as fallback"""
     try:
-        bucket_name = os.getenv('FIREBASE_STORAGE_BUCKET', 'gethired-prod')
+        bucket_name = os.getenv('GCS_RESUME', 'gethired-prod')
         client = gcs.Client()
         bucket = client.bucket(bucket_name)
         storage_path = f"resumes/{user_id}/{filename}"
