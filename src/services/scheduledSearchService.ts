@@ -455,7 +455,7 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
   }
 };
 
-const CLOUD_TASK_API_URL = import.meta.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000/api/v1';
+const CLOUD_TASK_API_URL = import.meta.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000';
 
 const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Promise<{
   success: boolean;
@@ -464,7 +464,7 @@ const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Pr
   error?: string;
 }> => {
   try {
-    if (!CLOUD_TASK_API_URL || CLOUD_TASK_API_URL === 'http://localhost:8000/api/v1') {
+    if (!CLOUD_TASK_API_URL || CLOUD_TASK_API_URL === 'http://localhost:8000') {
       console.warn('Cloud Task API not configured or not available locally');
       return {
         success: false,
@@ -472,7 +472,8 @@ const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Pr
       };
     }
 
-    const response = await fetch(`${CLOUD_TASK_API_URL}/tasks/schedule`, {
+    // Fix endpoint path to match api.py structure
+    const response = await fetch(`${CLOUD_TASK_API_URL}/api/v1/tasks/schedule`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -480,7 +481,7 @@ const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Pr
       body: JSON.stringify({
         scheduleId,
         schedule,
-        targetUrl: `${CLOUD_TASK_API_URL}/scheduled-search/execute`,
+        targetUrl: `${CLOUD_TASK_API_URL}/api/v1/scheduled-search/execute`,
       }),
     });
 
@@ -533,7 +534,8 @@ const deleteCloudTask = async (taskId: string): Promise<{
   error?: string;
 }> => {
   try {
-    const response = await fetch(`${CLOUD_TASK_API_URL}/tasks/${taskId}`, {
+    // Fix endpoint path to match api.py structure  
+    const response = await fetch(`${CLOUD_TASK_API_URL}/api/v1/tasks/${taskId}`, {
       method: 'DELETE',
     });
 
