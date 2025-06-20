@@ -2,6 +2,8 @@
  * Utility functions for managing user onboarding state
  */
 
+import type { JobPreferences } from '../models/UserData';
+
 const ONBOARDING_KEYS = {
   SEEN_PREFERENCES_MODAL: 'hasSeenPrefsModal',
   COMPLETED_ONBOARDING: 'completedOnboarding',
@@ -103,4 +105,56 @@ export const handlePreferencesSubmissionSuccess = (userId: string): void => {
   markPreferencesModalSeen(userId);
   markOnboardingCompleted(userId);
   markFirstLoginCompleted(userId);
+};
+
+/**
+ * Handle scheduling job search asynchronously with retry logic
+ */
+export const handleSchedulingAsync = async (
+  userId: string, 
+  preferences: JobPreferences
+): Promise<void> => {
+  try {
+    if (!preferences.searchSchedule?.enabled) {
+      return;
+    }
+
+    // Import scheduling service dynamically to avoid circular dependencies
+    const { createScheduledSearch, getUserScheduledSearches, updateScheduledSearch } = 
+      await import('../services/scheduledSearchService');
+
+    // Check if user already has a scheduled search
+    const existingSearches = await getUserScheduledSearches(userId);
+    
+    if (existingSearches.success && existingSearches.data && existingSearches.data.length > 0) {
+      // Update existing scheduled search
+      const existing = existingSearches.data[0];
+      const result = await updateScheduledSearch({
+        scheduleId: existing.id!,
+        preferences,
+        schedule: preferences.searchSchedule
+      });
+      
+      if (!result.success) {
+        console.warn('Failed to update scheduled search:', result.error);
+      }
+    } else {
+      // Create new scheduled search
+      const result = await createScheduledSearch({
+        userId,
+        preferences,
+        schedule: preferences.searchSchedule
+      });
+      
+      if (!result.success) {
+        console.warn('Failed to create scheduled search:', result.error);
+      } else if (result.cloudTaskError) {
+        console.warn('Scheduled search created but cloud task failed:', result.cloudTaskError);
+        // The schedule is saved, but automation will need to be retried
+      }
+    }
+  } catch (error) {
+    console.error('Error in async scheduling:', error);
+    // Don't throw - we don't want to fail the entire preference saving process
+  }
 };

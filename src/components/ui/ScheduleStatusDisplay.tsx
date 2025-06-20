@@ -4,6 +4,7 @@ import {
   getUserScheduledSearches, 
   updateScheduledSearch, 
   deleteScheduledSearch,
+  retryCloudTask,
   type ScheduledSearch 
 } from '../../services/scheduledSearchService';
 import { Timestamp } from 'firebase/firestore';
@@ -23,6 +24,7 @@ const ScheduleStatusDisplay: React.FC<ScheduleStatusDisplayProps> = ({
   const [schedules, setSchedules] = useState<ScheduledSearch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryingTaskIds, setRetryingTaskIds] = useState<Set<string>>(new Set());
 
   const loadSchedules = useCallback(async () => {
     if (!user?.uid) return;
@@ -91,6 +93,31 @@ const ScheduleStatusDisplay: React.FC<ScheduleStatusDisplayProps> = ({
     }
   };
 
+  const handleRetryCloudTask = async (schedule: ScheduledSearch) => {
+    if (!schedule.id) return;
+
+    try {
+      setRetryingTaskIds(prev => new Set(prev).add(schedule.id!));
+      
+      const result = await retryCloudTask(schedule.id);
+      
+      if (result.success) {
+        await loadSchedules(); // Reload to get updated data
+      } else {
+        setError(result.error || 'Failed to retry cloud task');
+      }
+    } catch (err) {
+      setError('Error retrying cloud task');
+      console.error('Error retrying cloud task:', err);
+    } finally {
+      setRetryingTaskIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(schedule.id!);
+        return newSet;
+      });
+    }
+  };
+
   const formatNextRun = (nextRunAt: TimestampLike) => {
     if (!nextRunAt) return 'Not scheduled';
     
@@ -153,6 +180,23 @@ const ScheduleStatusDisplay: React.FC<ScheduleStatusDisplayProps> = ({
         return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200`;
       default:
         return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  };
+
+  const getErrorBadge = () => {
+    const baseClasses = 'px-2 py-1 rounded-full text-xs font-medium';
+    return `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200`;
+  };
+
+  const formatRetryTime = (retryAfter?: number) => {
+    if (!retryAfter) return '';
+    
+    const minutes = Math.ceil(retryAfter / 60);
+    if (minutes < 60) {
+      return `Retry in ${minutes}m`;
+    } else {
+      const hours = Math.ceil(minutes / 60);
+      return `Retry in ${hours}h`;
     }
   };
 
@@ -224,10 +268,50 @@ const ScheduleStatusDisplay: React.FC<ScheduleStatusDisplayProps> = ({
                   <span className={getStatusBadge(schedule.status)}>
                     {schedule.status}
                   </span>
+                  {schedule.cloudTaskError && (
+                    <span className={getErrorBadge()} title={schedule.cloudTaskError}>
+                      ⚠️ Automation Error
+                    </span>
+                  )}
                   <span className="text-sm text-gray-600 dark:text-gray-400">
                     {schedule.schedule.frequency} at {schedule.schedule.customSchedule}
                   </span>
                 </div>
+
+                {schedule.cloudTaskError && (
+                  <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-red-700 dark:text-red-300 font-medium">Scheduling Error:</p>
+                        <p className="text-red-600 dark:text-red-400 text-xs mt-1">{schedule.cloudTaskError}</p>
+                        {schedule.retryAfter && (
+                          <p className="text-red-500 dark:text-red-500 text-xs mt-1">
+                            {formatRetryTime(schedule.retryAfter)}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleRetryCloudTask(schedule)}
+                        disabled={retryingTaskIds.has(schedule.id!)}
+                        className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium hover:bg-red-200 dark:bg-red-900 dark:text-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        title="Retry automation setup"
+                      >
+                        {retryingTaskIds.has(schedule.id!) ? (
+                          <>
+                            <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Retrying
+                          </>
+                        ) : (
+                          <>
+                            🔄 Retry
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>

@@ -58,10 +58,25 @@ async def create_scheduled_task(request: ScheduleRequest):
                 "message": "Task created successfully"
             }
         else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Failed to create task"))
+            # Return structured error with retry information
+            error_response = {
+                "error": result.get("error", "Failed to create task"),
+                "retry_after": result.get("retry_after", 60)
+            }
+            
+            # Use 503 for temporary issues (queue initialization), 400 for other errors
+            status_code = 503 if result.get("retry_after", 0) > 60 else 400
+            raise HTTPException(status_code=status_code, detail=error_response)
+            
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
         logger.error("Error creating scheduled task: %s", str(e))
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        error_response = {
+            "error": str(e),
+            "retry_after": 60
+        }
+        raise HTTPException(status_code=500, detail=error_response) from e
 
 @app.delete("/api/v1/tasks/{task_id}")
 async def delete_task(task_id: str):

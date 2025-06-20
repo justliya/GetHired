@@ -3,8 +3,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 import os
+import time
 from google.cloud import tasks_v2
 from google.protobuf import timestamp_pb2
+from google.api_core import exceptions
 import pytz
 
 logging.basicConfig(level=logging.INFO)
@@ -150,6 +152,87 @@ class CloudTaskScheduler:
         self.queue = os.getenv('CLOUD_TASKS_QUEUE', 'scheduled-searches')
         self.parent = self.client.queue_path(self.project, self.location, self.queue)
         self.cron_parser = CronParser()
+        self._queue_initialized = False
+        
+    def _ensure_queue_exists(self) -> bool:
+        """Ensure the Cloud Tasks queue exists, create if necessary"""
+        try:
+            # Try to get the queue
+            request = tasks_v2.GetQueueRequest(name=self.parent)
+            self.client.get_queue(request=request)
+            self._queue_initialized = True
+            logger.info(f"Queue {self.queue} exists and is ready")
+            return True
+        except exceptions.NotFound:
+            logger.info(f"Queue {self.queue} not found, attempting to create...")
+            return self._create_queue()
+        except Exception as e:
+            logger.error(f"Error checking queue existence: {e}")
+            return False
+    
+    def _create_queue(self) -> bool:
+        """Create the Cloud Tasks queue"""
+        try:
+            location_path = self.client.location_path(self.project, self.location)
+            
+            queue_config = {
+                "name": self.parent,
+                "rate_limits": {
+                    "max_dispatches_per_second": 1.0,
+                    "max_burst_size": 10
+                },
+                "retry_config": {
+                    "max_attempts": 3,
+                    "max_retry_duration": {"seconds": 300}
+                }
+            }
+            
+            request = tasks_v2.CreateQueueRequest(
+                parent=location_path,
+                queue=queue_config
+            )
+            
+            self.client.create_queue(request=request)
+            self._queue_initialized = True
+            logger.info(f"Created queue {self.queue} successfully")
+            
+            # Wait a moment for queue to be fully initialized
+            time.sleep(2)
+            return True
+            
+        except exceptions.AlreadyExists:
+            logger.info(f"Queue {self.queue} already exists")
+            self._queue_initialized = True
+            return True
+        except Exception as e:
+            logger.error(f"Error creating queue: {e}")
+            return False
+    
+    def _wait_for_queue_ready(self, max_wait_seconds: int = 90) -> bool:
+        """Wait for queue to be ready for task creation"""
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait_seconds:
+            try:
+                if self._ensure_queue_exists():
+                    # Additional check - try to list tasks to ensure queue is operational
+                    request = tasks_v2.ListTasksRequest(parent=self.parent, page_size=1)
+                    self.client.list_tasks(request=request)
+                    logger.info(f"Queue {self.queue} is operational")
+                    return True
+            except exceptions.FailedPrecondition as e:
+                if "queue must have been deleted" in str(e).lower():
+                    logger.warning("Queue initialization in progress, waiting...")
+                    time.sleep(5)
+                    continue
+                else:
+                    raise
+            except Exception as e:
+                logger.warning(f"Queue not ready yet: {e}, retrying in 5 seconds...")
+                time.sleep(5)
+        
+        logger.error(f"Queue {self.queue} not ready after {max_wait_seconds} seconds")
+        return False
         
     def create_scheduled_task(
         self, 
@@ -158,8 +241,16 @@ class CloudTaskScheduler:
         target_url: str,
         agent_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Create a Cloud Task for scheduled job search"""
+        """Create a Cloud Task for scheduled job search with queue initialization handling"""
         try:
+            # Ensure queue is ready with proper waiting
+            if not self._wait_for_queue_ready():
+                return {
+                    "success": False,
+                    "error": "Queue not ready after waiting. Please try again in a few minutes.",
+                    "retry_after": 120  # Suggest retry after 2 minutes
+                }
+            
             next_run_time = self._calculate_next_run_time(schedule_config)
             
             if not next_run_time:
@@ -187,23 +278,61 @@ class CloudTaskScheduler:
             task_name = f"{self.parent}/tasks/{schedule_id}-{int(next_run_time.timestamp())}"
             request = tasks_v2.CreateTaskRequest(parent=self.parent, task=task)
             
-            response = self.client.create_task(request=request)
+            # Retry task creation with exponential backoff
+            max_retries = 3
+            base_delay = 2
             
-            logger.info(f"Created task: {response.name}")
+            for attempt in range(max_retries):
+                try:
+                    response = self.client.create_task(request=request)
+                    logger.info(f"Created task: {response.name}")
+                    
+                    return {
+                        "success": True,
+                        "task_id": response.name.split('/')[-1],
+                        "task_name": response.name,
+                        "next_run_at": next_run_time.isoformat(),
+                        "cron_expression": self.cron_parser.schedule_to_cron(schedule_config)
+                    }
+                    
+                except exceptions.FailedPrecondition as e:
+                    if "queue must have been deleted" in str(e).lower() and attempt < max_retries - 1:
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(f"Queue initialization in progress, waiting {delay}s before retry {attempt + 1}")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        raise
+                except exceptions.NotFound as e:
+                    if "queue" in str(e).lower() and attempt < max_retries - 1:
+                        # Try to recreate queue
+                        logger.warning("Queue not found, attempting to recreate...")
+                        self._queue_initialized = False
+                        if self._wait_for_queue_ready():
+                            continue
+                    raise
             
+            # If we get here, all retries failed
             return {
-                "success": True,
-                "task_id": response.name.split('/')[-1],
-                "task_name": response.name,
-                "next_run_at": next_run_time.isoformat(),
-                "cron_expression": self.cron_parser.schedule_to_cron(schedule_config)
+                "success": False,
+                "error": "Failed to create task after multiple retries. Queue may need time to initialize.",
+                "retry_after": 180  # Suggest retry after 3 minutes
             }
             
         except Exception as e:
+            error_msg = str(e)
+            retry_after = 60  # Default retry time
+            
+            # Check for specific queue-related errors
+            if any(keyword in error_msg.lower() for keyword in ["queue", "not found", "failed precondition"]):
+                retry_after = 120  # Longer retry for queue issues
+                error_msg = "Cloud Task queue is initializing. Please try again in a few minutes."
+            
             logger.error(f"Error creating scheduled task: {e}")
             return {
                 "success": False,
-                "error": str(e)
+                "error": error_msg,
+                "retry_after": retry_after
             }
 
     def _create_agent_prompt(self, schedule_config: Dict[str, Any]) -> str:
