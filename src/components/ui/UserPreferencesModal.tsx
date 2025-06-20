@@ -141,11 +141,13 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 if (existingSchedule?.preferences) {
                     preferences = existingSchedule.preferences;
                 } else {
-                    const preferencesRef = doc(db, 'users', user.uid, 'preferences', 'jobSearch');
+                    // Fetch preferences using the correct Firestore document path
+                    const preferencesRef = doc(db, 'users', user.uid);
                     const docSnap = await getDoc(preferencesRef);
                     
                     if (docSnap.exists()) {
-                        preferences = docSnap.data() as JobPreferences;
+                        const userData = docSnap.data();
+                        preferences = userData?.jobPreferences as JobPreferences;
                     }
                 }
                 
@@ -194,6 +196,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
         const fetchResumes = async () => {
             if (!user?.uid) return;
             try {
+                // Use the correct resume service endpoint
                 const result = await getUserResumes(user.uid);
                 if (result.success && result.data) {
                     setResumes(result.data.map((r: Resume & { id: string }) => ({ ...r, id: r.id })));
@@ -222,6 +225,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 isOriginal: true,
                 keywords: formData.preferences.roles || [],
             };
+            // Use the correct resume upload service endpoint
             const result = await uploadResume(user.uid, file, metadata);
             if (result.success && result.data) {
                 setResumes(prev => [...prev, { ...result.data }]);
@@ -278,7 +282,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 excludeKeywords: formData.preferences.excludeKeywords
             };
 
-            // Use updateUserPreferences to save to Firebase
+            // Save preferences using the correct API endpoint
             const result = await updateUserPreferences(user.uid, preferencesToSave);
             if (result.success) {
                 // Update local user state with new preferences
