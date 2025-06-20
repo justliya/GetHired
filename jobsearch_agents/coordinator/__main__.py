@@ -24,7 +24,7 @@ from .agent import root_agent
 from common.a2a_server import create_agent_server
 
 
-default_timeout = 60.0
+default_timeout = 600.0
 
 # Logging configuration
 logging.basicConfig(

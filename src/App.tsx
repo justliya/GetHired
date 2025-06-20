@@ -13,13 +13,19 @@ import Auth from './pages/Auth';
 import { auth, onAuthStateChanged } from './firebase';
 import { updateUserPreferences, getUserPreferences } from './services/firebaseService';
 import UserPreferencesModal from "./components/ui/UserPreferencesModal";
-import SuccessModal from "./components/ui/SuccessModal";
+import { 
+  shouldShowPreferencesModal, 
+  markPreferencesModalSeen, 
+  handlePreferencesSubmissionSuccess 
+} from './utils/onboardingUtils';
+import type { ScheduledSearch } from './services/scheduledSearchService';
 
 function App() {
   const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'auth' | 'dashboard' | 'loading'>('loading');
   const [isNewUser, setIsNewUser] = useState<boolean>(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduledSearch | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -37,13 +43,20 @@ function App() {
           
           setCurrentPage('dashboard');
           
-          // Only show preferences modal for new users without preferences
-          if (!hasCustomPreferences) {
+          // Use utility function to determine if we should show the modal
+          const shouldShow = shouldShowPreferencesModal(user.uid, hasCustomPreferences || false);
+          
+          if (shouldShow) {
             setIsNewUser(true);
+            // Mark that they've seen the modal
+            markPreferencesModalSeen(user.uid);
             // Delay showing modal to ensure smooth transition
             setTimeout(() => {
               setShowUserPrefs(true);
             }, 500);
+          } else {
+            setIsNewUser(false);
+            setShowUserPrefs(false);
           }
         } catch (error) {
           console.error('Error checking user preferences:', error);
@@ -77,7 +90,10 @@ function App() {
       <Router>
         <Layout>
           <Routes>
-            <Route path="/" element={<Dashboard onOpenPreferences={() => setShowUserPrefs(true)} />} />
+            <Route path="/" element={<Dashboard onOpenPreferences={(schedule) => {
+              setEditingSchedule(schedule || null);
+              setShowUserPrefs(true);
+            }} />} />
             <Route path="/jobs" element={<JobListings />} />
             <Route path="/company-research/:jobId" element={<CompanyResearch />} />
             <Route path="/resume-tailoring/:jobId" element={<ResumeTailoring />} />
@@ -87,12 +103,18 @@ function App() {
           
           {showUserPrefs && (
             <UserPreferencesModal 
-              show={showUserPrefs} 
+              show={showUserPrefs}
+              existingSchedule={editingSchedule ? {
+                preferences: editingSchedule.preferences,
+                schedule: editingSchedule.schedule
+              } : undefined}
               onHide={() => {
                 setShowUserPrefs(false);
-                // If user closes modal without saving and they're new, show a reminder
-                if (isNewUser) {
-                  console.log('Remember to set your preferences for better job matches!');
+                setIsNewUser(false);
+                setEditingSchedule(null);
+                // If user closes modal without saving, we still consider they've seen it
+                if (auth.currentUser) {
+                  markPreferencesModalSeen(auth.currentUser.uid);
                 }
               }}
               onSubmit={async (formData) => {
@@ -132,15 +154,14 @@ function App() {
                     throw new Error(result.error || 'Failed to update preferences');
                   }
                   
-                  // Close preferences modal first, then show success modal
+                  // Handle successful submission with utility function
+                  handlePreferencesSubmissionSuccess(userId);
+                  
                   setShowUserPrefs(false);
                   setIsNewUser(false);
+                  setEditingSchedule(null);
                   
-                  // Small delay to ensure smooth transition between modals
-                  setTimeout(() => {
-                    setShowSuccessModal(true);
-                  }, 300);
-                  
+                  // Success message will be handled by the SuccessModal in UserPreferencesModal
                 } catch (error) {
                   console.error('Failed to save preferences:', error);
                   // You might want to show an error toast here
