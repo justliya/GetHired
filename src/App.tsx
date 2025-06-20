@@ -18,11 +18,13 @@ import {
   markPreferencesModalSeen, 
   handlePreferencesSubmissionSuccess 
 } from './utils/onboardingUtils';
+import type { ScheduledSearch } from './services/scheduledSearchService';
 
 function App() {
   const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'auth' | 'dashboard' | 'loading'>('loading');
+  const [isNewUser, setIsNewUser] = useState<boolean>(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduledSearch | null>(null);
 
   useEffect(() => {
@@ -108,6 +110,7 @@ function App() {
               onHide={() => {
                 setShowUserPrefs(false);
                 setIsNewUser(false);
+                setEditingSchedule(null);
                 // If user closes modal without saving, we still consider they've seen it
                 if (auth.currentUser) {
                   markPreferencesModalSeen(auth.currentUser.uid);
@@ -154,6 +157,7 @@ function App() {
                   handlePreferencesSubmissionSuccess(userId);
                   
                   setShowUserPrefs(false);
+                  setIsNewUser(false);
                   setEditingSchedule(null);
                   
                   // Success message will be handled by the SuccessModal in UserPreferencesModal

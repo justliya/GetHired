@@ -150,7 +150,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
 
       {/* Scheduled Searches Section */}
       <section className="mb-8">
-        <ScheduleStatusDisplay onEditSchedule={() => onOpenPreferences()} />
+        <ScheduleStatusDisplay onEditSchedule={(schedule) => onOpenPreferences(schedule)} />
       </section>
 
       {/* AI Agents Section */}
