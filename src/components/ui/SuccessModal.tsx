@@ -24,11 +24,11 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
     if (show) {
       // Trigger confetti animation when modal opens
       const triggerConfetti = () => {
-        const count = 150; // Reduced count for smoother animation
+        const count = 200; // Increased count for more dramatic effect
         const defaults = {
           origin: { y: 0.7 },
-          gravity: 0.8, // Slower fall
-          drift: 0.1 // Slight drift for more natural movement
+          gravity: 0.6, // Even slower fall for longer visibility
+          drift: 0.2 // More drift for natural movement
         };
 
         function fire(particleRatio: number, opts: confetti.Options) {
@@ -39,47 +39,57 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
           });
         }
 
-        // Staggered animation for smoother effect
+        // Extended staggered animation for longer effect
         // First burst - small spread
-        fire(0.3, {
+        fire(0.25, {
           spread: 30,
-          startVelocity: 35, // Reduced velocity
-          decay: 0.85, // Slower decay for longer animation
+          startVelocity: 30, // Slower start velocity
+          decay: 0.82, // Slower decay for much longer animation
         });
 
         // Second burst - medium spread (delayed)
         setTimeout(() => {
-          fire(0.25, {
-            spread: 70,
-            startVelocity: 40,
-            decay: 0.88,
+          fire(0.3, {
+            spread: 60,
+            startVelocity: 35,
+            decay: 0.84,
             scalar: 0.9
           });
-        }, 200);
+        }, 300);
 
         // Third burst - wide spread (more delayed)
         setTimeout(() => {
-          fire(0.3, {
-            spread: 120,
-            startVelocity: 30,
-            decay: 0.85,
+          fire(0.25, {
+            spread: 100,
+            startVelocity: 28,
+            decay: 0.82,
             scalar: 0.8
           });
-        }, 400);
+        }, 600);
 
-        // Final burst - very wide spread (most delayed)
+        // Fourth burst - very wide spread (even more delayed)
         setTimeout(() => {
-          fire(0.15, {
-            spread: 150,
+          fire(0.2, {
+            spread: 140,
             startVelocity: 25,
-            decay: 0.82,
+            decay: 0.8,
             scalar: 1.1
           });
-        }, 600);
+        }, 900);
+
+        // Final burst - maximum spread (most delayed)
+        setTimeout(() => {
+          fire(0.15, {
+            spread: 180,
+            startVelocity: 22,
+            decay: 0.78,
+            scalar: 1.2
+          });
+        }, 1200);
       };
 
-      // Delay confetti more to ensure modal content is readable
-      const confettiTimeout = setTimeout(triggerConfetti, 800);
+      // Longer delay before confetti starts
+      const confettiTimeout = setTimeout(triggerConfetti, 1000);
       
       return () => clearTimeout(confettiTimeout);
     }

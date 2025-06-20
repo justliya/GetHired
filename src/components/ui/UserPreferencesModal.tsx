@@ -244,6 +244,56 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
         setFormData(prev => ({ ...prev, resumeFile: null }));
     };
 
+    const handlePostSuccessJobSearch = async () => {
+        try {
+            // Check if user has preferences that would benefit from immediate job search
+            if (!user?.uid || !formData.preferences.roles.length) {
+                return;
+            }
+
+            // Only trigger job search if user has meaningful search criteria
+            const hasSearchCriteria = formData.preferences.roles.length > 0 || 
+                                     formData.preferences.locations.length > 0 ||
+                                     formData.preferences.skills.length > 0;
+
+            if (!hasSearchCriteria) {
+                return;
+            }
+
+            // Import job search service dynamically to avoid circular dependencies
+            const API_BASE_URL = "https://gethired-agents-104139545590.us-central1.run.app";
+            
+            // Use a simple job search request in the background
+            fetch(`${API_BASE_URL}/run`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: "find me jobs based on my preferences",
+                    context: {
+                        user_id: user.uid,
+                        firebase_uid: user.uid,
+                        is_anonymous: user.isAnonymous || false,
+                        source: "preferences_onboarding"
+                    },
+                    session_id: `onboarding-${Date.now()}`,
+                }),
+            }).then(response => {
+                if (response.ok) {
+                    console.log('Job search initiated successfully after preferences save');
+                } else {
+                    console.warn('Background job search failed:', response.status);
+                }
+            }).catch(error => {
+                console.warn('Background job search error:', error);
+                // Fail silently - this is a background enhancement, not critical
+            });
+
+        } catch (error) {
+            console.warn('Error in post-success job search:', error);
+            // Fail silently - this shouldn't block the user experience
+        }
+    };
+
     const handleSubmit = async () => {
         try {
             if (!user?.uid) {
@@ -862,6 +912,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
             onHide={() => {
                 setShowSuccessModal(false);
                 onHide();
+                // Trigger job search API request after modal closes
+                handlePostSuccessJobSearch();
             }}
             title="Success! 🎉"
             message={
@@ -869,15 +921,6 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     ? "Your preferences have been saved! We're now searching for jobs and you can expect to receive an email with findings soon."
                     : "Your preferences have been saved successfully! You can now search for jobs that match your criteria."
             }
-            actionButton={{
-                text: "Start Job Search",
-                onClick: () => {
-                    setShowSuccessModal(false);
-                    onHide();
-                    // Navigate to job search page
-                    window.location.href = '/job-listings';
-                }
-            }}
         />
         </>
     );

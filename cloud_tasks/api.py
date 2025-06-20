@@ -85,11 +85,19 @@ async def delete_task(task_id: str):
         result = scheduler.delete_task(task_id)
         
         if result.get("success"):
-            return {"message": "Task deleted successfully"}
+            return {"message": result.get("message", "Task deleted successfully")}
         else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Failed to delete task"))
+            # For delete operations, we should be more lenient with errors
+            # If task doesn't exist, that's actually what we want
+            error_msg = result.get("error", "Failed to delete task")
+            if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
+                return {"message": "Task not found (already deleted)"}
+            raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
         logger.error("Error deleting task: %s", str(e))
+        # For 404/not found errors, return success since the goal is achieved
+        if "not found" in str(e).lower() or "does not exist" in str(e).lower():
+            return {"message": "Task not found (already deleted)"}
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.put("/api/v1/tasks/{task_id}")
