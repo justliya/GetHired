@@ -924,6 +924,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
             onHide={() => {
                 setShowSuccessModal(false);
                 onHide();
+                // Trigger job search API request after modal closes
+                handlePostSuccessJobSearch();
             }}
             title="Success! 🎉"
             message={
@@ -931,15 +933,6 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     ? "Your preferences have been saved! We're now searching for jobs and you can expect to receive an email with findings soon."
                     : "Your preferences have been saved successfully! You can now search for jobs that match your criteria."
             }
-            actionButton={{
-                text: "Start Job Search",
-                onClick: () => {
-                    setShowSuccessModal(false);
-                    onHide();
-                    // Navigate to job search page
-                    window.location.href = '/job-listings';
-                }
-            }}
         />
         </>
     );

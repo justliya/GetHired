@@ -249,6 +249,13 @@ class CloudTaskScheduler:
                 "message": f"Task {task_name} deleted successfully"
             }
             
+        except exceptions.NotFound:
+            # Task doesn't exist - this is OK, consider it successful
+            logger.info(f"Task {task_name} not found (already deleted or never existed)")
+            return {
+                "success": True,
+                "message": f"Task {task_name} not found (already deleted)"
+            }
         except Exception as e:
             logger.error(f"Error deleting task: {e}")
             return {
