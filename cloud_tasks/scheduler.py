@@ -265,11 +265,14 @@ class CloudTaskScheduler:
     ) -> Dict[str, Any]:
         """Update a scheduled task (delete old, create new)"""
         try:
+            # If there's an existing task, try to delete it, but don't fail if it doesn't exist
             if current_task_name:
                 delete_result = self.delete_task(current_task_name)
                 if not delete_result["success"]:
-                    logger.warning(f"Failed to delete existing task: {delete_result.get('error')}")
+                    logger.warning(f"Failed to delete existing task (may not exist): {delete_result.get('error')}")
+                    # Continue anyway - this is expected for schedules that were never run
             
+            # Always create a new task
             return self.create_scheduled_task(schedule_id, schedule_config, target_url)
             
         except Exception as e:

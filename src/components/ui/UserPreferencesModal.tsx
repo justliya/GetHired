@@ -141,13 +141,11 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 if (existingSchedule?.preferences) {
                     preferences = existingSchedule.preferences;
                 } else {
-                    // Fetch preferences using the correct Firestore document path
-                    const preferencesRef = doc(db, 'users', user.uid);
+                    const preferencesRef = doc(db, 'users', user.uid, 'preferences', 'jobSearch');
                     const docSnap = await getDoc(preferencesRef);
                     
                     if (docSnap.exists()) {
-                        const userData = docSnap.data();
-                        preferences = userData?.jobPreferences as JobPreferences;
+                        preferences = docSnap.data() as JobPreferences;
                     }
                 }
                 

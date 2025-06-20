@@ -18,12 +18,13 @@ import {
   markPreferencesModalSeen, 
   handlePreferencesSubmissionSuccess 
 } from './utils/onboardingUtils';
+import type { ScheduledSearch } from './services/scheduledSearchService';
 
 function App() {
   const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'auth' | 'dashboard' | 'loading'>('loading');
-  const [editingSchedule, setEditingSchedule] = useState<ScheduledSearch | null>(null);
+  const [isNewUser, setIsNewUser] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -100,9 +101,10 @@ function App() {
               } : undefined}
               onHide={() => {
                 setShowUserPrefs(false);
-                // If user closes modal without saving and they're new, show a reminder
-                if (isNewUser) {
-                  console.log('Remember to set your preferences for better job matches!');
+                setIsNewUser(false);
+                // If user closes modal without saving, we still consider they've seen it
+                if (auth.currentUser) {
+                  markPreferencesModalSeen(auth.currentUser.uid);
                 }
               }}
               onSubmit={async (formData) => {
@@ -146,7 +148,7 @@ function App() {
                   handlePreferencesSubmissionSuccess(userId);
                   
                   setShowUserPrefs(false);
-                  setEditingSchedule(null);
+                  setIsNewUser(false);
                   
                   // Optionally show success message
                   console.log('Preferences saved successfully!');
