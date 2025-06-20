@@ -16,6 +16,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getUserResumes, uploadResume, updateUserPreferences } from '../../services/firebaseService';
 import { handlePreferencesSubmissionSuccess, handleSchedulingAsync } from '../../utils/onboardingUtils';
+import { ENV } from '../../config/environment';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead';
@@ -261,7 +262,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
             }
 
             // Import job search service dynamically to avoid circular dependencies
-            const API_BASE_URL = "https://gethired-agents-104139545590.us-central1.run.app";
+            const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
             
             // Use a simple job search request in the background
             fetch(`${API_BASE_URL}/run`, {

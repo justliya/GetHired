@@ -480,7 +480,9 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
   }
 };
 
-const CLOUD_TASK_API_URL = import.meta.env.VITE_CLOUD_TASK_API_URL || 'https://gethired-scheduler-104139545590.us-central1.run.app';
+import { ENV } from '../config/environment';
+
+const CLOUD_TASK_API_URL = ENV.CLOUD_TASK_API_URL;
 
 const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Promise<{
   success: boolean;
