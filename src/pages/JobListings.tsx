@@ -29,9 +29,36 @@ interface JobListing {
   favorite: boolean;
   status: 'new' | 'viewed' | 'applied' | 'rejected';
   jobLink?: string;
+// pages/JobListings.tsx
+
+import { useState, useRef, useEffect, useCallback } from "react";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { signInAnonymously } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { v4 as uuidv4 } from "uuid";
+
+import { auth, db } from "../firebase";
+import { saveListingsToUserProfile } from "../hooks/JobSave";
+import JobHeader from "../components/JobHeader";
+import JobFilters from "../components/JobFilters";
+import JobResults from "../components/JobResults";
+
+import type { JobListing } from "../types";
+import { ENV } from "../config/environment";
+
+interface SessionData {
+  agentJobs: JobListing[];
+  searchQuery: string;
+  filters: {
+    locationFilter: string[];
+    statusFilter: string[];
+  };
+  lastUpdated: string;
 }
 
-const API_BASE_URL = "https://gethired-agents-104139545590.us-central1.run.app";
+const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
 
 const JobListings = () => {
   const navigate = useNavigate();

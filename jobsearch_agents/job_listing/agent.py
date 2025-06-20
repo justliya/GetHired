@@ -12,6 +12,8 @@ from . import approval
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 MCP_TIMEOUT = float(os.getenv("MCP_CLIENT_TIMEOUT", "60.0"))
+# Get MCP server URL from environment
+MCP_SERVER_URL = os.getenv('MCP_SERVER_URL', 'https://gethired-mcp.onrender.com/jobsearch-mcp/')
 
 request_approval = Agent(
     name="RequestHumanApproval",
@@ -32,7 +34,7 @@ async def create_agent():
     # MCPToolset with proper timeout settings
     tools = MCPToolset(
         connection_params=StreamableHTTPServerParams(
-            url="https://gethired-mcp.onrender.com/jobsearch-mcp/",
+            url=MCP_SERVER_URL,
             timeout=MCP_TIMEOUT,
             sse_read_timeout=MCP_TIMEOUT * 5,
         ),

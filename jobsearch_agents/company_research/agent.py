@@ -9,6 +9,9 @@ from . import prompt
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
+# Get MCP server URL from environment
+MCP_SERVER_URL = os.getenv('MCP_SERVER_URL', 'https://gethired-mcp.onrender.com/jobsearch-mcp/')
+
 
 async def create_agent():
 
@@ -16,7 +19,7 @@ async def create_agent():
 
     tools = MCPToolset(
         connection_params=StreamableHTTPServerParams(
-            url="https://gethired-mcp.onrender.com/jobsearch-mcp/",
+            url=MCP_SERVER_URL,
         ),
         tool_filter=[
             "search_companies",
