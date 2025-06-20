@@ -24,9 +24,11 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
     if (show) {
       // Trigger confetti animation when modal opens
       const triggerConfetti = () => {
-        const count = 200;
+        const count = 150; // Reduced count for smoother animation
         const defaults = {
-          origin: { y: 0.7 }
+          origin: { y: 0.7 },
+          gravity: 0.8, // Slower fall
+          drift: 0.1 // Slight drift for more natural movement
         };
 
         function fire(particleRatio: number, opts: confetti.Options) {
@@ -37,36 +39,47 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
           });
         }
 
-        fire(0.25, {
-          spread: 26,
-          startVelocity: 55,
+        // Staggered animation for smoother effect
+        // First burst - small spread
+        fire(0.3, {
+          spread: 30,
+          startVelocity: 35, // Reduced velocity
+          decay: 0.85, // Slower decay for longer animation
         });
 
-        fire(0.2, {
-          spread: 60,
-        });
+        // Second burst - medium spread (delayed)
+        setTimeout(() => {
+          fire(0.25, {
+            spread: 70,
+            startVelocity: 40,
+            decay: 0.88,
+            scalar: 0.9
+          });
+        }, 200);
 
-        fire(0.35, {
-          spread: 100,
-          decay: 0.91,
-          scalar: 0.8
-        });
+        // Third burst - wide spread (more delayed)
+        setTimeout(() => {
+          fire(0.3, {
+            spread: 120,
+            startVelocity: 30,
+            decay: 0.85,
+            scalar: 0.8
+          });
+        }, 400);
 
-        fire(0.1, {
-          spread: 120,
-          startVelocity: 25,
-          decay: 0.92,
-          scalar: 1.2
-        });
-
-        fire(0.1, {
-          spread: 120,
-          startVelocity: 45,
-        });
+        // Final burst - very wide spread (most delayed)
+        setTimeout(() => {
+          fire(0.15, {
+            spread: 150,
+            startVelocity: 25,
+            decay: 0.82,
+            scalar: 1.1
+          });
+        }, 600);
       };
 
-      // Delay confetti slightly to ensure modal is visible
-      const confettiTimeout = setTimeout(triggerConfetti, 300);
+      // Delay confetti more to ensure modal content is readable
+      const confettiTimeout = setTimeout(triggerConfetti, 800);
       
       return () => clearTimeout(confettiTimeout);
     }

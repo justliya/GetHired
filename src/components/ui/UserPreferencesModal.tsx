@@ -44,6 +44,10 @@ interface UserPreferencesModalProps {
     show: boolean;
     onHide: () => void;
     onSubmit: (data: FormDataType) => void;
+    existingSchedule?: {
+        preferences?: JobPreferences;
+        schedule?: SearchSchedule;
+    };
 }
 
 // Update step labels
@@ -76,7 +80,12 @@ interface ResumeData extends Resume {
     id: string;
 }
 
-const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHide, onSubmit }) => {
+const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ 
+    show, 
+    onHide, 
+    onSubmit, 
+    existingSchedule 
+}) => {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [resumes, setResumes] = useState<ResumeData[]>([]);
     const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
@@ -126,16 +135,31 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
     useEffect(() => {
         const fetchData = async () => {
             if (user?.uid) {
-                const preferencesRef = doc(db, 'users', user.uid, 'preferences', 'jobSearch');
-                const docSnap = await getDoc(preferencesRef);
+                // Use existing schedule data if provided (for editing), otherwise fetch from Firebase
+                let preferences: JobPreferences | null = null;
                 
-                if (docSnap.exists()) {
-                    const preferences = docSnap.data() as JobPreferences;
+                if (existingSchedule?.preferences) {
+                    preferences = existingSchedule.preferences;
+                } else {
+                    const preferencesRef = doc(db, 'users', user.uid, 'preferences', 'jobSearch');
+                    const docSnap = await getDoc(preferencesRef);
+                    
+                    if (docSnap.exists()) {
+                        preferences = docSnap.data() as JobPreferences;
+                    }
+                }
+                
+                if (preferences) {
+                    // Use schedule from existingSchedule if available, otherwise from preferences
+                    const scheduleData = existingSchedule?.schedule || preferences.searchSchedule;
+                    
                     setFormData(prev => ({
                         ...prev,
                         preferences: {
                             ...prev.preferences,
                             roles: preferences.titles || [],
+                            companies: preferences.companies || [],
+                            skills: preferences.skills || [],
                             locations: preferences.locations || [],
                             salaryRange: {
                                 min: preferences.salaryRange?.min || 0,
@@ -146,7 +170,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                             other: preferences.other || '',
                             includeKeywords: preferences.includeKeywords || [],
                             excludeKeywords: preferences.excludeKeywords || [],
-                            searchSchedule: preferences.searchSchedule || {
+                            searchSchedule: scheduleData || {
                                 enabled: false,
                                 frequency: 'Daily',
                                 customSchedule: '09:00',
@@ -164,7 +188,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
         };
 
         fetchData();
-    }, [user?.uid]);
+    }, [user?.uid, existingSchedule]);
 
     useEffect(() => {
         const fetchResumes = async () => {

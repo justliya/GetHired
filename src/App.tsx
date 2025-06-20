@@ -18,11 +18,13 @@ import {
   markPreferencesModalSeen, 
   handlePreferencesSubmissionSuccess 
 } from './utils/onboardingUtils';
+import type { ScheduledSearch } from './services/scheduledSearchService';
 
 function App() {
   const [showUserPrefs, setShowUserPrefs] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'auth' | 'dashboard' | 'loading'>('loading');
   const [isNewUser, setIsNewUser] = useState<boolean>(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduledSearch | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -87,7 +89,10 @@ function App() {
       <Router>
         <Layout>
           <Routes>
-            <Route path="/" element={<Dashboard onOpenPreferences={() => setShowUserPrefs(true)} />} />
+            <Route path="/" element={<Dashboard onOpenPreferences={(schedule) => {
+              setEditingSchedule(schedule || null);
+              setShowUserPrefs(true);
+            }} />} />
             <Route path="/jobs" element={<JobListings />} />
             <Route path="/company-research/:jobId" element={<CompanyResearch />} />
             <Route path="/resume-tailoring/:jobId" element={<ResumeTailoring />} />
@@ -97,10 +102,15 @@ function App() {
           
           {showUserPrefs && (
             <UserPreferencesModal 
-              show={showUserPrefs} 
+              show={showUserPrefs}
+              existingSchedule={editingSchedule ? {
+                preferences: editingSchedule.preferences,
+                schedule: editingSchedule.schedule
+              } : undefined}
               onHide={() => {
                 setShowUserPrefs(false);
                 setIsNewUser(false);
+                setEditingSchedule(null);
                 // If user closes modal without saving, we still consider they've seen it
                 if (auth.currentUser) {
                   markPreferencesModalSeen(auth.currentUser.uid);
@@ -148,6 +158,7 @@ function App() {
                   
                   setShowUserPrefs(false);
                   setIsNewUser(false);
+                  setEditingSchedule(null);
                   
                   // Success message will be handled by the SuccessModal in UserPreferencesModal
                 } catch (error) {
