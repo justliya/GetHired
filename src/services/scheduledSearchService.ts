@@ -56,8 +56,6 @@ export const testFirebaseConnection = async (): Promise<{
       };
     }
 
-    // Simple test - try to create a query (doesn't execute until we call getDocs)
-    // This will fail gracefully if rules aren't set up yet
     try {
       const testQuery = query(
         collection(db, COLLECTION_NAME),
@@ -455,7 +453,7 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
   }
 };
 
-const CLOUD_TASK_API_URL = import.meta.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000';
+const CLOUD_TASK_API_URL = import.meta.env.VITE_CLOUD_TASK_API_URL || 'https://gethired-scheduler-104139545590.us-central1.run.app';
 
 const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Promise<{
   success: boolean;
@@ -464,7 +462,7 @@ const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Pr
   error?: string;
 }> => {
   try {
-    if (!CLOUD_TASK_API_URL || CLOUD_TASK_API_URL === 'http://localhost:8000') {
+    if (!CLOUD_TASK_API_URL) {
       console.warn('Cloud Task API not configured or not available locally');
       return {
         success: false,
