@@ -16,6 +16,7 @@ import JobFilters from "../components/JobFilters";
 import JobResults from "../components/JobResults";
 
 import type { JobListing } from "../types";
+import { ENV } from "../config/environment";
 
 interface SessionData {
   agentJobs: JobListing[];
@@ -27,7 +28,7 @@ interface SessionData {
   lastUpdated: string;
 }
 
-const API_BASE_URL = "https://gethired-agents-104139545590.us-central1.run.app";
+const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
 
 const JobListings = () => {
   const navigate = useNavigate();

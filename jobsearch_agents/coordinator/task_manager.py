@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 A2A_APP_NAME = "jobsearch_agents"
 
 # Default timeout in seconds
-DEFAULT_TIMEOUT = 60.0
+DEFAULT_TIMEOUT = 120.0
 
 
 class TaskManager:

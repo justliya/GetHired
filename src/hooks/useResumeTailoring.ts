@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getApiUrl } from '../config/environment';
 
 interface SuggestedChange {
   section: string;
@@ -154,7 +155,7 @@ export const useResumeTailoring = () => {
 
     setIsAnalyzing(true);
     try {
-      const response = await fetch('https://gethired-agents-staging-104139545590.us-central1.run.app/run', {
+      const response = await fetch(`${getApiUrl(true)}/run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

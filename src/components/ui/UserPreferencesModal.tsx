@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import type { ChangeEvent } from 'react';
 import { User } from '../../context/UserContext';
 import ChipInput from './ChipInput';
 import RangeSlider from './RangeSlider';
+import SuccessModal from './SuccessModal';
 import type { 
     JobPreferences, 
     SalaryRange, 
@@ -15,6 +15,8 @@ import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getUserResumes, uploadResume, updateUserPreferences } from '../../services/firebaseService';
+import { handlePreferencesSubmissionSuccess, handleSchedulingAsync } from '../../utils/onboardingUtils';
+import { ENV } from '../../config/environment';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead';
@@ -43,6 +45,10 @@ interface UserPreferencesModalProps {
     show: boolean;
     onHide: () => void;
     onSubmit: (data: FormDataType) => void;
+    existingSchedule?: {
+        preferences?: JobPreferences;
+        schedule?: SearchSchedule;
+    };
 }
 
 // Update step labels
@@ -75,9 +81,15 @@ interface ResumeData extends Resume {
     id: string;
 }
 
-const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHide, onSubmit }) => {
+const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ 
+    show, 
+    onHide, 
+    onSubmit, 
+    existingSchedule 
+}) => {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [resumes, setResumes] = useState<ResumeData[]>([]);
+    const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
     const [formData, setFormData] = useState<FormDataType>({
         resumeFile: null,
         currentRole: '',
@@ -121,32 +133,36 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
         }));
     };
 
-    const handleInputChange = (
-        field: keyof PreferencesData,
-        value: string | string[] | number | boolean
-    ) => {
-        setFormData(prev => ({
-            ...prev,
-            preferences: {
-                ...prev.preferences,
-                [field]: value
-            }
-        }));
-    };
-
     useEffect(() => {
         const fetchData = async () => {
             if (user?.uid) {
-                const preferencesRef = doc(db, 'users', user.uid, 'preferences', 'jobSearch');
-                const docSnap = await getDoc(preferencesRef);
+                // Use existing schedule data if provided (for editing), otherwise fetch from Firebase
+                let preferences: JobPreferences | null = null;
                 
-                if (docSnap.exists()) {
-                    const preferences = docSnap.data() as JobPreferences;
+                if (existingSchedule?.preferences) {
+                    preferences = existingSchedule.preferences;
+                } else {
+                    // Fetch preferences using the correct Firestore document path
+                    const preferencesRef = doc(db, 'users', user.uid);
+                    const docSnap = await getDoc(preferencesRef);
+                    
+                    if (docSnap.exists()) {
+                        const userData = docSnap.data();
+                        preferences = userData?.jobPreferences as JobPreferences;
+                    }
+                }
+                
+                if (preferences) {
+                    // Use schedule from existingSchedule if available, otherwise from preferences
+                    const scheduleData = existingSchedule?.schedule || preferences.searchSchedule;
+                    
                     setFormData(prev => ({
                         ...prev,
                         preferences: {
                             ...prev.preferences,
                             roles: preferences.titles || [],
+                            companies: preferences.companies || [],
+                            skills: preferences.skills || [],
                             locations: preferences.locations || [],
                             salaryRange: {
                                 min: preferences.salaryRange?.min || 0,
@@ -157,7 +173,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                             other: preferences.other || '',
                             includeKeywords: preferences.includeKeywords || [],
                             excludeKeywords: preferences.excludeKeywords || [],
-                            searchSchedule: preferences.searchSchedule || {
+                            searchSchedule: scheduleData || {
                                 enabled: false,
                                 frequency: 'Daily',
                                 customSchedule: '09:00',
@@ -175,15 +191,16 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
         };
 
         fetchData();
-    }, [user?.uid]);
+    }, [user?.uid, existingSchedule]);
 
     useEffect(() => {
         const fetchResumes = async () => {
             if (!user?.uid) return;
             try {
+                // Use the correct resume service endpoint
                 const result = await getUserResumes(user.uid);
                 if (result.success && result.data) {
-                    setResumes(result.data.map((r: any) => ({ ...r, id: r.id })));
+                    setResumes(result.data.map((r: Resume & { id: string }) => ({ ...r, id: r.id })));
                     if (result.data.length > 0 && !selectedResumeId) {
                         setSelectedResumeId(result.data[0].id);
                     }
@@ -209,6 +226,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                 isOriginal: true,
                 keywords: formData.preferences.roles || [],
             };
+            // Use the correct resume upload service endpoint
             const result = await uploadResume(user.uid, file, metadata);
             if (result.success && result.data) {
                 setResumes(prev => [...prev, { ...result.data }]);
@@ -225,6 +243,56 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
     const handleSelectResume = (resumeId: string) => {
         setSelectedResumeId(resumeId);
         setFormData(prev => ({ ...prev, resumeFile: null }));
+    };
+
+    const handlePostSuccessJobSearch = async () => {
+        try {
+            // Check if user has preferences that would benefit from immediate job search
+            if (!user?.uid || !formData.preferences.roles.length) {
+                return;
+            }
+
+            // Only trigger job search if user has meaningful search criteria
+            const hasSearchCriteria = formData.preferences.roles.length > 0 || 
+                                     formData.preferences.locations.length > 0 ||
+                                     formData.preferences.skills.length > 0;
+
+            if (!hasSearchCriteria) {
+                return;
+            }
+
+            // Import job search service dynamically to avoid circular dependencies
+            const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
+            
+            // Use a simple job search request in the background
+            fetch(`${API_BASE_URL}/run`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: "find me jobs based on my preferences",
+                    context: {
+                        user_id: user.uid,
+                        firebase_uid: user.uid,
+                        is_anonymous: user.isAnonymous || false,
+                        source: "preferences_onboarding"
+                    },
+                    session_id: `onboarding-${Date.now()}`,
+                }),
+            }).then(response => {
+                if (response.ok) {
+                    console.log('Job search initiated successfully after preferences save');
+                } else {
+                    console.warn('Background job search failed:', response.status);
+                }
+            }).catch(error => {
+                console.warn('Background job search error:', error);
+                // Fail silently - this is a background enhancement, not critical
+            });
+
+        } catch (error) {
+            console.warn('Error in post-success job search:', error);
+            // Fail silently - this shouldn't block the user experience
+        }
     };
 
     const handleSubmit = async () => {
@@ -265,13 +333,25 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                 excludeKeywords: formData.preferences.excludeKeywords
             };
 
-            // Use updateUserPreferences to save to Firebase
+            // Save preferences using the correct API endpoint
             const result = await updateUserPreferences(user.uid, preferencesToSave);
             if (result.success) {
                 // Update local user state with new preferences
                 setUser(prev => prev ? { ...prev, jobPreferences: preferencesToSave } : prev);
+                
+                // Handle successful submission with utility function
+                handlePreferencesSubmissionSuccess(user.uid);
+                
+                // Handle scheduling asynchronously (won't block the success modal)
+                handleSchedulingAsync(user.uid, preferencesToSave).catch(error => {
+                    console.warn('Async scheduling failed:', error);
+                    // Could show a toast notification here if needed
+                });
+                
                 onSubmit({ ...formData });
-                onHide();
+                
+                // Show success modal immediately - don't wait for scheduling API
+                setShowSuccessModal(true);
             } else {
                 setResumeError('Failed to save preferences.');
             }
@@ -779,7 +859,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
     if (!show) return null;
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+        <>
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
             <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
                 {/* Close button */}
                 <div className="absolute top-0 right-0 pt-4 pr-4">
@@ -825,6 +906,24 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({ show, onHid
                 </div>
             </div>
         </div>
+        
+        {/* Success Modal */}
+        <SuccessModal
+            show={showSuccessModal}
+            onHide={() => {
+                setShowSuccessModal(false);
+                onHide();
+                // Trigger job search API request after modal closes
+                handlePostSuccessJobSearch();
+            }}
+            title="Success! 🎉"
+            message={
+                formData.preferences.searchSchedule.enabled 
+                    ? "Your preferences have been saved! We're now searching for jobs and you can expect to receive an email with findings soon."
+                    : "Your preferences have been saved successfully! You can now search for jobs that match your criteria."
+            }
+        />
+        </>
     );
 };
 

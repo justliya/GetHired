@@ -9,9 +9,10 @@ import { auth, db } from '../firebase';
 import JobCard from '../components/JobCard';
 import ScheduleStatusDisplay from '../components/ui/ScheduleStatusDisplay';
 import type { JobListing } from '../types';
+import type { ScheduledSearch } from '../services/scheduledSearchService';
 
 interface DashboardProps {
-  onOpenPreferences: () => void;
+  onOpenPreferences: (scheduleData?: ScheduledSearch) => void;
 }
 
 const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
@@ -74,7 +75,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
         </div>
         <div className="mt-4 md:mt-0">
           <button
-            onClick={onOpenPreferences}
+            onClick={() => onOpenPreferences()}
             className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
           >
             <Sparkles className="w-5 h-5 mr-2" />
@@ -149,7 +150,7 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
 
       {/* Scheduled Searches Section */}
       <section className="mb-8">
-        <ScheduleStatusDisplay onEditSchedule={() => onOpenPreferences()} />
+        <ScheduleStatusDisplay onEditSchedule={(schedule) => onOpenPreferences(schedule)} />
       </section>
 
       {/* AI Agents Section */}
