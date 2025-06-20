@@ -15,7 +15,8 @@ import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getUserResumes, uploadResume, updateUserPreferences } from '../../services/firebaseService';
-import { handlePreferencesSubmissionSuccess } from '../../utils/onboardingUtils';
+import { handlePreferencesSubmissionSuccess, handleSchedulingAsync } from '../../utils/onboardingUtils';
+import { ENV } from '../../config/environment';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead';

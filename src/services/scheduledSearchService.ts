@@ -338,8 +338,9 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
   }
 };
 
-// Cloud Task Management Functions
-const CLOUD_TASK_API_URL = process.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000/api/v1';
+import { ENV } from '../config/environment';
+
+const CLOUD_TASK_API_URL = ENV.CLOUD_TASK_API_URL;
 
 /**
  * Create a Cloud Task for scheduled job search
