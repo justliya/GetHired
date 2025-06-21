@@ -89,6 +89,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 }) => {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [resumes, setResumes] = useState<ResumeData[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
     const [formData, setFormData] = useState<FormDataType>({
         resumeFile: null,
