@@ -67,5 +67,4 @@ async def create_agent():
 
     return agent_instance, exit_stack
 
-
 root_agent = create_agent()

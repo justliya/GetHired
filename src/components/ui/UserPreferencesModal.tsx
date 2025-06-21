@@ -89,6 +89,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 }) => {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [resumes, setResumes] = useState<ResumeData[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
     const [formData, setFormData] = useState<FormDataType>({
         resumeFile: null,
@@ -202,7 +203,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 if (result.success && result.data) {
                     setResumes(result.data.map((r: Resume & { id: string }) => ({ ...r, id: r.id })));
                     if (result.data.length > 0 && !selectedResumeId) {
-                        setSelectedResumeId(result.data[0].id);
+                        setSelectedResumeId((result.data[0] as Resume & { id: string }).id);
                     }
                 } else {
                     setResumeError('Could not fetch resumes.');
@@ -296,6 +297,10 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
     };
 
     const handleSubmit = async () => {
+        // Prevent multiple submissions
+        if (isSubmitting) return;
+        
+        setIsSubmitting(true);
         try {
             if (!user?.uid) {
                 setResumeError('No user ID found.');
@@ -358,6 +363,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
         } catch (error) {
             console.error('Error in handleSubmit:', error);
             setResumeError('Error saving preferences.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -807,9 +814,10 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     <button
                         key={label}
                         onClick={() => setCurrentStep(index)}
+                        disabled={isSubmitting}
                         className={`relative flex items-center ${
                             index <= currentStep ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'
-                        } ${index === currentStep ? 'font-semibold' : ''}`}
+                        } ${index === currentStep ? 'font-semibold' : ''} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                         <span className="absolute -bottom-[20px] text-xs whitespace-nowrap">
                             {label}
@@ -866,7 +874,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 <div className="absolute top-0 right-0 pt-4 pr-4">
                     <button
                         onClick={onHide}
-                        className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        disabled={isSubmitting}
+                        className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <span className="sr-only">Close</span>
                         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -889,7 +898,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                         <button
                             type="button"
                             onClick={handleBack}
-                            className="w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                            disabled={isSubmitting}
+                            className="w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Back
                         </button>
@@ -897,11 +907,22 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     <button
                         type="button"
                         onClick={handleNext}
-                        className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:text-sm ${
+                        disabled={isSubmitting}
+                        className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                             currentStep === 0 ? 'sm:col-start-2' : ''
                         }`}
                     >
-                        {currentStep === stepLabels.length - 1 ? 'Finish' : 'Next'}
+                        {isSubmitting ? (
+                            <div className="flex items-center">
+                                <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Saving...
+                            </div>
+                        ) : (
+                            currentStep === stepLabels.length - 1 ? 'Finish' : 'Next'
+                        )}
                     </button>
                 </div>
             </div>
