@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import { collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import JobCard from '../components/JobCard';
-import ScheduleStatusDisplay from '../components/ui/ScheduleStatusDisplay';
 import type { JobListing } from '../types';
 import type { ScheduledSearch } from '../services/scheduledSearchService';
 
@@ -146,11 +145,6 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
             />
           ))}
         </div>
-      </section>
-
-      {/* Scheduled Searches Section */}
-      <section className="mb-8">
-        <ScheduleStatusDisplay onEditSchedule={() => onOpenPreferences()} />
       </section>
 
       {/* AI Agents Section */}
