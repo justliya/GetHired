@@ -8,31 +8,24 @@ import { Heart, Building2, MapPin, DollarSign, Calendar, Trash2, Search, CheckCi
 import { auth, db } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { signInAnonymously } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import { v4 as uuidv4 } from "uuid";
 
-import { auth, db } from "../firebase";
-import { saveListingsToUserProfile } from "../hooks/JobSave";
-import JobHeader from "../components/JobHeader";
-import JobFilters from "../components/JobFilters";
-import JobResults from "../components/JobResults";
-
-import type { JobListing } from "../types";
-import { ENV } from "../config/environment";
-
-interface SessionData {
-  agentJobs: JobListing[];
-  searchQuery: string;
-  filters: {
-    locationFilter: string[];
-    statusFilter: string[];
-  };
-  lastUpdated: string;
+// Types
+interface JobListing {
+  id: string;
+  listingNumber?: number;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  datePosted: string;
+  description: string;
+  qualifications: string[];
+  benefits: string[];
+  url: string;
+  easyApply: boolean;
+  favorite: boolean;
+  status: 'new' | 'viewed' | 'applied' | 'rejected';
+  jobLink?: string;
 }
 
 const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
