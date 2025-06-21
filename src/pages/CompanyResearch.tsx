@@ -303,17 +303,6 @@ const CompanyResearchPage = () => {
             <List className="w-4 h-4" />
             List
           </button>
-          <button
-            onClick={() => setViewMode('detailed')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'detailed'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            Detailed
-          </button>
         </div>
 
         {/* Company Selector for Detailed View */}
