@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { doc, deleteDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { Building2 } from 'lucide-react';
+import { Building2, Grid3X3, List, RefreshCw } from 'lucide-react';
 import { db, auth } from "../firebase";
 import type { CompanyResearch } from "../types";
-import CompanyCard from "../components/CompanyCard";
+
 import ResearchCard from "../components/ResearchCard";
 
 function isValidCompanyResearch(obj: any): obj is CompanyResearch {
@@ -24,13 +24,13 @@ function isValidCompanyResearch(obj: any): obj is CompanyResearch {
   );
 }
 
-const CompanyResearch = () => {
+const CompanyResearchPage = () => {
   const [user] = useAuthState(auth);
   const [researchList, setResearchList] = useState<CompanyResearch[]>([]);
   const [selectedResearchIndex, setSelectedResearchIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'detailed'>('list');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'detailed'>('grid');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   const parseResearchData = useCallback((rawData: any): CompanyResearch | null => {
@@ -116,18 +116,39 @@ const CompanyResearch = () => {
       }).filter((data): data is CompanyResearch => !!data);
 
       setResearchList(allResearch);
-      setSelectedResearchIndex(0);
-    } catch {
+      if (allResearch.length > 0 && selectedResearchIndex >= allResearch.length) {
+        setSelectedResearchIndex(0);
+      }
+    } catch (err) {
+      console.error('Failed to load research data:', err);
       setError("Failed to load research data. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [user?.uid, parseResearchData]);
+  }, [user?.uid, parseResearchData, selectedResearchIndex]);
 
   // Load research data when component mounts
   useEffect(() => {
     loadResearchData();
   }, [loadResearchData]);
+
+  // Load favorites from localStorage
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('companyFavorites');
+    if (savedFavorites) {
+      try {
+        const parsed = JSON.parse(savedFavorites);
+        setFavorites(new Set(parsed));
+      } catch (err) {
+        console.error('Failed to parse saved favorites:', err);
+      }
+    }
+  }, []);
+
+  // Save favorites to localStorage whenever favorites change
+  useEffect(() => {
+    localStorage.setItem('companyFavorites', JSON.stringify(Array.from(favorites)));
+  }, [favorites]);
 
   // Card component event handlers
   const handleFavoriteToggle = (company: CompanyResearch) => {
@@ -169,7 +190,8 @@ const CompanyResearch = () => {
         }
         
         setError(null);
-      } catch {
+      } catch (err) {
+        console.error('Failed to delete research data:', err);
         setError('Failed to delete research data. Please try again.');
       }
     }
@@ -197,7 +219,8 @@ const CompanyResearch = () => {
       setResearchList(newList);
       setSelectedResearchIndex(Math.max(0, newList.length - 1));
       setError(null);
-    } catch {
+    } catch (err) {
+      console.error('Failed to delete research data:', err);
       setError('Failed to delete research data. Please try again.');
     }
   };
@@ -212,17 +235,19 @@ const CompanyResearch = () => {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto p-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Company Research</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Loading research data...</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <div className="animate-pulse">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow animate-pulse">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -232,11 +257,11 @@ const CompanyResearch = () => {
   const researchData = researchList[selectedResearchIndex];
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto p-6">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Company Research</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-400">
-          Manage and view your company research data
+          Manage and view your company research data ({researchList.length} companies)
         </p>
       </div>
 
@@ -245,41 +270,56 @@ const CompanyResearch = () => {
           <div className="text-red-800 dark:text-red-200">{error}</div>
           <button
             onClick={() => setError(null)}
-            className="text-red-600 dark:text-red-400 text-sm underline mt-2"
+            className="text-red-600 dark:text-red-400 text-sm underline mt-2 hover:no-underline"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* View Mode Toggle */}
-      <div className="mb-6 flex gap-4 items-center">
+      {/* Controls */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        {/* View Mode Toggle */}
         <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
+            onClick={() => setViewMode('grid')}
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+              viewMode === 'grid'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            <Grid3X3 className="w-4 h-4" />
+            Grid
+          </button>
+          <button
             onClick={() => setViewMode('list')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
               viewMode === 'list'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            Card View
+            <List className="w-4 h-4" />
+            List
           </button>
           <button
             onClick={() => setViewMode('detailed')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
               viewMode === 'detailed'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            Detailed View
+            <Building2 className="w-4 h-4" />
+            Detailed
           </button>
         </div>
 
+        {/* Company Selector for Detailed View */}
         {researchList.length > 1 && viewMode === 'detailed' && (
           <select
-            className="px-3 py-2 rounded-md border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            className="px-3 py-2 rounded-md border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
             value={selectedResearchIndex}
             onChange={(e) => setSelectedResearchIndex(parseInt(e.target.value))}
           >
@@ -290,21 +330,75 @@ const CompanyResearch = () => {
             ))}
           </select>
         )}
+
+        {/* Refresh Button */}
+        <button
+          onClick={loadResearchData}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {researchList.length > 0 ? (
-        viewMode === 'list' ? (
-          // Card Grid View
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        viewMode === 'detailed' && researchData ? (
+          // Detailed View
+          <div className="space-y-6">
+            <ResearchCard
+              companyResearch={{
+                ...researchData,
+                favorite: favorites.has(researchData.companyOverview.id || researchData.companyOverview.name)
+              }}
+              variant="detailed"
+              onFavoriteToggle={handleFavoriteToggle}
+              onResearch={handleResearch}
+              onDelete={handleDelete}
+              onViewReviews={handleViewReviews}
+              className="max-w-4xl mx-auto"
+            />
+            
+            {/* Action Buttons for Detailed View */}
+            <div className="flex flex-wrap gap-4 max-w-4xl mx-auto">
+              <button
+                onClick={deleteResearchData}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+              >
+                Delete Research
+              </button>
+              <button
+                onClick={handleSaveResearchData}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+              >
+                Save Research
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm"
+              >
+                Back to Grid
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Grid/List View
+          <div className={`
+            ${viewMode === 'grid' 
+              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
+              : 'space-y-4'
+            }
+          `}>
             {researchList.map((research, index) => {
               const companyId = research.companyOverview.id || research.companyOverview.name;
               return (
-                <CompanyCard
-                  key={index}
+                <ResearchCard
+                  key={`${companyId}-${index}`}
                   companyResearch={{
                     ...research,
                     favorite: favorites.has(companyId)
                   }}
+                  variant={viewMode === 'list' ? 'detailed' : 'compact'}
                   onFavoriteToggle={handleFavoriteToggle}
                   onResearch={handleResearch}
                   onDelete={handleDelete}
@@ -313,45 +407,21 @@ const CompanyResearch = () => {
               );
             })}
           </div>
-        ) : (
-          // Detailed Research Card View
-          <div className="space-y-6">
-            <ResearchCard
-              companyResearch={researchData}
-              title="Company Research Details"
-              icon={<Building2 className="w-5 h-5" />}
-              className="max-w-4xl"
-            />
-            
-            {/* Action Buttons */}
-            <div className="flex gap-4 max-w-4xl">
-              <button
-                onClick={deleteResearchData}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-              >
-                Delete Research
-              </button>
-              <button
-                onClick={loadResearchData}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Refresh Data
-              </button>
-              <button
-                onClick={handleSaveResearchData}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-              >
-                Save Research
-              </button>
-            </div>
-          </div>
         )
       ) : (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">No company research available.</p>
+        // Empty State
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow text-center">
+          <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No Company Research Available
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            You haven't saved any company research yet. Start by researching companies to see them here.
+          </p>
           <button
             onClick={loadResearchData}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             Try Loading Again
           </button>
@@ -361,4 +431,4 @@ const CompanyResearch = () => {
   );
 };
 
-export default CompanyResearch;
+export default CompanyResearchPage;
