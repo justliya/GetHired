@@ -11,6 +11,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import { auth, db } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { useNavigate } from 'react-router-dom';
 
 
 // Types
@@ -53,15 +54,17 @@ export default function JobListings() {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
 
+  const navigate = useNavigate();
+
   const saveToStorageAndFirebase = React.useCallback(async (updatedJobs: JobListing[]) => {
     try {
       // Save to sessionStorage
       sessionStorage.setItem(sessionStorageKey, JSON.stringify(updatedJobs));
-      
+
       // Save to Firebase if user is authenticated
       if (user?.uid) {
         const userRef = doc(db, 'users', user.uid, 'sessions', sessionId);
-        await setDoc(userRef, { 
+        await setDoc(userRef, {
           jobs: updatedJobs,
           lastUpdated: new Date().toISOString(),
           sessionId: sessionId
@@ -113,7 +116,7 @@ export default function JobListings() {
 
   function parseJobListings(responseData: any): JobListing[] {
     console.log('Full response data:', responseData);
-    
+
     // Try to find job arrays in various response structures
     const possibleJobArrays = [
       responseData?.jobs,
@@ -122,7 +125,7 @@ export default function JobListings() {
       Array.isArray(responseData) ? responseData : null,
       responseData?.response
     ].filter(arr => Array.isArray(arr) && arr.length > 0);
-    
+
     for (const jobArray of possibleJobArrays) {
       if (Array.isArray(jobArray) && jobArray.length > 0) {
         return jobArray.map((job: any, index: number) => ({
@@ -134,13 +137,13 @@ export default function JobListings() {
           salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
           datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
           description: job.description || job.job_description || job.summary || 'No description available.',
-          qualifications: Array.isArray(job.qualifications) ? job.qualifications : 
-                         Array.isArray(job.requirements) ? job.requirements :
-                         Array.isArray(job.skills) ? job.skills :
-                         (job.qualifications || job.requirements || job.skills) ? 
-                         [job.qualifications || job.requirements || job.skills] : [],
-          benefits: Array.isArray(job.benefits) ? job.benefits : 
-                   (job.benefits) ? [job.benefits] : [],
+          qualifications: Array.isArray(job.qualifications) ? job.qualifications :
+            Array.isArray(job.requirements) ? job.requirements :
+              Array.isArray(job.skills) ? job.skills :
+                (job.qualifications || job.requirements || job.skills) ?
+                  [job.qualifications || job.requirements || job.skills] : [],
+          benefits: Array.isArray(job.benefits) ? job.benefits :
+            (job.benefits) ? [job.benefits] : [],
           url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
           easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
           favorite: false,
@@ -148,7 +151,7 @@ export default function JobListings() {
         }));
       }
     }
-    
+
     // Try to parse from message text if no direct jobs array found
     const messageText = responseData?.message || responseData?.response || '';
     if (messageText) {
@@ -158,7 +161,7 @@ export default function JobListings() {
         /\{[\s\S]*\}/,
         /\[[\s\S]*\]/
       ];
-      
+
       for (const pattern of patterns) {
         const match = messageText.match(pattern);
         if (match) {
@@ -168,7 +171,7 @@ export default function JobListings() {
             const arr = Array.isArray(parsedData)
               ? parsedData
               : parsedData.jobs ?? parsedData.listings ?? parsedData.results ?? [];
-            
+
             if (arr.length > 0) {
               return arr.map((job: any, index: number) => ({
                 id: `${sessionId}-${index}-${Date.now()}`,
@@ -179,13 +182,13 @@ export default function JobListings() {
                 salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
                 datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
                 description: job.description || job.job_description || job.summary || 'No description available.',
-                qualifications: Array.isArray(job.qualifications) ? job.qualifications : 
-                               Array.isArray(job.requirements) ? job.requirements :
-                               Array.isArray(job.skills) ? job.skills :
-                               (job.qualifications || job.requirements || job.skills) ? 
-                               [job.qualifications || job.requirements || job.skills] : [],
-                benefits: Array.isArray(job.benefits) ? job.benefits : 
-                         (job.benefits) ? [job.benefits] : [],
+                qualifications: Array.isArray(job.qualifications) ? job.qualifications :
+                  Array.isArray(job.requirements) ? job.requirements :
+                    Array.isArray(job.skills) ? job.skills :
+                      (job.qualifications || job.requirements || job.skills) ?
+                        [job.qualifications || job.requirements || job.skills] : [],
+                benefits: Array.isArray(job.benefits) ? job.benefits :
+                  (job.benefits) ? [job.benefits] : [],
                 url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
                 easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
                 favorite: false,
@@ -198,22 +201,22 @@ export default function JobListings() {
         }
       }
     }
-    
+
     return [];
   }
 
   // Fixed API call function - only sends the data, not method/headers in body
   const makeApiCall = async (endpoint: string, requestData: any) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000); 
-    
+    const timeoutId = setTimeout(() => controller.abort(), 300000);
+
     try {
       console.log('Making API call:', { endpoint, requestData });
       setDebugInfo((prev: any) => ({ ...prev, lastRequest: { endpoint, requestData, timestamp: new Date().toISOString() } }));
-      
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -222,14 +225,14 @@ export default function JobListings() {
       });
 
       clearTimeout(timeoutId);
-      
+
       console.log('Response status:', response.status);
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      setDebugInfo((prev: any) => ({ 
-        ...prev, 
-        lastResponse: { 
-          status: response.status, 
+
+      setDebugInfo((prev: any) => ({
+        ...prev,
+        lastResponse: {
+          status: response.status,
           statusText: response.statusText,
           headers: Object.fromEntries(response.headers.entries()),
           timestamp: new Date().toISOString()
@@ -242,7 +245,7 @@ export default function JobListings() {
           const errorText = await response.text();
           console.log('Error response body:', errorText);
           setDebugInfo((prev: any) => ({ ...prev, lastErrorBody: errorText }));
-          
+
           // Try to parse as JSON for more details
           try {
             const errorJson = JSON.parse(errorText);
@@ -260,20 +263,20 @@ export default function JobListings() {
       const result = await response.json();
       console.log('API Response:', result);
       setDebugInfo((prev: any) => ({ ...prev, lastResult: result }));
-      
+
       return result;
     } catch (error) {
       clearTimeout(timeoutId);
       console.error('API call failed:', error);
-      
+
       if (typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError') {
         throw new Error('Request timed out after 5 minutes');
       }
-      
+
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error: Unable to connect to server. Check your internet connection and CORS settings.');
       }
-      
+
       throw error;
     }
   };
@@ -283,12 +286,12 @@ export default function JobListings() {
       setError('Please log in to start a session.');
       return;
     }
-  
+
     setLoading(true);
     setError(null);
-  
+
     try {
-      
+
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
         message: `Initialize session for user ${user.uid}`,
         context: { user_id: user.uid },
@@ -311,23 +314,23 @@ export default function JobListings() {
       setError('Please start a session first.');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      
+
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
         message: 'find me jobs',
         context: { user_id: user.uid },
         session_id: sessionId,
       });
-      
+
       console.log('Jobs search result:', result);
-      
-      
+
+
       const newJobs = parseJobListings(result);
-      
+
       if (newJobs.length > 0) {
         console.log(`Successfully parsed ${newJobs.length} jobs:`, newJobs);
         setJobs(newJobs);
@@ -335,20 +338,19 @@ export default function JobListings() {
         setError(null);
       } else {
         console.warn('No jobs found in response:', result);
-        
+
         let errorMsg = 'No jobs found in the response.';
         if (result.message) {
           const preview = result.message.substring(0, 300);
           errorMsg += ` Response preview: "${preview}${result.message.length > 300 ? '...' : ''}"`;
         }
-        
+
         setError(errorMsg);
       }
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
       setError(
-        `Failed to fetch jobs: ${
-          error instanceof Error ? error.message : String(error)
+        `Failed to fetch jobs: ${error instanceof Error ? error.message : String(error)
         }`
       );
     } finally {
@@ -372,7 +374,7 @@ export default function JobListings() {
           await setDoc(favoriteRef, favoritedJob);
         } else {
           await deleteDoc(favoriteRef);
-         
+
           const jobListingRef = doc(db, 'users', user.uid, 'jobListings', jobId);
           await deleteDoc(jobListingRef);
         }
@@ -383,46 +385,141 @@ export default function JobListings() {
     }
   };
 
-  const handleResearch = async (jobId: string) => {
-    if (!user?.uid) {
-      setError('Please log in to research jobs.');
-      return;
-    }
-    
-    const jobIndex = jobs.findIndex(job => job.id === jobId);
-    if (jobIndex === -1) {
-      setError('Job not found.');
-      return;
-    }
-    
-    setActionLoading(jobId);
-    setError(null);
-    
-    try {
-      // Fixed: Send only the data that backend expects
-      const result = await makeApiCall(`${API_BASE_URL}/run`, {
-        message: `${jobIndex + 1}`,
-        context: { user_id: user.uid },
-        session_id: sessionId,
-      });
+const handleResearch = async (jobId: string) => {
+  if (!user?.uid) {
+    setError('Please log in to research jobs.');
+    return;
+  }
 
-      console.log('Research result:', result);
-      
-      // Update job status to viewed after research
-      const updatedJobs = jobs.map(job => 
-        job.id === jobId ? { ...job, status: 'viewed' as const } : job
-      );
-      setJobs(updatedJobs);
-      await saveToStorageAndFirebase(updatedJobs);
-      
-    } catch (error) {
-      console.error('Failed to research job:', error);
-      setError(`Failed to research job: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const jobIndex = jobs.findIndex(job => job.id === jobId);
+  if (jobIndex === -1) {
+    setError('Job not found.');
+    return;
+  }
 
+  const currentJob = jobs[jobIndex];
+  setActionLoading(jobId);
+  setError(null);
+
+  try {
+    const result = await makeApiCall(`${API_BASE_URL}/run`, {
+      message: `${jobIndex + 1}`,
+      context: { user_id: user.uid },
+      session_id: sessionId,
+    });
+
+    console.log('Research API result:', result);
+
+    // Save the job listing to dedicated subcollection
+    const jobListingRef = doc(db, 'users', user.uid, 'jobListings', jobId);
+    await setDoc(jobListingRef, currentJob);
+
+    // Parse and save company research data
+    let parsedResearchData = null;
+    
+    // Try to parse the research data from the API response
+    const parseResearchData = (rawData: any) => {
+      if (!rawData) return null;
+
+      // Check if it's already in the right format
+      if (rawData.companyOverview && rawData.ratings) {
+        return rawData;
+      }
+
+      // Try different nested structures
+      const possibleStructures = [
+        rawData?.companyResearch,
+        rawData?.data?.companyResearch,
+        rawData?.researchData,
+        rawData?.research,
+        rawData?.response?.companyResearch,
+        Array.isArray(rawData) ? rawData[0] : null,
+      ].filter(obj => obj && typeof obj === 'object');
+
+      for (const obj of possibleStructures) {
+        if (obj.companyOverview && obj.ratings) {
+          return obj;
+        }
+      }
+
+      // Try to parse from message text
+      const messageText = rawData?.message || rawData?.data?.raw_events?.[0]?.parts?.[0]?.text || rawData?.text || "";
+      if (messageText) {
+        const patterns = [
+          /```json\s*([\s\S]+?)```/,
+          /```([\s\S]+?)```/,
+          /\{[\s\S]*"companyOverview"[\s\S]*\}/,
+          /\{[\s\S]*\}/,
+        ];
+
+        for (const pattern of patterns) {
+          const match = messageText.match(pattern);
+          if (match) {
+            const jsonStr = match[pattern.source.includes('```') ? 1 : 0];
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const dataObj = parsed.companyResearch ?? parsed;
+              if (dataObj.companyOverview && dataObj.ratings) {
+                return dataObj;
+              }
+            } catch (e) {
+              console.warn('JSON parse error:', e);
+            }
+          }
+        }
+      }
+
+      return null;
+    };
+
+    parsedResearchData = parseResearchData(result);
+
+    // Save to both Firebase and localStorage
+    const researchDocData = {
+      jobId: jobId,
+      jobTitle: currentJob.title,
+      company: currentJob.company,
+      researchData: parsedResearchData || result, // Save raw data if parsing fails
+      createdAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Save company research to its own subcollection
+    const companyResearchRef = doc(db, 'users', user.uid, 'companyResearch', jobId);
+    await setDoc(companyResearchRef, researchDocData);
+
+    // Also save to localStorage for immediate access
+    const localStorageKey = `company-research-${jobId}`;
+    if (parsedResearchData) {
+      localStorage.setItem(localStorageKey, JSON.stringify(parsedResearchData));
+    } else {
+      // Save the raw result if we couldn't parse it properly
+      localStorage.setItem(localStorageKey, JSON.stringify(result));
+    }
+
+    // Update job status to viewed in the current session
+    const updatedJobs = jobs.map(job =>
+      job.id === jobId ? { ...job, status: 'viewed' as const } : job
+    );
+    setJobs(updatedJobs);
+    await saveToStorageAndFirebase(updatedJobs);
+
+    console.log('Job and research data saved to subcollections and localStorage:', {
+      jobId,
+      jobTitle: currentJob.title,
+      company: currentJob.company,
+      researchDataParsed: !!parsedResearchData
+    });
+
+    // Navigate to company research page
+    navigate(`/company-research/${jobId}`);
+  } catch (error) {
+    console.error('Failed to research job:', error);
+    setError(`Failed to research job: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    setActionLoading(null);
+  }
+};
   const handleDelete = async (jobId: string) => {
     try {
       const updatedJobs = jobs.filter(job => job.id !== jobId);
@@ -439,10 +536,10 @@ export default function JobListings() {
       setError('Please log in to complete session.');
       return;
     }
-  
+
     setLoading(true);
     setError(null);
-  
+
     try {
       // Fixed: Send only the data that backend expects - consistent format
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
@@ -462,20 +559,20 @@ export default function JobListings() {
     }
   };
 
-  
- 
+
+
 
   // Test connection function
   const testConnection = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/health`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
       });
-      
+
       if (response.ok) {
         setError('✅ Connection test successful!');
       } else {
@@ -483,8 +580,7 @@ export default function JobListings() {
       }
     } catch (error) {
       setError(
-        `❌ Connection test failed: ${
-          error instanceof Error ? error.message : String(error)
+        `❌ Connection test failed: ${error instanceof Error ? error.message : String(error)
         }`
       );
     } finally {
@@ -555,7 +651,7 @@ export default function JobListings() {
           <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-6 text-xs">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-semibold">Debug Information:</h3>
-              <button 
+              <button
                 onClick={() => setDebugInfo(null)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
@@ -570,16 +666,15 @@ export default function JobListings() {
 
         {/* Error Display */}
         {error && (
-          <div className={`border rounded-lg p-4 mb-6 ${
-            error.startsWith('✅') 
-              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
-              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
-          }`}>
+          <div className={`border rounded-lg p-4 mb-6 ${error.startsWith('✅')
+            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
+            }`}>
             <div className="flex items-start gap-2">
               <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <div className="text-sm">{error}</div>
-                <button 
+                <button
                   onClick={() => setError(null)}
                   className="text-xs underline mt-1 opacity-75 hover:opacity-100"
                 >

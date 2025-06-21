@@ -9,7 +9,7 @@ export interface JobListing {
   description: string;
   qualifications: string[];
   benefits: string[];
-  jobLink: string;
+  jobLink?: string;
   easyApply?: boolean;
   favorite: boolean;
   status: string;
