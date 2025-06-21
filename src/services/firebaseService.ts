@@ -195,6 +195,7 @@ export const uploadResume = async (userId: string, file: File, metadata?: Partia
 
     const resumeData: Resume = {
       fileUrl,
+      publicUrl: getPublicUrlFromDownloadUrl(fileUrl), // Store both URLs
       createdAt: new Date().toISOString(),
       type: meta.isOriginal ? 'original' : 'tailored',
       metadata: meta
@@ -479,6 +480,70 @@ export const getUserData = async (userId: string) => {
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+};
+
+// Utility function to convert Firebase download URL to public URL for agent processing
+export const getPublicUrlFromDownloadUrl = (downloadUrl: string): string => {
+  try {
+    // Firebase Storage download URLs have the format:
+    // https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media&token={token}
+    // Public URLs have the format:
+    // https://storage.googleapis.com/{bucket}/{path}
+    
+    const url = new URL(downloadUrl);
+    
+    // Check if it's a Firebase Storage download URL
+    if (url.hostname === 'firebasestorage.googleapis.com') {
+      // Extract bucket and path from the URL
+      const pathParts = url.pathname.split('/');
+      if (pathParts.length >= 4 && pathParts[1] === 'v0' && pathParts[2] === 'b') {
+        const bucket = pathParts[3];
+        const encodedPath = pathParts.slice(5).join('/'); // Skip 'v0', 'b', bucket, 'o'
+        const decodedPath = decodeURIComponent(encodedPath);
+        
+        // Return public URL format
+        return `https://storage.googleapis.com/${bucket}/${decodedPath}`;
+      }
+    }
+    
+    // If it's already a public URL or not a Firebase Storage URL, return as is
+    return downloadUrl;
+  } catch (error) {
+    console.warn('Failed to convert download URL to public URL:', error);
+    return downloadUrl; // Return original URL as fallback
+  }
+};
+
+// Enhanced function to get user resumes with public URL option
+export const getUserResumesWithPublicUrls = async (userId: string, usePublicUrls: boolean = false) => {
+  try {
+    const result = await getUserResumes(userId);
+    
+    if (!result.success || !result.data) {
+      return result;
+    }
+    
+    // If public URLs are requested, convert download URLs to public URLs
+    if (usePublicUrls) {
+      const resumesWithPublicUrls = result.data.map(resume => ({
+        ...resume,
+        fileUrl: getPublicUrlFromDownloadUrl(resume.fileUrl),
+        // Add a separate field for the public URL to maintain both
+        publicUrl: getPublicUrlFromDownloadUrl(resume.fileUrl)
+      }));
+      
+      return { success: true, data: resumesWithPublicUrls };
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Failed to fetch user resumes with public URLs:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      data: [] 
     };
   }
 };
