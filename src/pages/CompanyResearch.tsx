@@ -208,12 +208,10 @@ const CompanyResearchPage = () => {
     if (!user?.uid || researchList.length === 0) return;
     const researchData = researchList[selectedResearchIndex];
     if (!researchData) return;
-
     try {
       const companyId = researchData.companyOverview.id || researchData.companyOverview.name;
       const ref = doc(db, "users", user.uid, "companyResearch", companyId);
       await deleteDoc(ref);
-
       // Remove from local list
       const newList = researchList.filter((_, idx) => idx !== selectedResearchIndex);
       setResearchList(newList);

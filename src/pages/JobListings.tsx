@@ -509,6 +509,7 @@ const handleResearch = async (jobId: string) => {
     }
   };
 
+
   // Commented out test connection function
   // const testConnection = async () => {
   //   setLoading(true);
