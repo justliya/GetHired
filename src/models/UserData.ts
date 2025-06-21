@@ -71,6 +71,7 @@ export type ResumeUploadSource = 'manual' | 'job-application' | 'auto-generated'
 
 export interface Resume {
   fileUrl: string;
+  publicUrl?: string;  // Public URL for agent processing (without authentication)
   createdAt: string;
   type: ResumeType;
   metadata: {
