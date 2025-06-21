@@ -4,7 +4,7 @@ import { Loader2, ArrowLeft, FileText } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
-import { getUserResumes, uploadResume, getJobListings, getUserData } from '../services/firebaseService';
+import { getUserResumes, getPublicUrlFromDownloadUrl, uploadResume, getJobListings, getUserData } from '../services/firebaseService';
 import { useResumeTailoring } from '../hooks/useResumeTailoring';
 import {
   ResumeSelector,
@@ -72,7 +72,7 @@ const ResumeTailoring = () => {
           const defaultResume = resumesResult.data?.find(r => r.metadata?.isOriginal);
           if (defaultResume) {
             setSelectedResumeId(defaultResume.id);
-            setSelectedResumeUrl(defaultResume.fileUrl);
+            setSelectedResumeUrl(getPublicUrlFromDownloadUrl(defaultResume.fileUrl));
             setResumeInputMethod('saved');
             setResumeText(`Upload resume content will be processed automatically.`);
           }
@@ -144,7 +144,7 @@ const ResumeTailoring = () => {
         const newResume = result.data;
         setUserResumes(prev => [...prev, newResume]);
         setSelectedResumeId(newResume.id);
-        setSelectedResumeUrl(newResume.fileUrl);
+        setSelectedResumeUrl(getPublicUrlFromDownloadUrl(newResume.fileUrl));
         setResumeInputMethod('upload');
         
         setResumeText(`The resume content will be processed automatically.`);
@@ -160,7 +160,7 @@ const ResumeTailoring = () => {
     const resume = userResumes.find(r => r.id === resumeId);
     if (!resume) return;
 
-    setSelectedResumeUrl(resume.fileUrl);
+    setSelectedResumeUrl(getPublicUrlFromDownloadUrl(resume.fileUrl));
     setResumeInputMethod('saved');
     
     setResumeText(`The resume content will be processed automatically. You can also paste additional text if needed.`);
