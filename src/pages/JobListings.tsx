@@ -46,22 +46,36 @@ import JobResults from "../components/JobResults";
 import type { JobListing } from "../types";
 import { ENV } from "../config/environment";
 
-interface SessionData {
-  agentJobs: JobListing[];
-  searchQuery: string;
-  filters: {
-    locationFilter: string[];
-    statusFilter: string[];
-  };
-  lastUpdated: string;
+
+// Types
+interface JobListing {
+  id: string;
+  listingNumber?: number;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  datePosted: string;
+  description: string;
+  qualifications: string[];
+  benefits: string[];
+  url: string;
+  easyApply: boolean;
+  favorite: boolean;
+  status: 'new' | 'viewed' | 'applied' | 'rejected';
+  jobLink?: string;
 }
 
-const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
+const API_BASE_URL = 'https://gethired-agents-104139545590.us-central1.run.app';
 
-const JobListings = () => {
-  const navigate = useNavigate();
-  const [user, loading, error] = useAuthState(auth);
-  const sessionId = useRef(`conv-${uuidv4()}`).current;
+export default function JobListings() {
+  const [user, authLoading, authError] = useAuthState(auth);
+  const [sessionId] = useState(() => {
+    const existing = sessionStorage.getItem('active-session-id');
+    const newId = existing || `conv-${uuidv4()}`;
+    sessionStorage.setItem('active-session-id', newId);
+    return newId;
+  });
   const sessionStorageKey = `session-${sessionId}`;
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [sessionStarted, setSessionStarted] = useState(() => {
@@ -78,19 +92,18 @@ const JobListings = () => {
     try {
       // Save to sessionStorage
       sessionStorage.setItem(sessionStorageKey, JSON.stringify(updatedJobs));
-      
+
       // Save to Firebase if user is authenticated
       if (user?.uid) {
         const userRef = doc(db, 'users', user.uid, 'sessions', sessionId);
-        await setDoc(userRef, { 
+        await setDoc(userRef, {
           jobs: updatedJobs,
           lastUpdated: new Date().toISOString(),
           sessionId: sessionId
         }, { merge: true });
       }
-    } catch (error) {
-      console.error('Failed to save jobs:', error);
-      setError('Failed to save jobs. Please try again.');
+    } catch (e) {
+      console.error("Error in JSON parsing:", e);
     }
   };
 
@@ -127,14 +140,14 @@ const JobListings = () => {
   }, [user, authLoading, sessionId, sessionStorageKey]);
 
   useEffect(() => {
-    if (jobs.length > 0) {
-      saveToStorageAndFirebase(jobs);
+    if (!loading) {
+      loadSessionData();
     }
   }, [jobs]);
 
   function parseJobListings(responseData: any): JobListing[] {
     console.log('Full response data:', responseData);
-    
+
     // Try to find job arrays in various response structures
     const possibleJobArrays = [
       responseData?.jobs,
@@ -143,7 +156,7 @@ const JobListings = () => {
       Array.isArray(responseData) ? responseData : null,
       responseData?.response
     ].filter(arr => Array.isArray(arr) && arr.length > 0);
-    
+
     for (const jobArray of possibleJobArrays) {
       if (Array.isArray(jobArray) && jobArray.length > 0) {
         return jobArray.map((job: any, index: number) => ({
@@ -155,13 +168,13 @@ const JobListings = () => {
           salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
           datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
           description: job.description || job.job_description || job.summary || 'No description available.',
-          qualifications: Array.isArray(job.qualifications) ? job.qualifications : 
-                         Array.isArray(job.requirements) ? job.requirements :
-                         Array.isArray(job.skills) ? job.skills :
-                         (job.qualifications || job.requirements || job.skills) ? 
-                         [job.qualifications || job.requirements || job.skills] : [],
-          benefits: Array.isArray(job.benefits) ? job.benefits : 
-                   (job.benefits) ? [job.benefits] : [],
+          qualifications: Array.isArray(job.qualifications) ? job.qualifications :
+            Array.isArray(job.requirements) ? job.requirements :
+              Array.isArray(job.skills) ? job.skills :
+                (job.qualifications || job.requirements || job.skills) ?
+                  [job.qualifications || job.requirements || job.skills] : [],
+          benefits: Array.isArray(job.benefits) ? job.benefits :
+            (job.benefits) ? [job.benefits] : [],
           url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
           easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
           favorite: false,
@@ -169,7 +182,7 @@ const JobListings = () => {
         }));
       }
     }
-    
+
     // Try to parse from message text if no direct jobs array found
     const messageText = responseData?.message || responseData?.response || '';
     if (messageText) {
@@ -179,7 +192,7 @@ const JobListings = () => {
         /\{[\s\S]*\}/,
         /\[[\s\S]*\]/
       ];
-      
+
       for (const pattern of patterns) {
         const match = messageText.match(pattern);
         if (match) {
@@ -189,7 +202,7 @@ const JobListings = () => {
             const arr = Array.isArray(parsedData)
               ? parsedData
               : parsedData.jobs ?? parsedData.listings ?? parsedData.results ?? [];
-            
+
             if (arr.length > 0) {
               return arr.map((job: any, index: number) => ({
                 id: `${sessionId}-${index}-${Date.now()}`,
@@ -200,13 +213,13 @@ const JobListings = () => {
                 salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
                 datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
                 description: job.description || job.job_description || job.summary || 'No description available.',
-                qualifications: Array.isArray(job.qualifications) ? job.qualifications : 
-                               Array.isArray(job.requirements) ? job.requirements :
-                               Array.isArray(job.skills) ? job.skills :
-                               (job.qualifications || job.requirements || job.skills) ? 
-                               [job.qualifications || job.requirements || job.skills] : [],
-                benefits: Array.isArray(job.benefits) ? job.benefits : 
-                         (job.benefits) ? [job.benefits] : [],
+                qualifications: Array.isArray(job.qualifications) ? job.qualifications :
+                  Array.isArray(job.requirements) ? job.requirements :
+                    Array.isArray(job.skills) ? job.skills :
+                      (job.qualifications || job.requirements || job.skills) ?
+                        [job.qualifications || job.requirements || job.skills] : [],
+                benefits: Array.isArray(job.benefits) ? job.benefits :
+                  (job.benefits) ? [job.benefits] : [],
                 url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
                 easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
                 favorite: false,
@@ -219,22 +232,22 @@ const JobListings = () => {
         }
       }
     }
-    
+
     return [];
   }
 
   // Fixed API call function - only sends the data, not method/headers in body
   const makeApiCall = async (endpoint: string, requestData: any) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000); 
-    
+    const timeoutId = setTimeout(() => controller.abort(), 300000);
+
     try {
       console.log('Making API call:', { endpoint, requestData });
-      setDebugInfo((prev: any) => ({ ...prev, lastRequest: { endpoint, requestData, timestamp: new Date().toISOString() } }));
-      
+      // setDebugInfo((prev: any) => ({ ...prev, lastRequest: { endpoint, requestData, timestamp: new Date().toISOString() } })); // Commented out debug
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -243,27 +256,27 @@ const JobListings = () => {
       });
 
       clearTimeout(timeoutId);
-      
+
       console.log('Response status:', response.status);
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      setDebugInfo((prev: any) => ({ 
-        ...prev, 
-        lastResponse: { 
-          status: response.status, 
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          timestamp: new Date().toISOString()
-        }
-      }));
+
+      // setDebugInfo((prev: any) => ({
+      //   ...prev,
+      //   lastResponse: {
+      //     status: response.status,
+      //     statusText: response.statusText,
+      //     headers: Object.fromEntries(response.headers.entries()),
+      //     timestamp: new Date().toISOString()
+      //   }
+      // })); // Commented out debug
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errorText = await response.text();
           console.log('Error response body:', errorText);
-          setDebugInfo((prev: any) => ({ ...prev, lastErrorBody: errorText }));
-          
+          // setDebugInfo((prev: any) => ({ ...prev, lastErrorBody: errorText })); // Commented out debug
+
           // Try to parse as JSON for more details
           try {
             const errorJson = JSON.parse(errorText);
@@ -280,21 +293,21 @@ const JobListings = () => {
 
       const result = await response.json();
       console.log('API Response:', result);
-      setDebugInfo((prev: any) => ({ ...prev, lastResult: result }));
-      
+      // setDebugInfo((prev: any) => ({ ...prev, lastResult: result })); // Commented out debug
+
       return result;
     } catch (error) {
       clearTimeout(timeoutId);
       console.error('API call failed:', error);
-      
+
       if (typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError') {
         throw new Error('Request timed out after 5 minutes');
       }
-      
+
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error: Unable to connect to server. Check your internet connection and CORS settings.');
       }
-      
+
       throw error;
     }
   };
@@ -304,51 +317,56 @@ const JobListings = () => {
       setError('Please log in to start a session.');
       return;
     }
-  
+
     setLoading(true);
     setError(null);
-  
+
     try {
-      
+
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
         message: `Initialize session for user ${user.uid}`,
         context: { user_id: user.uid },
         session_id: sessionId,
       });
-
-      console.log('Session started:', result);
-      setSessionStarted(true);
-      sessionStorage.setItem(`session-started-${sessionId}`, 'true');
-    } catch (error) {
-      console.error('Failed to start session:', error);
-      setError(`Failed to start session: ${error instanceof Error ? error.message : String(error)}`);
+      
+      if (!res.ok) throw new Error(res.statusText);
+      
+      setConfirmation("Session started successfully!");
+      setTimeout(() => setConfirmation(""), 2000);
+    } catch (err: any) {
+      console.error("Error starting session:", err);
+      setConfirmation(`Error starting session: ${err.message}`);
+      setTimeout(() => setConfirmation(""), 3000);
+      setSessionStarted(false);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const searchJobs = async () => {
-    if (!sessionStarted || !user?.uid) {
-      setError('Please start a session first.');
+  // Search for jobs autonomously
+  const handleSearchJobs = async () => {
+    if (!sessionStarted) {
+      setConfirmation("Please start a session first!");
+      setTimeout(() => setConfirmation(""), 2000);
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      
+
       const result = await makeApiCall(`${API_BASE_URL}/run`, {
         message: 'find me jobs',
         context: { user_id: user.uid },
         session_id: sessionId,
       });
-      
+
       console.log('Jobs search result:', result);
-      
-      
+
+
       const newJobs = parseJobListings(result);
-      
+
       if (newJobs.length > 0) {
         console.log(`Successfully parsed ${newJobs.length} jobs:`, newJobs);
         setJobs(newJobs);
@@ -356,24 +374,23 @@ const JobListings = () => {
         setError(null);
       } else {
         console.warn('No jobs found in response:', result);
-        
+
         let errorMsg = 'No jobs found in the response.';
         if (result.message) {
           const preview = result.message.substring(0, 300);
           errorMsg += ` Response preview: "${preview}${result.message.length > 300 ? '...' : ''}"`;
         }
-        
+
         setError(errorMsg);
       }
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
       setError(
-        `Failed to fetch jobs: ${
-          error instanceof Error ? error.message : String(error)
+        `Failed to fetch jobs: ${error instanceof Error ? error.message : String(error)
         }`
       );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -524,45 +541,41 @@ const JobListings = () => {
     }
   };
 
-  // Reset session
-  const handleNewSession = () => {
-    setAgentJobs([]);
-    setUseAgentJobs(false);
-    setSessionStarted(false);
-    sessionStorage.removeItem(sessionStorageKey);
-    setConfirmation("New session started!");
-    setTimeout(() => setConfirmation(""), 2000);
-  };
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (loading) return <div className="py-12 text-center text-gray-600">Initializing auth…</div>;
-  if (error) return <div className="py-12 text-center text-red-600">Auth Error: {error.message}</div>;
+  // Show error state if authentication failed
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">Authentication Error</div>
+          <p className="text-gray-600 dark:text-gray-300">Please try refreshing the page.</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Display and filter jobs
-  const displayJobs = useAgentJobs ? agentJobs : profileJobs;
-  const filteredJobs = displayJobs.filter((job) => {
-    if (searchQuery && ![job.title, job.company].some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))) return false;
-    if (locationFilter.length && !locationFilter.includes(job.location)) return false;
-    if (statusFilter.length && !statusFilter.includes(job.status)) return false;
-    return true;
-  });
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            Job Search Agent
-          </h1>
+  // Show login required state
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Please log in to access job listings
+          </div>
           <p className="text-gray-600 dark:text-gray-300">
-            Find your next career opportunity with AI-powered job matching
+            You need to be authenticated to use this feature.
           </p>
-          {user && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Welcome {user.email}, after jobs appear select your favorites and the ones you would like to research
-              then click 'Complete Session' when you are done and researched listing will appear in the 'Resume Tailoring' tab!
-            </p>
-          )}
         </div>
 
         {/* Getting Started Instructions */}
@@ -622,7 +635,7 @@ const JobListings = () => {
           <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-6 text-xs">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-semibold">Debug Information:</h3>
-              <button 
+              <button
                 onClick={() => setDebugInfo(null)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
@@ -873,39 +886,33 @@ const JobListings = () => {
             </div>
           ))}
         </div>
-        {sessionStarted && (
-          <p className="text-sm text-green-600 mt-2">
-            ✓ Session active - Jobs will be automatically saved to session storage
-          </p>
+
+        {/* Empty State */}
+        {jobs.length === 0 && !loading && (
+          <div className="text-center py-16">
+            <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No Jobs Found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Start a session and search for jobs to see opportunities here.
+            </p>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-16">
+            <Loader2 className="w-16 h-16 text-blue-600 mx-auto mb-4 animate-spin" />
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              {sessionStarted ? 'Searching for Jobs...' : 'Starting Session...'}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              Please wait while we process your request.
+            </p>
+          </div>
         )}
       </div>
-
-      {confirmation && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          className="bg-green-100 text-green-800 p-2 rounded mb-4 text-center"
-        >
-          {confirmation}
-        </motion.div>
-      )}
-
-      <JobFilters
-        searchQuery={searchQuery}
-        onSearchChange={handleSearchChange}
-        onClear={handleClearFilters}
-      />
-
-      <AnimatePresence>
-        <JobResults
-          jobs={filteredJobs}
-          onResearch={job => navigate(`/company-research/${job.id}`)}
-          onFavoriteToggle={handleFavoriteToggle}
-        />
-      </AnimatePresence>
     </div>
   );
-};
-
-export default JobListings;
+}
