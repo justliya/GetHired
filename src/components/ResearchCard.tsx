@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { 
-  Users, 
-  MapPin, 
-  Star, 
-  DollarSign, 
-  Bookmark, 
-  ExternalLink, 
-  Award, 
-  TrendingUp, 
+import {
+  Users,
+  MapPin,
+  Star,
+  DollarSign,
+  Bookmark,
+  ExternalLink,
+  Award,
+  TrendingUp,
   AlertTriangle,
   Calendar,
   ChevronDown,
@@ -103,8 +103,6 @@ interface ResearchCardProps {
   className?: string;
 }
 
-
-
 // Improved Logo Component with Error Handling
 const CompanyLogo: React.FC<{
   logoUrl: string;
@@ -127,8 +125,8 @@ const CompanyLogo: React.FC<{
       {imageLoading && (
         <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
       )}
-      <img 
-        src={logoUrl} 
+      <img
+        src={logoUrl}
         alt={`${companyName} logo`}
         className={`w-full h-full object-contain transition-opacity duration-200 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
         onError={() => {
@@ -138,7 +136,7 @@ const CompanyLogo: React.FC<{
         onLoad={() => {
           setImageLoading(false);
         }}
-        style={{ 
+        style={{
           maxWidth: '100%',
           maxHeight: '100%'
         }}
@@ -220,26 +218,25 @@ const CollapsibleSection: React.FC<{
 const ResearchCard: React.FC<ResearchCardProps> = ({
   companyResearch,
   onFavoriteToggle,
-  onResearch,
   onDelete,
   onViewReviews,
   variant = 'compact',
   className = ''
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  const { 
-    companyOverview, 
-    ratings, 
-    salaryEstimates, 
-    strategicAssessment, 
+
+  const {
+    companyOverview,
+    ratings,
+    salaryEstimates,
+    strategicAssessment,
     awards,
     reviewsSummary,
     interviewIntelligence,
     competitors,
     officeLocations
   } = companyResearch;
-  
+
   // Create a summary description from strategic assessment
   const summaryDescription = [
     strategicAssessment.strengths[0],
@@ -267,7 +264,7 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <CompanyLogo 
+            <CompanyLogo
               logoUrl={companyOverview.logoUrl}
               companyName={companyOverview.name}
             />
@@ -283,7 +280,7 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
               <p className="text-sm opacity-90">{companyOverview.industry}</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => onFavoriteToggle(companyResearch)}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
           >
@@ -459,8 +456,8 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
                   <TrendingUp className="w-4 h-4" />
                   Pros
                 </h5>
-                <ExpandableList 
-                  items={reviewsSummary.pros} 
+                <ExpandableList
+                  items={reviewsSummary.pros}
                   maxItems={3}
                   className="space-y-1"
                 />
@@ -470,8 +467,8 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
                   <AlertTriangle className="w-4 h-4" />
                   Cons
                 </h5>
-                <ExpandableList 
-                  items={reviewsSummary.cons} 
+                <ExpandableList
+                  items={reviewsSummary.cons}
                   maxItems={3}
                   className="space-y-1"
                 />
@@ -520,7 +517,7 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Rounds</div>
                 </div>
               </div>
-              
+
               <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                 <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Process</h5>
                 <p className="text-sm text-gray-600 dark:text-gray-400">{interviewIntelligence.process}</p>
@@ -531,8 +528,8 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
                   <HelpCircle className="w-4 h-4" />
                   Common Questions
                 </h5>
-                <ExpandableList 
-                  items={interviewIntelligence.commonQuestions} 
+                <ExpandableList
+                  items={interviewIntelligence.commonQuestions}
                   maxItems={3}
                   className="space-y-1"
                 />
@@ -543,8 +540,8 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
                   <Target className="w-4 h-4" />
                   Interview Tips
                 </h5>
-                <ExpandableList 
-                  items={interviewIntelligence.tips} 
+                <ExpandableList
+                  items={interviewIntelligence.tips}
                   maxItems={3}
                   className="space-y-1"
                 />
@@ -613,21 +610,21 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
                   <TrendingUp className="w-4 h-4" />
                   Strengths
                 </h5>
-                <ExpandableList 
-                  items={strategicAssessment.strengths} 
+                <ExpandableList
+                  items={strategicAssessment.strengths}
                   maxItems={3}
                   className="space-y-2"
                   itemClassName="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg"
                 />
               </div>
-              
+
               <div>
                 <h5 className="font-medium text-yellow-700 dark:text-yellow-300 mb-3 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   Concerns
                 </h5>
-                <ExpandableList 
-                  items={strategicAssessment.concerns} 
+                <ExpandableList
+                  items={strategicAssessment.concerns}
                   maxItems={3}
                   className="space-y-2"
                   itemClassName="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg"
@@ -664,10 +661,10 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
           Reviews
         </button>
         <button
-          onClick={() => onResearch(companyResearch)}
-          className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 text-sm font-medium hover:underline transition-colors"
+          onClick={() => window.location.href = `/resume-tailoring/${companyResearch.companyOverview.id}`}
+          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm font-medium hover:underline transition-colors"
         >
-          Research
+          Tailor Resume
         </button>
         <button
           onClick={() => onDelete(companyResearch)}

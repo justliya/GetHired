@@ -179,16 +179,16 @@ const CompanyResearchPage = () => {
         const companyId = company.companyOverview.id || company.companyOverview.name;
         const ref = doc(db, "users", user.uid, "companyResearch", companyId);
         await deleteDoc(ref);
-        
+
         // Remove from local list
         const newList = researchList.filter((_, idx) => idx !== index);
         setResearchList(newList);
-        
+
         // Adjust selected index if needed
         if (selectedResearchIndex >= newList.length) {
           setSelectedResearchIndex(Math.max(0, newList.length - 1));
         }
-        
+
         setError(null);
       } catch (err) {
         console.error('Failed to delete research data:', err);
@@ -208,12 +208,12 @@ const CompanyResearchPage = () => {
     if (!user?.uid || researchList.length === 0) return;
     const researchData = researchList[selectedResearchIndex];
     if (!researchData) return;
-    
+
     try {
       const companyId = researchData.companyOverview.id || researchData.companyOverview.name;
       const ref = doc(db, "users", user.uid, "companyResearch", companyId);
       await deleteDoc(ref);
-      
+
       // Remove from local list
       const newList = researchList.filter((_, idx) => idx !== selectedResearchIndex);
       setResearchList(newList);
@@ -283,22 +283,20 @@ const CompanyResearchPage = () => {
         <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
             onClick={() => setViewMode('grid')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'grid'
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${viewMode === 'grid'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <Grid3X3 className="w-4 h-4" />
             Grid
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'list'
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${viewMode === 'list'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <List className="w-4 h-4" />
             List
@@ -347,7 +345,7 @@ const CompanyResearchPage = () => {
               onViewReviews={handleViewReviews}
               className="max-w-4xl mx-auto"
             />
-            
+
             {/* Action Buttons for Detailed View */}
             <div className="flex flex-wrap gap-4 max-w-4xl mx-auto">
               <button
@@ -373,8 +371,8 @@ const CompanyResearchPage = () => {
         ) : (
           // Grid/List View
           <div className={`
-            ${viewMode === 'grid' 
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
+            ${viewMode === 'grid'
+              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
               : 'space-y-4'
             }
           `}>

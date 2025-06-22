@@ -11,10 +11,9 @@ interface CardProps {
 
 const Card: React.FC<CardProps> = ({ title, icon, children, className = '', onClick, hover = false }) => {
   return (
-    <div 
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden ${
-        hover ? 'hover:shadow-md transition-shadow duration-200 cursor-pointer' : ''
-      } ${className}`}
+    <div
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden ${hover ? 'hover:shadow-md transition-shadow duration-200 cursor-pointer' : ''
+        } ${className}`}
       onClick={onClick}
     >
       {(title || icon) && (
