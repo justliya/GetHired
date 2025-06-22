@@ -49,20 +49,51 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const fileExtension = getFileExtension(documentUrl);
   const isWordDoc = ['doc', 'docx'].includes(fileExtension);
   const isPdf = fileExtension === 'pdf';
+  const [viewerFallback, setViewerFallback] = useState(0); // 0: primary, 1: fallback 1, 2: fallback 2
 
-  // Generate viewer URL based on document type
+  // Generate viewer URL based on document type with fallback options
   const getViewerUrl = useCallback(() => {
     if (isWordDoc) {
-      // Use Microsoft Office Online viewer for Word documents
-      return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(documentUrl)}`;
+      switch (viewerFallback) {
+        case 0:
+          // Primary: Microsoft Office Online viewer
+          return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(documentUrl)}`;
+        case 1:
+          // Fallback 1: Google Drive viewer
+          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(documentUrl)}`;
+        case 2:
+          // Fallback 2: Direct download link
+          return documentUrl;
+        default:
+          return documentUrl;
+      }
     } else if (isPdf) {
-      // Use browser's native PDF viewer or Google Drive viewer
-      return documentUrl;
+      switch (viewerFallback) {
+        case 0:
+          // Primary: Direct PDF viewing
+          return documentUrl;
+        case 1:
+          // Fallback: Google Drive viewer for PDFs
+          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(documentUrl)}`;
+        default:
+          return documentUrl;
+      }
     } else {
-      // Fallback to Google Drive viewer for other document types
-      return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(documentUrl)}`;
+      switch (viewerFallback) {
+        case 0:
+          // Primary: Google Drive viewer
+          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(documentUrl)}`;
+        case 1:
+          // Fallback: Microsoft Office Online (for other office docs)
+          return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(documentUrl)}`;
+        case 2:
+          // Fallback 2: Direct link
+          return documentUrl;
+        default:
+          return documentUrl;
+      }
     }
-  }, [documentUrl, isWordDoc, isPdf]);
+  }, [documentUrl, isWordDoc, isPdf, viewerFallback]);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 25, 300));
@@ -120,7 +151,23 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
   const handleIframeError = () => {
     setIsLoading(false);
-    setError('Failed to load document. The document might not be publicly accessible.');
+    
+    // Try fallback viewers before showing error
+    if (viewerFallback < 2) {
+      console.log(`Primary viewer failed, trying fallback ${viewerFallback + 1}`);
+      setViewerFallback(prev => prev + 1);
+      setIsLoading(true);
+      setError(null);
+      return;
+    }
+    
+    setError('Failed to load document. The document might not be publicly accessible or may have CORS restrictions.');
+  };
+
+  const handleTryAlternativeViewer = () => {
+    setViewerFallback(prev => (prev + 1) % 3);
+    setIsLoading(true);
+    setError(null);
   };
 
   return (
@@ -246,6 +293,13 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
                 {error}
               </p>
               <div className="space-x-2">
+                <button
+                  onClick={handleTryAlternativeViewer}
+                  className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Try Alternative Viewer
+                </button>
                 <button
                   onClick={handleDownload}
                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
