@@ -2,14 +2,14 @@
 // This provides fallbacks when Firebase Storage has CORS issues
 
 import { storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, getStorage } from 'firebase/storage';
 
 interface GCSUploadResponse {
   success: boolean;
   fileUrl?: string;
   publicUrl?: string;
   fileName?: string;
-  uploadSource?: 'firebase' | 'public' | 'direct';
+  uploadSource?: 'firebase' | 'public' | 'direct' | 'base64';
   error?: string;
 }
 
@@ -27,37 +27,41 @@ const getGCSConfig = (): GCSConfig => {
     bucketName: 'gethired-upload-resumes'}
 };
 
-export const uploadToPublicFirebaseStorage = async (
+// Upload to dedicated upload bucket with proper CORS configuration
+export const uploadToUploadBucket = async (
   file: File,
   userId: string
 ): Promise<GCSUploadResponse> => {
   try {
     const timestamp = Date.now();
     const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const publicPath = `public-resumes/${userId}/${timestamp}_${safeFileName}`;
+    const uploadPath = `resumes/${userId}/${timestamp}_${safeFileName}`;
     
-    console.log('🔄 Uploading to public Firebase Storage path:', publicPath);
+    console.log('🔄 Uploading to dedicated upload bucket:', uploadPath);
     
-    const storageRef = ref(storage, publicPath);
+    // Create a reference to the dedicated upload bucket
+    const uploadStorage = getStorage(undefined, 'gs://gethired-upload-resumes');
+    const storageRef = ref(uploadStorage, uploadPath);
     
-    // Set custom metadata for public access
+    // Set metadata for public access
     const metadata = {
       contentType: file.type,
+      cacheControl: 'public, max-age=31536000',
       customMetadata: {
         'publicAccess': 'true',
         'uploadedAt': timestamp.toString(),
-        'originalName': file.name
+        'originalName': file.name,
+        'userId': userId
       }
     };
     
     const snapshot = await uploadBytes(storageRef, file, metadata);
     const downloadUrl = await getDownloadURL(snapshot.ref);
     
-    // Create a public URL that should work with external viewers
-    const config = getGCSConfig();
-    const publicUrl = `https://storage.googleapis.com/${config.bucketName}/${publicPath}`;
+    // Create a direct public URL that should work with external viewers
+    const publicUrl = `https://storage.googleapis.com/gethired-upload-resumes/${uploadPath}`;
     
-    console.log('✅ Public Firebase upload successful');
+    console.log('✅ Upload bucket upload successful');
     console.log('📥 Download URL:', downloadUrl);
     console.log('🌐 Public URL:', publicUrl);
     
@@ -69,58 +73,67 @@ export const uploadToPublicFirebaseStorage = async (
       uploadSource: 'public'
     };
   } catch (error) {
-    console.error('❌ Failed to upload to public Firebase Storage:', error);
+    console.error('❌ Failed to upload to upload bucket:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'GCS upload failed'
+      error: error instanceof Error ? error.message : 'Upload bucket failed'
     };
   }
 };
 
-export const createPublicGCSUrl = (downloadUrl: string): string => {
-  try {
-    const url = new URL(downloadUrl);
-    
-    // If it's a Firebase Storage URL, convert to direct GCS URL
-    if (url.hostname === 'firebasestorage.googleapis.com') {
-      const pathMatch = url.pathname.match(/\/v0\/b\/(.+?)\/o\/(.+)/);
-      if (pathMatch) {
-        const [, bucket, encodedPath] = pathMatch;
-        const decodedPath = decodeURIComponent(encodedPath);
-        return `https://storage.googleapis.com/${bucket}/${decodedPath}`;
-      }
+// Create Base64 data URL for immediate use (CORS-free)
+export const createBase64Upload = async (file: File): Promise<GCSUploadResponse> => {
+  return new Promise((resolve) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        resolve({
+          success: true,
+          fileUrl: dataUrl,
+          publicUrl: dataUrl,
+          fileName: file.name,
+          uploadSource: 'base64'
+        });
+      };
+      reader.onerror = () => {
+        resolve({
+          success: false,
+          error: 'Failed to create base64 data URL'
+        });
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
-    
-    // Remove auth tokens for public access
-    url.searchParams.delete('token');
-    url.searchParams.delete('alt');
-    return url.toString();
-  } catch (error) {
-    console.error('Failed to create public GCS URL:', error);
-    return downloadUrl;
-  }
+  });
 };
 
+// Multi-strategy upload with comprehensive fallbacks
 export const uploadWithMultipleStrategies = async (
   file: File,
   userId: string
 ): Promise<GCSUploadResponse> => {
-  console.log('🔄 Starting multi-strategy GCS upload for:', file.name);
+  console.log('🔄 Starting multi-strategy upload for:', file.name, 'Size:', file.size);
   
-  // Strategy 1: Upload to public folder in Firebase Storage
+  // Strategy 1: Upload to dedicated upload bucket (should work with CORS configured)
   try {
-    const publicResult = await uploadToPublicFirebaseStorage(file, userId);
-    if (publicResult.success) {
-      console.log('✅ Strategy 1 (public Firebase) succeeded');
-      return publicResult;
+    console.log('🔄 Strategy 1: Dedicated upload bucket');
+    const uploadBucketResult = await uploadToUploadBucket(file, userId);
+    if (uploadBucketResult.success) {
+      console.log('✅ Strategy 1 (upload bucket) succeeded');
+      return uploadBucketResult;
     }
   } catch (error) {
-    console.warn('⚠️ Strategy 1 (public Firebase) failed:', error);
+    console.warn('⚠️ Strategy 1 (upload bucket) failed:', error);
   }
   
-  // Strategy 2: Try regular Firebase Storage with public URL conversion
+  // Strategy 2: Try regular Firebase Storage
   try {
-    console.log('🔄 Trying Strategy 2: Regular Firebase with public URL conversion');
+    console.log('🔄 Strategy 2: Regular Firebase Storage');
     
     const timestamp = Date.now();
     const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -129,9 +142,19 @@ export const uploadWithMultipleStrategies = async (
     const storageRef = ref(storage, regularPath);
     const snapshot = await uploadBytes(storageRef, file);
     const downloadUrl = await getDownloadURL(snapshot.ref);
-    const publicUrl = createPublicGCSUrl(downloadUrl);
     
-    console.log('✅ Strategy 2 succeeded');
+    // Create direct GCS URL
+    const url = new URL(downloadUrl);
+    const pathMatch = url.pathname.match(/\/v0\/b\/(.+?)\/o\/(.+)/);
+    let publicUrl = downloadUrl;
+    
+    if (pathMatch) {
+      const [, bucket, encodedPath] = pathMatch;
+      const decodedPath = decodeURIComponent(encodedPath);
+      publicUrl = `https://storage.googleapis.com/${bucket}/${decodedPath}`;
+    }
+    
+    console.log('✅ Strategy 2 (Firebase) succeeded');
     
     return {
       success: true,
@@ -141,21 +164,19 @@ export const uploadWithMultipleStrategies = async (
       uploadSource: 'firebase'
     };
   } catch (error) {
-    console.warn('⚠️ Strategy 2 (regular Firebase) failed:', error);
+    console.warn('⚠️ Strategy 2 (Firebase) failed:', error);
   }
   
-  // Strategy 3: Create data URL as last resort (for very small files)
-  if (file.size < 1024 * 1024) { // Only for files under 1MB
-    try {
-      console.log('🔄 Trying Strategy 3: Data URL fallback');
-      const dataUrlResult = await createDataUrlFallback(file);
-      if (dataUrlResult.success) {
-        console.log('✅ Strategy 3 (data URL) succeeded');
-        return dataUrlResult;
-      }
-    } catch (error) {
-      console.warn('⚠️ Strategy 3 (data URL) failed:', error);
+  // Strategy 3: Base64 data URL (works for any size, no CORS issues)
+  try {
+    console.log('🔄 Strategy 3: Base64 data URL');
+    const base64Result = await createBase64Upload(file);
+    if (base64Result.success) {
+      console.log('✅ Strategy 3 (base64) succeeded');
+      return base64Result;
     }
+  } catch (error) {
+    console.warn('⚠️ Strategy 3 (base64) failed:', error);
   }
   
   // All strategies failed

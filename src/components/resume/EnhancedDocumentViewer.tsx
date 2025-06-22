@@ -33,8 +33,8 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const [rotation, setRotation] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [proxyUrl, setProxyUrl] = useState<string | null>(null);
   const [viewerFallback, setViewerFallback] = useState(0); // 0: primary, 1: fallback 1, 2: fallback 2
+  const [corsFixedUrl, setCorsFixedUrl] = useState<string | null>(null);
 
   // Get file extension to determine document type
   const getFileExtension = (url: string): string => {
@@ -49,35 +49,60 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   };
 
   const fileExtension = getFileExtension(documentUrl);
+
+  // Check if URL is a data URL (base64) - these don't have CORS issues
+  const isDataUrl = documentUrl.startsWith('data:');
+
+  // Convert Firebase Storage URL to direct GCS URL for better CORS compatibility
+  const createCorsFixedUrl = useCallback((url: string): string => {
+    try {
+      // If it's already a data URL, return as-is
+      if (url.startsWith('data:')) {
+        return url;
+      }
+
+      // If it's a Firebase Storage URL, convert to direct GCS URL
+      if (url.includes('firebasestorage.googleapis.com')) {
+        const urlObj = new URL(url);
+        const pathMatch = urlObj.pathname.match(/\/v0\/b\/(.+?)\/o\/(.+)/);
+        if (pathMatch) {
+          const [, bucket, encodedPath] = pathMatch;
+          const decodedPath = decodeURIComponent(encodedPath);
+          return `https://storage.googleapis.com/${bucket}/${decodedPath}`;
+        }
+      }
+
+      // If it's already a direct GCS URL, return as-is
+      if (url.includes('storage.googleapis.com')) {
+        return url;
+      }
+
+      return url;
+    } catch (error) {
+      console.error('Failed to create CORS-fixed URL:', error);
+      return url;
+    }
+  }, []);
+
+  // Update CORS-fixed URL when document URL changes
+  useEffect(() => {
+    const fixedUrl = createCorsFixedUrl(documentUrl);
+    setCorsFixedUrl(fixedUrl);
+    console.log('🔗 Original URL:', documentUrl);
+    console.log('🔧 CORS-fixed URL:', fixedUrl);
+  }, [documentUrl, createCorsFixedUrl]);
+  
   const isWordDoc = ['doc', 'docx'].includes(fileExtension);
   const isPdf = fileExtension === 'pdf';
 
-  // Try to create proxy URL for better external viewer compatibility
-  useEffect(() => {
-    const createProxyUrl = async () => {
-      try {
-        // Import proxy service dynamically to avoid circular dependencies
-        const { getBestUrlForContext } = await import('../../services/fileProxyService');
-        
-        if (isWordDoc) {
-          const bestUrl = await getBestUrlForContext(documentUrl, 'office-viewer');
-          setProxyUrl(bestUrl);
-        } else {
-          const bestUrl = await getBestUrlForContext(documentUrl, 'google-viewer');
-          setProxyUrl(bestUrl);
-        }
-      } catch (error) {
-        console.warn('Failed to create proxy URL:', error);
-        setProxyUrl(documentUrl); // Fallback to original URL
-      }
-    };
-
-    createProxyUrl();
-  }, [documentUrl, isWordDoc]);
-
   // Generate viewer URL based on document type with fallback options
   const getViewerUrl = useCallback(() => {
-    const urlToUse = proxyUrl || documentUrl;
+    const urlToUse = corsFixedUrl || documentUrl;
+    
+    // If it's a data URL, return directly (no external viewer needed)
+    if (isDataUrl) {
+      return urlToUse;
+    }
     
     if (isWordDoc) {
       switch (viewerFallback) {
@@ -119,7 +144,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
           return urlToUse;
       }
     }
-  }, [documentUrl, proxyUrl, isWordDoc, isPdf, viewerFallback]);
+  }, [documentUrl, corsFixedUrl, isWordDoc, isPdf, viewerFallback, isDataUrl]);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 25, 300));
@@ -139,16 +164,29 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(documentUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `tailored_resume_${job?.company || 'document'}.${fileExtension}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const urlToDownload = corsFixedUrl || documentUrl;
+      
+      // Handle data URLs differently
+      if (isDataUrl) {
+        const link = document.createElement('a');
+        link.href = urlToDownload;
+        link.download = `tailored_resume_${job?.company || 'document'}.${fileExtension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // For regular URLs, fetch and download
+        const response = await fetch(urlToDownload);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `tailored_resume_${job?.company || 'document'}.${fileExtension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
       
       if (onDownload) {
         onDownload();
@@ -156,7 +194,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
     } catch (err) {
       console.error('Download failed:', err);
       // Fallback: open in new tab
-      window.open(documentUrl, '_blank');
+      window.open(corsFixedUrl || documentUrl, '_blank');
     }
   };
 
@@ -279,7 +317,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
           </button>
 
           <a
-            href={documentUrl}
+            href={corsFixedUrl || documentUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -339,7 +377,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
                   Download Document
                 </button>
                 <a
-                  href={documentUrl}
+                  href={corsFixedUrl || documentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
@@ -352,20 +390,54 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
           </div>
         )}
 
-        <iframe
-          src={getViewerUrl()}
-          className={`document-viewer-iframe w-full h-full border-0 transition-transform ${
-            error ? 'hidden' : ''
-          }`}
-          style={{
-            transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-            transformOrigin: 'center center'
-          }}
-          onLoad={handleIframeLoad}
-          onError={handleIframeError}
-          title="Document Viewer"
-          sandbox="allow-same-origin allow-scripts allow-forms"
-        />
+        {/* Render different viewer based on URL type */}
+        {isDataUrl ? (
+          // For data URLs, embed directly or show download option
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-6">
+              <FileText className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Document Ready for Download
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                This document is stored as secure data. Click download to view it.
+              </p>
+              <div className="space-x-2">
+                <button
+                  onClick={handleDownload}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download & View
+                </button>
+                <a
+                  href={getViewerUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View in New Tab
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <iframe
+            src={getViewerUrl()}
+            className={`document-viewer-iframe w-full h-full border-0 transition-transform ${
+              error ? 'hidden' : ''
+            }`}
+            style={{
+              transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+              transformOrigin: 'center center'
+            }}
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            title="Document Viewer"
+            sandbox="allow-same-origin allow-scripts allow-forms"
+          />
+        )}
       </div>
 
       {/* Footer with document info */}
