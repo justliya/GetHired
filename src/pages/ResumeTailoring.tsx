@@ -4,7 +4,7 @@ import { Loader2, ArrowLeft, FileText } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
-import { getUserResumes, getResumeUrlForContext, uploadResume, getJobListings, getUserData } from '../services/firebaseService';
+import { getUserResumes, getResumeUrlForContext, uploadResumeWithFallback, getJobListings, getUserData } from '../services/firebaseService';
 import { useResumeTailoring } from '../hooks/useResumeTailoring';
 import {
   ResumeSelector,
@@ -137,7 +137,7 @@ const ResumeTailoring = () => {
 
     try {
       setIsUploading(true);
-      const result = await uploadResume(user.uid, file, {
+      const result = await uploadResumeWithFallback(user.uid, file, {
         title: file.name,
         isOriginal: true,
         uploadSource: 'manual',

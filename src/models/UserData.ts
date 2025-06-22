@@ -67,7 +67,7 @@ export interface Application {
 }
 
 export type ResumeType = 'original' | 'tailored' | 'generated';
-export type ResumeUploadSource = 'manual' | 'job-application' | 'auto-generated';
+export type ResumeUploadSource = 'manual' | 'job-application' | 'auto-generated' | 'proxy' | 'public' | 'firebase' | 'direct';
 
 export interface Resume {
   fileUrl: string;

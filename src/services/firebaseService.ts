@@ -3,7 +3,8 @@ import { doc, setDoc, getDoc, collection, addDoc, getDocs, DocumentReference, ty
 import { ref, uploadBytes, getDownloadURL, getBlob } from 'firebase/storage';
 import type { 
   JobPreferences, 
-  Resume, 
+  Resume,
+  ResumeUploadSource, 
   Application, 
   JobListing, 
   JobSearch,
@@ -683,6 +684,101 @@ export const checkResumeUrlAccess = async (resumeUrl: string): Promise<{
       success: true,
       accessible: false,
       error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+// Enhanced upload function with GCS fallback for CORS issues
+export const uploadResumeWithFallback = async (userId: string, file: File, metadata?: Partial<Resume['metadata']>) => {
+  try {
+    // First, try the direct Firebase Storage upload
+    console.log('🔄 Attempting direct Firebase Storage upload...');
+    const directUploadResult = await uploadResume(userId, file, metadata);
+    
+    if (directUploadResult.success) {
+      console.log('✅ Direct Firebase Storage upload successful');
+      return directUploadResult;
+    }
+    
+    console.warn('❌ Direct upload failed, trying GCS multi-strategy upload...', directUploadResult.error);
+  } catch (directUploadError) {
+    console.warn('❌ Direct upload error, trying GCS multi-strategy upload...', directUploadError);
+  }
+  
+  // Fallback to GCS multi-strategy upload
+  try {
+    const { uploadWithMultipleStrategies } = await import('./gcsService');
+    console.log('🔄 Attempting GCS multi-strategy upload...');
+    
+    const gcsUploadResult = await uploadWithMultipleStrategies(file, userId);
+    
+    if (gcsUploadResult.success && gcsUploadResult.fileUrl) {
+      console.log('✅ GCS multi-strategy upload successful');
+      
+      // Create the metadata object
+      const meta: Resume['metadata'] = {
+        title: metadata?.title || file.name,
+        uploadSource: (gcsUploadResult.uploadSource as ResumeUploadSource) || 'manual',
+        isOriginal: metadata?.isOriginal ?? true,
+        keywords: metadata?.keywords || [],
+        ...(metadata?.description && { description: metadata.description }),
+        ...(metadata?.relatedJobId && { relatedJobId: metadata.relatedJobId }),
+        ...(metadata?.relatedCompany && { relatedCompany: metadata.relatedCompany }),
+        ...(metadata?.relatedRole && { relatedRole: metadata.relatedRole }),
+        ...(metadata?.originalResumeId && { originalResumeId: metadata.originalResumeId }),
+        ...(metadata?.customizations && { customizations: metadata.customizations })
+      };
+      
+      // Format the response to match the expected Resume structure
+      const resumeData: Resume & { id: string } = {
+        id: `gcs_${Date.now()}`, // Generate a temporary ID
+        fileUrl: gcsUploadResult.fileUrl,
+        publicUrl: gcsUploadResult.publicUrl || gcsUploadResult.fileUrl,
+        createdAt: new Date().toISOString(),
+        type: metadata?.isOriginal ? 'original' : 'tailored',
+        metadata: meta
+      };
+      
+      // Try to save to Firebase Firestore even if storage upload failed
+      try {
+        const resumesRef = collection(db, 'users', userId, 'resumes');
+        const docRef = await addDoc(resumesRef, resumeData);
+        
+        // Update the ID with the actual Firestore document ID
+        resumeData.id = docRef.id;
+        
+        // Also update the resumes array in main document
+        const userRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as UserData;
+          const updatedResumes = [...(userData.resumes || []), resumeData];
+          
+          await setDoc(userRef, { 
+            resumes: updatedResumes 
+          }, { merge: true });
+        }
+        
+        console.log('📄 Resume metadata saved to Firestore with ID:', docRef.id);
+        resumeData.id = docRef.id;
+      } catch (firestoreError) {
+        console.warn('⚠️ Failed to save resume metadata to Firestore:', firestoreError);
+        // Continue with the upload result even if Firestore save fails
+      }
+      
+      return { success: true, data: resumeData };
+    }
+    
+    return {
+      success: false,
+      error: gcsUploadResult.error || 'GCS upload failed'
+    };
+  } catch (gcsError) {
+    console.error('❌ GCS upload failed:', gcsError);
+    return {
+      success: false,
+      error: 'Both direct and GCS uploads failed. Please check your internet connection and try again.'
     };
   }
 };
