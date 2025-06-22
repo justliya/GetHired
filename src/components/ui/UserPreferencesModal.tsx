@@ -221,23 +221,45 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
         setResumeError(null);
         try {
             const file = e.target.files[0];
+            
+            // Validate file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                setResumeError('File size must be less than 10MB');
+                return;
+            }
+            
+            // Validate file type
+            const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+            if (!allowedTypes.includes(file.type)) {
+                setResumeError('Please upload a PDF, DOCX, or TXT file');
+                return;
+            }
+            
             const metadata = {
                 title: file.name,
                 uploadSource: 'manual' as const,
                 isOriginal: true,
                 keywords: formData.preferences.roles || [],
             };
-            // Use the correct resume upload service endpoint
+            
+            console.log('🔄 Starting resume upload in UserPreferencesModal...', file.name);
+            
+            // Use the enhanced upload service with GCS priority
             const result = await uploadResumeWithFallback(user.uid, file, metadata);
+            
             if (result.success && result.data) {
+                console.log('✅ Resume upload successful:', result.data);
                 setResumes(prev => [...prev, { ...result.data }]);
                 setSelectedResumeId(result.data.id);
                 setFormData(prev => ({ ...prev, resumeFile: file }));
             } else {
-                setResumeError('Failed to upload resume.');
+                console.error('❌ Resume upload failed:', result);
+                const errorMessage = 'error' in result ? result.error : 'Failed to upload resume. Please try again.';
+                setResumeError(errorMessage);
             }
-        } catch {
-            setResumeError('Error uploading resume.');
+        } catch (error) {
+            console.error('❌ Resume upload error:', error);
+            setResumeError('Error uploading resume. Please check your connection and try again.');
         }
     };
 
@@ -318,7 +340,8 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 if (result.success && result.data) {
                     selectedResume = { ...result.data };
                 } else {
-                    setResumeError('Failed to upload resume on submit.');
+                    const errorMessage = 'error' in result ? result.error : 'Failed to upload resume on submit.';
+                    setResumeError(errorMessage);
                     return;
                 }
             }

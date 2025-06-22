@@ -688,27 +688,14 @@ export const checkResumeUrlAccess = async (resumeUrl: string): Promise<{
   }
 };
 
-// Enhanced upload function with GCS fallback for CORS issues
+// Enhanced upload function with GCS prioritized for CORS issues
 export const uploadResumeWithFallback = async (userId: string, file: File, metadata?: Partial<Resume['metadata']>) => {
-  try {
-    // First, try the direct Firebase Storage upload
-    console.log('🔄 Attempting direct Firebase Storage upload...');
-    const directUploadResult = await uploadResume(userId, file, metadata);
-    
-    if (directUploadResult.success) {
-      console.log('✅ Direct Firebase Storage upload successful');
-      return directUploadResult;
-    }
-    
-    console.warn('❌ Direct upload failed, trying GCS multi-strategy upload...', directUploadResult.error);
-  } catch (directUploadError) {
-    console.warn('❌ Direct upload error, trying GCS multi-strategy upload...', directUploadError);
-  }
+  console.log('🔄 Starting enhanced resume upload with GCS priority...');
   
-  // Fallback to GCS multi-strategy upload
+  // Start with GCS multi-strategy upload (better CORS handling)
   try {
     const { uploadWithMultipleStrategies } = await import('./gcsService');
-    console.log('🔄 Attempting GCS multi-strategy upload...');
+    console.log('🔄 Attempting GCS multi-strategy upload first...');
     
     const gcsUploadResult = await uploadWithMultipleStrategies(file, userId);
     
@@ -739,7 +726,7 @@ export const uploadResumeWithFallback = async (userId: string, file: File, metad
         metadata: meta
       };
       
-      // Try to save to Firebase Firestore even if storage upload failed
+      // Try to save to Firebase Firestore 
       try {
         const resumesRef = collection(db, 'users', userId, 'resumes');
         const docRef = await addDoc(resumesRef, resumeData);
@@ -770,15 +757,29 @@ export const uploadResumeWithFallback = async (userId: string, file: File, metad
       return { success: true, data: resumeData };
     }
     
-    return {
-      success: false,
-      error: gcsUploadResult.error || 'GCS upload failed'
-    };
+    console.warn('❌ GCS upload failed, trying direct Firebase Storage...', gcsUploadResult.error);
   } catch (gcsError) {
-    console.error('❌ GCS upload failed:', gcsError);
-    return {
-      success: false,
-      error: 'Both direct and GCS uploads failed. Please check your internet connection and try again.'
-    };
+    console.warn('❌ GCS service failed, trying direct Firebase Storage...', gcsError);
   }
+  
+  // Fallback to direct Firebase Storage if GCS fails
+  try {
+    console.log('🔄 Attempting direct Firebase Storage upload...');
+    const directUploadResult = await uploadResume(userId, file, metadata);
+    
+    if (directUploadResult.success) {
+      console.log('✅ Direct Firebase Storage upload successful');
+      return directUploadResult;
+    }
+    
+    console.warn('❌ Direct Firebase upload also failed:', directUploadResult.error);
+  } catch (directUploadError) {
+    console.warn('❌ Direct Firebase upload error:', directUploadError);
+  }
+  
+  // If both fail, return error
+  return {
+    success: false,
+    error: 'All upload methods failed. This might be due to Firebase authorization domains or CORS restrictions. Please try again or contact support.'
+  };
 };
