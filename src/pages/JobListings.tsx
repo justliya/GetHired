@@ -1,6 +1,7 @@
 
 import React from 'react';
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
@@ -531,13 +532,66 @@ const JobListings = () => {
           </p>
           {user && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Welcome, {user.email} | Session: {sessionId.slice(-8)}
+              Welcome {user.email}, after jobs appear select your favorites and the ones you would like to research
+              then click 'Complete Session' when you are done and researched listing will appear in the 'Resume Tailoring' tab!
             </p>
           )}
         </div>
 
-        {/* Debug Info */}
-        {debugInfo && (
+        {/* Getting Started Instructions */}
+        {!sessionStarted && jobs.length === 0 && (
+          <Card className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+            <div className="text-center">
+              <Play className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                Let's Find Your Dream Job!
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
+                Follow these simple steps to get personalized job recommendations tailored to your skills and preferences.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mb-3">1</div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Start Session</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Initialize your job search session with our AI agent</p>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-10 h-10 bg-green-600 text-white rounded-full flex items-center justify-center font-bold mb-3">2</div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Search Jobs</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Let our AI find relevant job opportunities for you</p>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-10 h-10 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold mb-3">3</div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Research & Apply</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Get company insights and apply to your favorite positions</p>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <ArrowRight className="w-6 h-6 text-blue-600 animate-bounce" />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Session Active Instructions */}
+        {sessionStarted && jobs.length === 0 && !loading && (
+          <Card className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+            <div className="text-center">
+              <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                Session Active! 🎉
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Great! Your job search session is now active. Click "Search Jobs" below to find opportunities that match your profile.
+              </p>
+            </div>
+          </Card>
+        )}
+
+        {/* Commented out Debug Info section */}
+        {/* {debugInfo && (
           <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-6 text-xs">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-semibold">Debug Information:</h3>
@@ -552,7 +606,7 @@ const JobListings = () => {
               {JSON.stringify(debugInfo, null, 2)}
             </pre>
           </div>
-        )}
+        )} */}
 
         {/* Error Display */}
         {error && (
