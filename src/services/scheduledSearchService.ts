@@ -1,5 +1,4 @@
 import { db } from '../firebase';
-import { auth } from '../firebase';
 import { 
   collection, 
   doc, 
@@ -15,82 +14,6 @@ import {
 } from 'firebase/firestore';
 import type { JobPreferences, SearchSchedule } from '../models/UserData';
 
-const COLLECTION_NAME = 'scheduledSearches';
-
-const getCurrentUserId = () => {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('User must be authenticated to access scheduled searches');
-  }
-  return user.uid;
-};
-
-const verifyUserAccess = (userId: string) => {
-  const currentUserId = getCurrentUserId();
-  if (currentUserId !== userId) {
-    throw new Error('Unauthorized access to user data');
-  }
-};
-
-export const isUserAuthenticated = (): boolean => {
-  return auth.currentUser !== null;
-};
-
-export const getCurrentUserIdSafe = (): string | null => {
-  return auth.currentUser?.uid || null;
-};
-
-export const testFirebaseConnection = async (): Promise<{
-  success: boolean;
-  authenticated: boolean;
-  userId?: string;
-  error?: string;
-}> => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      return {
-        success: false,
-        authenticated: false,
-        error: 'User not authenticated'
-      };
-    }
-
-    try {
-      const testQuery = query(
-        collection(db, COLLECTION_NAME),
-        where('userId', '==', user.uid)
-      );
-      
-      await getDocs(testQuery);
-      
-      return {
-        success: true,
-        authenticated: true,
-        userId: user.uid
-      };
-    } catch (firestoreError) {
-      // If it's a permission error, that's expected without rules
-      if (firestoreError instanceof Error && firestoreError.message.includes('permission')) {
-        return {
-          success: false,
-          authenticated: true,
-          userId: user.uid,
-          error: 'Firestore rules not configured yet - add security rules to Firebase Console'
-        };
-      }
-      throw firestoreError;
-    }
-  } catch (error) {
-    return {
-      success: false,
-      authenticated: auth.currentUser !== null,
-      userId: auth.currentUser?.uid,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-};
-
 export interface ScheduledSearch {
   id?: string;
   userId: string;
@@ -102,8 +25,6 @@ export interface ScheduledSearch {
   lastRunAt?: Timestamp;
   nextRunAt?: Timestamp;
   cloudTaskId?: string;
-  cloudTaskError?: string;
-  retryAfter?: number;
 }
 
 export interface ScheduleCreateRequest {
@@ -119,41 +40,17 @@ export interface ScheduleUpdateRequest {
   status?: 'active' | 'paused' | 'disabled';
 }
 
-const retryFirebaseOperation = async <T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 2,
-  delay: number = 1000
-): Promise<T> => {
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (attempt === maxRetries) throw error;
-      
-      if (error instanceof Error && 
-          (error.message.includes('unavailable') || 
-           error.message.includes('deadline-exceeded') ||
-           error.message.includes('internal'))) {
-        console.warn(`Firebase operation failed, retrying... (attempt ${attempt + 1}/${maxRetries + 1})`);
-        await new Promise(resolve => setTimeout(resolve, delay * (attempt + 1)));
-      } else {
-        throw error;
-      }
-    }
-  }
-  throw new Error('Max retries exceeded');
-};
+const COLLECTION_NAME = 'scheduledSearches';
 
+/**
+ * Create a new scheduled search
+ */
 export const createScheduledSearch = async (request: ScheduleCreateRequest): Promise<{
   success: boolean;
   data?: ScheduledSearch;
   error?: string;
-  cloudTaskError?: string;
-  retryAfter?: number;
 }> => {
   try {
-    verifyUserAccess(request.userId);
-
     if (!request.schedule.enabled) {
       return { success: false, error: 'Schedule must be enabled to create' };
     }
@@ -167,87 +64,29 @@ export const createScheduledSearch = async (request: ScheduleCreateRequest): Pro
       updatedAt: serverTimestamp() as Timestamp,
     };
 
-    try {
-      // Always save to Firestore first - this is the primary success
-      const docRef = await retryFirebaseOperation(() => 
-        addDoc(collection(db, COLLECTION_NAME), scheduledSearch)
-      );
-      
-      const finalResult: ScheduledSearch = {
-        id: docRef.id,
-        ...scheduledSearch,
-      };
-
-      // Try to create cloud task but don't fail if it doesn't work
-      const cloudTaskResult = await createCloudTask(docRef.id, request.schedule);
-      
-      if (cloudTaskResult.success && cloudTaskResult.taskId) {
-        try {
-          await retryFirebaseOperation(() => 
-            updateDoc(docRef, {
-              cloudTaskId: cloudTaskResult.taskId,
-              nextRunAt: cloudTaskResult.nextRunAt
-            })
-          );
-          
-          finalResult.cloudTaskId = cloudTaskResult.taskId;
-          finalResult.nextRunAt = cloudTaskResult.nextRunAt;
-        } catch (updateError) {
-          console.warn('Failed to update document with Cloud Task info:', updateError);
-        }
-      } else {
-        console.warn('Failed to create Cloud Task:', cloudTaskResult.error);
-        // Mark the schedule with error status but still return success
-        try {
-          await retryFirebaseOperation(() => 
-            updateDoc(docRef, {
-              status: 'active' as const, // Keep active but mark with error
-              cloudTaskError: cloudTaskResult.error,
-              retryAfter: cloudTaskResult.retryAfter
-            })
-          );
-          
-          finalResult.status = 'active';
-        } catch (updateError) {
-          console.warn('Failed to update document with error info:', updateError);
-        }
-        
-        return { 
-          success: true, 
-          data: finalResult,
-          cloudTaskError: cloudTaskResult.error,
-          retryAfter: cloudTaskResult.retryAfter
-        };
-      }
-
-      return { success: true, data: finalResult };
-    } catch (firestoreError) {
-      if (firestoreError instanceof Error && firestoreError.message.includes('permission')) {
-        return { 
-          success: false, 
-          error: 'Firebase security rules not configured. Please add the rules from firestore-security-rules.txt to your Firebase Console.' 
-        };
-      }
-      throw firestoreError;
+    const docRef = await addDoc(collection(db, COLLECTION_NAME), scheduledSearch);
+    
+    // Create Cloud Task for this schedule
+    const cloudTaskResult = await createCloudTask(docRef.id, request.schedule);
+    
+    if (cloudTaskResult.success && cloudTaskResult.taskId) {
+      // Update the document with the Cloud Task ID
+      await updateDoc(docRef, {
+        cloudTaskId: cloudTaskResult.taskId,
+        nextRunAt: cloudTaskResult.nextRunAt
+      });
     }
+
+    const result = {
+      id: docRef.id,
+      ...scheduledSearch,
+      cloudTaskId: cloudTaskResult.taskId,
+      nextRunAt: cloudTaskResult.nextRunAt
+    } as ScheduledSearch;
+
+    return { success: true, data: result };
   } catch (error) {
     console.error('Error creating scheduled search:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('authenticated') || error.message.includes('Unauthorized')) {
-        return { 
-          success: false, 
-          error: 'Authentication required. Please sign in to create scheduled searches.' 
-        };
-      }
-      if (error.message.includes('permission') || error.message.includes('denied')) {
-        return { 
-          success: false, 
-          error: 'Permission denied. Check your Firestore security rules for the scheduledSearches collection.' 
-        };
-      }
-    }
-    
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -255,6 +94,9 @@ export const createScheduledSearch = async (request: ScheduleCreateRequest): Pro
   }
 };
 
+/**
+ * Update an existing scheduled search
+ */
 export const updateScheduledSearch = async (request: ScheduleUpdateRequest): Promise<{
   success: boolean;
   data?: ScheduledSearch;
@@ -262,15 +104,13 @@ export const updateScheduledSearch = async (request: ScheduleUpdateRequest): Pro
 }> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, request.scheduleId);
-    const docSnap = await retryFirebaseOperation(() => getDoc(docRef));
+    const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
       return { success: false, error: 'Scheduled search not found' };
     }
 
     const currentData = docSnap.data() as ScheduledSearch;
-    
-    verifyUserAccess(currentData.userId);
     const updateData: Partial<ScheduledSearch> = {
       updatedAt: serverTimestamp() as Timestamp,
     };
@@ -282,6 +122,7 @@ export const updateScheduledSearch = async (request: ScheduleUpdateRequest): Pro
     if (request.schedule) {
       updateData.schedule = request.schedule;
       
+      // If schedule changed and is enabled, update Cloud Task
       if (request.schedule.enabled) {
         const cloudTaskResult = await updateCloudTask(
           currentData.cloudTaskId, 
@@ -294,6 +135,7 @@ export const updateScheduledSearch = async (request: ScheduleUpdateRequest): Pro
           updateData.nextRunAt = cloudTaskResult.nextRunAt;
         }
       } else {
+        // If disabled, delete Cloud Task
         if (currentData.cloudTaskId) {
           await deleteCloudTask(currentData.cloudTaskId);
           updateData.cloudTaskId = undefined;
@@ -305,6 +147,7 @@ export const updateScheduledSearch = async (request: ScheduleUpdateRequest): Pro
     if (request.status) {
       updateData.status = request.status;
       
+      // If pausing or disabling, delete Cloud Task
       if (request.status !== 'active' && currentData.cloudTaskId) {
         await deleteCloudTask(currentData.cloudTaskId);
         updateData.cloudTaskId = undefined;
@@ -312,28 +155,12 @@ export const updateScheduledSearch = async (request: ScheduleUpdateRequest): Pro
       }
     }
 
-    await retryFirebaseOperation(() => updateDoc(docRef, updateData));
+    await updateDoc(docRef, updateData);
 
     const updatedData = { ...currentData, ...updateData, id: request.scheduleId };
     return { success: true, data: updatedData };
   } catch (error) {
     console.error('Error updating scheduled search:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('authenticated') || error.message.includes('Unauthorized')) {
-        return { 
-          success: false, 
-          error: 'Authentication required. Please sign in to update scheduled searches.' 
-        };
-      }
-      if (error.message.includes('permission') || error.message.includes('denied')) {
-        return { 
-          success: false, 
-          error: 'Permission denied. Check your Firestore security rules for the scheduledSearches collection.' 
-        };
-      }
-    }
-    
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -341,13 +168,16 @@ export const updateScheduledSearch = async (request: ScheduleUpdateRequest): Pro
   }
 };
 
+/**
+ * Delete a scheduled search
+ */
 export const deleteScheduledSearch = async (scheduleId: string): Promise<{
   success: boolean;
   error?: string;
 }> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, scheduleId);
-    const docSnap = await retryFirebaseOperation(() => getDoc(docRef));
+    const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
       return { success: false, error: 'Scheduled search not found' };
@@ -355,32 +185,15 @@ export const deleteScheduledSearch = async (scheduleId: string): Promise<{
 
     const data = docSnap.data() as ScheduledSearch;
     
-    verifyUserAccess(data.userId);
-    
+    // Delete Cloud Task if exists
     if (data.cloudTaskId) {
       await deleteCloudTask(data.cloudTaskId);
     }
 
-    await retryFirebaseOperation(() => deleteDoc(docRef));
+    await deleteDoc(docRef);
     return { success: true };
   } catch (error) {
     console.error('Error deleting scheduled search:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('authenticated') || error.message.includes('Unauthorized')) {
-        return { 
-          success: false, 
-          error: 'Authentication required. Please sign in to delete scheduled searches.' 
-        };
-      }
-      if (error.message.includes('permission') || error.message.includes('denied')) {
-        return { 
-          success: false, 
-          error: 'Permission denied. Check your Firestore security rules for the scheduledSearches collection.' 
-        };
-      }
-    }
-    
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -388,20 +201,21 @@ export const deleteScheduledSearch = async (scheduleId: string): Promise<{
   }
 };
 
+/**
+ * Get all scheduled searches for a user
+ */
 export const getUserScheduledSearches = async (userId: string): Promise<{
   success: boolean;
   data?: ScheduledSearch[];
   error?: string;
 }> => {
   try {
-    verifyUserAccess(userId);
-
     const q = query(
       collection(db, COLLECTION_NAME),
       where('userId', '==', userId)
     );
     
-    const querySnapshot = await retryFirebaseOperation(() => getDocs(q));
+    const querySnapshot = await getDocs(q);
     const scheduledSearches: ScheduledSearch[] = [];
 
     querySnapshot.forEach((doc) => {
@@ -414,22 +228,6 @@ export const getUserScheduledSearches = async (userId: string): Promise<{
     return { success: true, data: scheduledSearches };
   } catch (error) {
     console.error('Error getting user scheduled searches:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('authenticated') || error.message.includes('Unauthorized')) {
-        return { 
-          success: false, 
-          error: 'Authentication required. Please sign in to view scheduled searches.' 
-        };
-      }
-      if (error.message.includes('permission') || error.message.includes('denied')) {
-        return { 
-          success: false, 
-          error: 'Permission denied. Check your Firestore security rules for the scheduledSearches collection.' 
-        };
-      }
-    }
-    
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -437,6 +235,9 @@ export const getUserScheduledSearches = async (userId: string): Promise<{
   }
 };
 
+/**
+ * Get a specific scheduled search
+ */
 export const getScheduledSearch = async (scheduleId: string): Promise<{
   success: boolean;
   data?: ScheduledSearch;
@@ -444,35 +245,16 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
 }> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, scheduleId);
-    const docSnap = await retryFirebaseOperation(() => getDoc(docRef));
+    const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
       return { success: false, error: 'Scheduled search not found' };
     }
 
     const data = { id: scheduleId, ...docSnap.data() } as ScheduledSearch;
-    
-    verifyUserAccess(data.userId);
-
     return { success: true, data };
   } catch (error) {
     console.error('Error getting scheduled search:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('authenticated') || error.message.includes('Unauthorized')) {
-        return { 
-          success: false, 
-          error: 'Authentication required. Please sign in to view scheduled searches.' 
-        };
-      }
-      if (error.message.includes('permission') || error.message.includes('denied')) {
-        return { 
-          success: false, 
-          error: 'Permission denied. Check your Firestore security rules for the scheduledSearches collection.' 
-        };
-      }
-    }
-    
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -480,28 +262,20 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
   }
 };
 
-import { ENV } from '../config/environment';
+// Cloud Task Management Functions
+const CLOUD_TASK_API_URL = process.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000/api/v1';
 
-const CLOUD_TASK_API_URL = ENV.CLOUD_TASK_API_URL;
-
+/**
+ * Create a Cloud Task for scheduled job search
+ */
 const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Promise<{
   success: boolean;
   taskId?: string;
   nextRunAt?: Timestamp;
   error?: string;
-  retryAfter?: number;
 }> => {
   try {
-    if (!CLOUD_TASK_API_URL) {
-      console.warn('Cloud Task API not configured or not available locally');
-      return {
-        success: false,
-        error: 'Cloud Task API not available - schedule saved without automation'
-      };
-    }
-
-    // Fix endpoint path to match api.py structure
-    const response = await fetch(`${CLOUD_TASK_API_URL}/api/v1/tasks/schedule`, {
+    const response = await fetch(`${CLOUD_TASK_API_URL}/tasks/schedule`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -509,36 +283,12 @@ const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Pr
       body: JSON.stringify({
         scheduleId,
         schedule,
-        targetUrl: `${CLOUD_TASK_API_URL}/api/v1/scheduled-search/execute`,
+        targetUrl: `${CLOUD_TASK_API_URL}/scheduled-search/execute`,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      
-      // Handle specific error cases
-      if (response.status === 503) {
-        // Service unavailable (queue initializing)
-        return {
-          success: false,
-          error: errorData.error || 'Cloud Task queue is initializing. Please try again in a few minutes.',
-          retryAfter: errorData.retry_after || 120,
-        };
-      } else if (response.status === 500) {
-        // Server error
-        return {
-          success: false,
-          error: errorData.error || 'Server error occurred. Please try again.',
-          retryAfter: errorData.retry_after || 60,
-        };
-      } else {
-        // Other errors
-        return {
-          success: false,
-          error: errorData.error || `HTTP ${response.status}: ${response.statusText}`,
-          retryAfter: errorData.retry_after || 30,
-        };
-      }
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const result = await response.json();
@@ -552,11 +302,13 @@ const createCloudTask = async (scheduleId: string, schedule: SearchSchedule): Pr
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create Cloud Task',
-      retryAfter: 60,
     };
   }
 };
 
+/**
+ * Update an existing Cloud Task
+ */
 const updateCloudTask = async (
   currentTaskId: string | undefined,
   scheduleId: string,
@@ -568,10 +320,12 @@ const updateCloudTask = async (
   error?: string;
 }> => {
   try {
+    // Delete existing task if it exists
     if (currentTaskId) {
       await deleteCloudTask(currentTaskId);
     }
 
+    // Create new task with updated schedule
     return await createCloudTask(scheduleId, schedule);
   } catch (error) {
     console.error('Error updating Cloud Task:', error);
@@ -583,95 +337,14 @@ const updateCloudTask = async (
 };
 
 /**
- * Retry cloud task creation for a scheduled search
+ * Delete a Cloud Task
  */
-export const retryCloudTask = async (scheduleId: string): Promise<{
-  success: boolean;
-  data?: ScheduledSearch;
-  error?: string;
-  retryAfter?: number;
-}> => {
-  try {
-    const docRef = doc(db, COLLECTION_NAME, scheduleId);
-    const docSnap = await retryFirebaseOperation(() => getDoc(docRef));
-
-    if (!docSnap.exists()) {
-      return { success: false, error: 'Scheduled search not found' };
-    }
-
-    const currentData = docSnap.data() as ScheduledSearch;
-    verifyUserAccess(currentData.userId);
-
-    // Only retry if there's actually an error
-    if (!currentData.cloudTaskError) {
-      return { success: true, data: { ...currentData, id: scheduleId } };
-    }
-
-    // Attempt to create cloud task
-    const cloudTaskResult = await createCloudTask(scheduleId, currentData.schedule);
-    
-    const updateData: Partial<ScheduledSearch> = {
-      updatedAt: serverTimestamp() as Timestamp,
-    };
-
-    if (cloudTaskResult.success && cloudTaskResult.taskId) {
-      // Success - clear error and set task info
-      updateData.cloudTaskId = cloudTaskResult.taskId;
-      updateData.nextRunAt = cloudTaskResult.nextRunAt;
-      updateData.cloudTaskError = undefined;
-      updateData.retryAfter = undefined;
-    } else {
-      // Still failed - update error info
-      updateData.cloudTaskError = cloudTaskResult.error;
-      updateData.retryAfter = cloudTaskResult.retryAfter;
-    }
-
-    await retryFirebaseOperation(() => updateDoc(docRef, updateData));
-
-    const updatedData = { ...currentData, ...updateData, id: scheduleId };
-    
-    if (cloudTaskResult.success) {
-      return { success: true, data: updatedData };
-    } else {
-      return { 
-        success: false, 
-        data: updatedData,
-        error: cloudTaskResult.error,
-        retryAfter: cloudTaskResult.retryAfter
-      };
-    }
-  } catch (error) {
-    console.error('Error retrying cloud task:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('authenticated') || error.message.includes('Unauthorized')) {
-        return { 
-          success: false, 
-          error: 'Authentication required. Please sign in to retry cloud tasks.' 
-        };
-      }
-      if (error.message.includes('permission') || error.message.includes('denied')) {
-        return { 
-          success: false, 
-          error: 'Permission denied. Check your Firestore security rules for the scheduledSearches collection.' 
-        };
-      }
-    }
-    
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
 const deleteCloudTask = async (taskId: string): Promise<{
   success: boolean;
   error?: string;
 }> => {
   try {
-    // Fix endpoint path to match api.py structure  
-    const response = await fetch(`${CLOUD_TASK_API_URL}/api/v1/tasks/${taskId}`, {
+    const response = await fetch(`${CLOUD_TASK_API_URL}/tasks/${taskId}`, {
       method: 'DELETE',
     });
 

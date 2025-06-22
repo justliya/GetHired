@@ -91,6 +91,37 @@ export const updateUserPreferences = async (userId: string, preferences: JobPref
       }
     }
     
+
+    // Handle scheduled search if enabled
+    if (preferences.searchSchedule?.enabled) {
+      try {
+        const { createScheduledSearch, getUserScheduledSearches, updateScheduledSearch } = await import('./scheduledSearchService');
+        
+        // Check if user already has a scheduled search
+        const existingSearches = await getUserScheduledSearches(userId);
+        
+        if (existingSearches.success && existingSearches.data && existingSearches.data.length > 0) {
+          // Update existing scheduled search
+          const existing = existingSearches.data[0];
+          await updateScheduledSearch({
+            scheduleId: existing.id!,
+            preferences,
+            schedule: preferences.searchSchedule
+          });
+        } else {
+          // Create new scheduled search
+          await createScheduledSearch({
+            userId,
+            preferences,
+            schedule: preferences.searchSchedule
+          });
+        }
+      } catch (scheduleError) {
+        console.error('Failed to update scheduled search:', scheduleError);
+        // Don't fail the entire preference update if scheduled search fails
+      }
+    }
+    
     return { success: true, data: preferences };
   } catch (error) {
     console.error('Failed to update user preferences:', error);
@@ -480,70 +511,6 @@ export const getUserData = async (userId: string) => {
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
-// Utility function to convert Firebase download URL to public URL for agent processing
-export const getPublicUrlFromDownloadUrl = (downloadUrl: string): string => {
-  try {
-    // Firebase Storage download URLs have the format:
-    // https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media&token={token}
-    // Public URLs have the format:
-    // https://storage.googleapis.com/{bucket}/{path}
-    
-    const url = new URL(downloadUrl);
-    
-    // Check if it's a Firebase Storage download URL
-    if (url.hostname === 'firebasestorage.googleapis.com') {
-      // Extract bucket and path from the URL
-      const pathParts = url.pathname.split('/');
-      if (pathParts.length >= 4 && pathParts[1] === 'v0' && pathParts[2] === 'b') {
-        const bucket = pathParts[3];
-        const encodedPath = pathParts.slice(5).join('/'); // Skip 'v0', 'b', bucket, 'o'
-        const decodedPath = decodeURIComponent(encodedPath);
-        
-        // Return public URL format
-        return `https://storage.googleapis.com/${bucket}/${decodedPath}`;
-      }
-    }
-    
-    // If it's already a public URL or not a Firebase Storage URL, return as is
-    return downloadUrl;
-  } catch (error) {
-    console.warn('Failed to convert download URL to public URL:', error);
-    return downloadUrl; // Return original URL as fallback
-  }
-};
-
-// Enhanced function to get user resumes with public URL option
-export const getUserResumesWithPublicUrls = async (userId: string, usePublicUrls: boolean = false) => {
-  try {
-    const result = await getUserResumes(userId);
-    
-    if (!result.success || !result.data) {
-      return result;
-    }
-    
-    // If public URLs are requested, convert download URLs to public URLs
-    if (usePublicUrls) {
-      const resumesWithPublicUrls = result.data.map(resume => ({
-        ...resume,
-        fileUrl: getPublicUrlFromDownloadUrl(resume.fileUrl),
-        // Add a separate field for the public URL to maintain both
-        publicUrl: getPublicUrlFromDownloadUrl(resume.fileUrl)
-      }));
-      
-      return { success: true, data: resumesWithPublicUrls };
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('Failed to fetch user resumes with public URLs:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      data: [] 
     };
   }
 };

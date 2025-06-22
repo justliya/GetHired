@@ -5,4 +5,3 @@ google-cloud-firestore==2.13.1
 pydantic==2.5.0
 requests==2.31.0
 pytz==2023.3
-mailchimp-marketing==3.0.80
