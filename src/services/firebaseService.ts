@@ -520,14 +520,11 @@ export const getPublicUrlFromDownloadUrl = (downloadUrl: string): string => {
 export const getResumeContent = async (resumeUrl: string): Promise<{
   success: boolean;
   data?: Blob;
-  publicUrl?: string;
+  downloadUrl?: string;
   error?: string;
 }> => {
   try {
-    // First, try to convert to public URL for direct access
-    const publicUrl = getPublicUrlFromDownloadUrl(resumeUrl);
-    
-    // If it's a Firebase Storage URL, try to use Firebase SDK
+    // If it's a Firebase Storage URL, try to use Firebase SDK first
     if (resumeUrl.includes('firebasestorage.googleapis.com')) {
       try {
         // Extract the storage path from the Firebase Storage URL
@@ -547,41 +544,28 @@ export const getResumeContent = async (resumeUrl: string): Promise<{
           return {
             success: true,
             data: blob,
-            publicUrl: publicUrl
+            downloadUrl: resumeUrl
           };
         }
       } catch (firebaseError) {
-        console.warn('Firebase SDK access failed, trying public URL:', firebaseError);
+        console.warn('Firebase SDK access failed:', firebaseError);
+        
+        // For agent processing, return the download URL as-is
+        // Agents can access Firebase Storage URLs server-side without CORS issues
+        return {
+          success: true,
+          downloadUrl: resumeUrl,
+          error: 'File content not accessible from browser, but download URL available for server-side processing'
+        };
       }
     }
     
-    // Fallback: try to fetch the public URL directly
-    try {
-      const response = await fetch(publicUrl, {
-        mode: 'cors',
-        credentials: 'omit'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      return {
-        success: true,
-        data: blob,
-        publicUrl: publicUrl
-      };
-    } catch (fetchError) {
-      console.warn('Direct fetch failed:', fetchError);
-      
-      // Return the public URL anyway for agent processing
-      return {
-        success: true,
-        publicUrl: publicUrl,
-        error: 'File content not accessible from browser, but public URL available for server-side processing'
-      };
-    }
+    // For non-Firebase URLs or as a fallback, return the URL for server-side processing
+    return {
+      success: true,
+      downloadUrl: resumeUrl,
+      error: 'File accessible via server-side processing only'
+    };
     
   } catch (error) {
     console.error('Failed to get resume content:', error);
@@ -596,14 +580,16 @@ export const getResumeContent = async (resumeUrl: string): Promise<{
 export const getResumeUrlForContext = (resume: Resume, context: 'user' | 'agent' | 'download'): string => {
   switch (context) {
     case 'user':
-      // For user viewing in UI, use authenticated download URL
+      // For user viewing in UI (including external viewers like Office Online), 
+      // use authenticated download URL which has better cross-origin support
       return resume.fileUrl;
     case 'agent':
-      // For agent processing, use public URL
-      return resume.publicUrl || getPublicUrlFromDownloadUrl(resume.fileUrl);
+      // For agent processing, use authenticated download URL
+      // Server-side agents can access this without CORS restrictions
+      return resume.fileUrl;
     case 'download':
-      // For downloads, try public URL first, fallback to authenticated
-      return resume.publicUrl || getPublicUrlFromDownloadUrl(resume.fileUrl);
+      // For downloads, use authenticated URL to ensure access
+      return resume.fileUrl;
     default:
       return resume.fileUrl;
   }
@@ -637,6 +623,66 @@ export const getUserResumesWithPublicUrls = async (userId: string, usePublicUrls
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error',
       data: [] 
+    };
+  }
+};
+
+// Function to get resume content for client-side access via server proxy
+export const getResumeContentViaProxy = async (resumeUrl: string): Promise<{
+  success: boolean;
+  data?: Blob;
+  proxyUrl?: string;
+  error?: string;
+}> => {
+  try {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined') {
+      return {
+        success: false,
+        error: 'Proxy function only available in browser environment'
+      };
+    }
+
+    // Use the Firebase authenticated download URL for server-side processing
+    // The backend can access this without CORS issues
+    return {
+      success: true,
+      proxyUrl: resumeUrl, // Return the original URL for server-side use
+      error: undefined
+    };
+  } catch (error) {
+    console.error('Failed to create proxy URL:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+// Function to check if a resume URL is accessible from the client
+export const checkResumeUrlAccess = async (resumeUrl: string): Promise<{
+  success: boolean;
+  accessible: boolean;
+  error?: string;
+}> => {
+  try {
+    // Try a HEAD request to check if the URL is accessible
+    const response = await fetch(resumeUrl, {
+      method: 'HEAD',
+      mode: 'cors',
+      credentials: 'omit'
+    });
+    
+    return {
+      success: true,
+      accessible: response.ok
+    };
+  } catch (error) {
+    // CORS errors or other network errors mean the URL is not accessible from client
+    return {
+      success: true,
+      accessible: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 };
