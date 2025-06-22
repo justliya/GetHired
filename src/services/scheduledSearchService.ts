@@ -14,82 +14,6 @@ import {
 } from 'firebase/firestore';
 import type { JobPreferences, SearchSchedule } from '../models/UserData';
 
-const COLLECTION_NAME = 'scheduledSearches';
-
-const getCurrentUserId = () => {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('User must be authenticated to access scheduled searches');
-  }
-  return user.uid;
-};
-
-const verifyUserAccess = (userId: string) => {
-  const currentUserId = getCurrentUserId();
-  if (currentUserId !== userId) {
-    throw new Error('Unauthorized access to user data');
-  }
-};
-
-export const isUserAuthenticated = (): boolean => {
-  return auth.currentUser !== null;
-};
-
-export const getCurrentUserIdSafe = (): string | null => {
-  return auth.currentUser?.uid || null;
-};
-
-export const testFirebaseConnection = async (): Promise<{
-  success: boolean;
-  authenticated: boolean;
-  userId?: string;
-  error?: string;
-}> => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      return {
-        success: false,
-        authenticated: false,
-        error: 'User not authenticated'
-      };
-    }
-
-    try {
-      const testQuery = query(
-        collection(db, COLLECTION_NAME),
-        where('userId', '==', user.uid)
-      );
-      
-      await getDocs(testQuery);
-      
-      return {
-        success: true,
-        authenticated: true,
-        userId: user.uid
-      };
-    } catch (firestoreError) {
-      // If it's a permission error, that's expected without rules
-      if (firestoreError instanceof Error && firestoreError.message.includes('permission')) {
-        return {
-          success: false,
-          authenticated: true,
-          userId: user.uid,
-          error: 'Firestore rules not configured yet - add security rules to Firebase Console'
-        };
-      }
-      throw firestoreError;
-    }
-  } catch (error) {
-    return {
-      success: false,
-      authenticated: auth.currentUser !== null,
-      userId: auth.currentUser?.uid,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-};
-
 export interface ScheduledSearch {
   id?: string;
   userId: string;
@@ -338,9 +262,8 @@ export const getScheduledSearch = async (scheduleId: string): Promise<{
   }
 };
 
-import { ENV } from '../config/environment';
-
-const CLOUD_TASK_API_URL = ENV.CLOUD_TASK_API_URL;
+// Cloud Task Management Functions
+const CLOUD_TASK_API_URL = process.env.VITE_CLOUD_TASK_API_URL || 'http://localhost:8000/api/v1';
 
 /**
  * Create a Cloud Task for scheduled job search

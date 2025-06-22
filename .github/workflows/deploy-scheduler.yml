@@ -69,3 +69,41 @@ jobs:
             --format="value(status.url)")
           echo "✅ Scheduler deployed at: $SERVICE_URL"
           echo "🔗 Health check: $SERVICE_URL/api/v1/health"
+=======
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+        export_environment_variables: true
+        cleanup_credentials: true
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Deploy Cloud Tasks Scheduler
+      working-directory: cloud_tasks
+      env:
+        SERVICE_NAME: gethired-scheduler
+        REGION: us-central1
+        QUEUE_NAME: scheduled-searches
+      run: |
+        ./deploy.sh $GOOGLE_CLOUD_PROJECT
+
+    - name: Verify deployment
+      env:
+        SERVICE_NAME: gethired-scheduler
+        REGION: us-central1
+      run: |
+        SERVICE_URL=$(gcloud run services describe $SERVICE_NAME \
+          --region=$REGION \
+          --project=$GOOGLE_CLOUD_PROJECT \
+          --format="value(status.url)")
+        echo "✅ Scheduler deployed at: $SERVICE_URL"
+        echo "🔗 Health check: $SERVICE_URL/api/v1/health"
+>>>>>>> bc20f97 (feat: Implement scheduled job search email notifications and management)
