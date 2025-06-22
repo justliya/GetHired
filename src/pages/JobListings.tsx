@@ -509,7 +509,6 @@ const handleResearch = async (jobId: string) => {
     }
   };
 
-
   // Commented out test connection function
   // const testConnection = async () => {
   //   setLoading(true);
@@ -521,7 +520,7 @@ const handleResearch = async (jobId: string) => {
   //       headers: { 'Accept': 'application/json' },
   //     });
 
-  //     if (response.ok) {
+
   //       setError('✅ Connection test successful!');
   //     } else {
   //       setError(`❌ Connection test failed: ${response.status} ${response.statusText}`);
