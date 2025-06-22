@@ -1,6 +1,6 @@
 import { db, auth, storage } from '../firebase';
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, DocumentReference, type DocumentData } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, getBlob } from 'firebase/storage';
 import type { 
   JobPreferences, 
   Resume, 
@@ -513,6 +513,99 @@ export const getPublicUrlFromDownloadUrl = (downloadUrl: string): string => {
   } catch (error) {
     console.warn('Failed to convert download URL to public URL:', error);
     return downloadUrl; // Return original URL as fallback
+  }
+};
+
+// Function to safely fetch resume content that handles CORS issues
+export const getResumeContent = async (resumeUrl: string): Promise<{
+  success: boolean;
+  data?: Blob;
+  publicUrl?: string;
+  error?: string;
+}> => {
+  try {
+    // First, try to convert to public URL for direct access
+    const publicUrl = getPublicUrlFromDownloadUrl(resumeUrl);
+    
+    // If it's a Firebase Storage URL, try to use Firebase SDK
+    if (resumeUrl.includes('firebasestorage.googleapis.com')) {
+      try {
+        // Extract the storage path from the Firebase Storage URL
+        const url = new URL(resumeUrl);
+        const pathParts = url.pathname.split('/');
+        
+        if (pathParts.length >= 4 && pathParts[1] === 'v0' && pathParts[2] === 'b') {
+          const encodedPath = pathParts.slice(5).join('/'); // Skip 'v0', 'b', bucket, 'o'
+          const decodedPath = decodeURIComponent(encodedPath);
+          
+          // Create a reference to the file
+          const storageRef = ref(storage, decodedPath);
+          
+          // Get the blob using Firebase SDK (this handles auth properly)
+          const blob = await getBlob(storageRef);
+          
+          return {
+            success: true,
+            data: blob,
+            publicUrl: publicUrl
+          };
+        }
+      } catch (firebaseError) {
+        console.warn('Firebase SDK access failed, trying public URL:', firebaseError);
+      }
+    }
+    
+    // Fallback: try to fetch the public URL directly
+    try {
+      const response = await fetch(publicUrl, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      return {
+        success: true,
+        data: blob,
+        publicUrl: publicUrl
+      };
+    } catch (fetchError) {
+      console.warn('Direct fetch failed:', fetchError);
+      
+      // Return the public URL anyway for agent processing
+      return {
+        success: true,
+        publicUrl: publicUrl,
+        error: 'File content not accessible from browser, but public URL available for server-side processing'
+      };
+    }
+    
+  } catch (error) {
+    console.error('Failed to get resume content:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+// Enhanced function to get resume URL that's safe for different use cases
+export const getResumeUrlForContext = (resume: Resume, context: 'user' | 'agent' | 'download'): string => {
+  switch (context) {
+    case 'user':
+      // For user viewing in UI, use authenticated download URL
+      return resume.fileUrl;
+    case 'agent':
+      // For agent processing, use public URL
+      return resume.publicUrl || getPublicUrlFromDownloadUrl(resume.fileUrl);
+    case 'download':
+      // For downloads, try public URL first, fallback to authenticated
+      return resume.publicUrl || getPublicUrlFromDownloadUrl(resume.fileUrl);
+    default:
+      return resume.fileUrl;
   }
 };
 

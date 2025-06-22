@@ -14,7 +14,7 @@ import type {
 import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getUserResumes, getPublicUrlFromDownloadUrl, uploadResume, updateUserPreferences } from '../../services/firebaseService';
+import { getUserResumes, getResumeUrlForContext, uploadResume, updateUserPreferences } from '../../services/firebaseService';
 import { handlePreferencesSubmissionSuccess, handleSchedulingAsync } from '../../utils/onboardingUtils';
 import { ENV } from '../../config/environment';
 
@@ -390,7 +390,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                                 {resumes[0]?.metadata?.title || resumes[0]?.fileUrl?.split('/').pop() || 'Untitled Resume'}
                             </span>
                             <a 
-                                href={getPublicUrlFromDownloadUrl(resumes[0]?.fileUrl)} 
+                                href={getResumeUrlForContext(resumes[0], 'user')} 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
                                 className="ml-2 text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
