@@ -141,9 +141,15 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
             <JobCard
               key={job.id}
               job={job}
-              onFavoriteToggle={() => {}}
-              onResearch={() => {}}
-            />
+                onFavoriteToggle={() => { } }
+                onResearch={() => { } }
+                onTailorResume={function (): void {
+                  throw new Error('Function not implemented.');
+                } }
+                onDelete={function (): void {
+                  throw new Error('Function not implemented.');
+                } }
+              />
           ))}
         </div>
       </section>
