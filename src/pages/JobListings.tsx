@@ -102,8 +102,9 @@ export default function JobListings() {
           sessionId: sessionId
         }, { merge: true });
       }
-    } catch (e) {
-      console.error("Error in JSON parsing:", e);
+    } catch (error) {
+      console.error('Failed to save jobs:', error);
+      setError('Failed to save jobs. Please try again.');
     }
   };
 
@@ -310,7 +311,6 @@ export default function JobListings() {
 
       throw error;
     }
-  };
 
   const startSession = async () => {
     if (!user?.uid) {
@@ -328,26 +328,67 @@ export default function JobListings() {
         context: { user_id: user.uid },
         session_id: sessionId,
       });
-      
-      if (!res.ok) throw new Error(res.statusText);
-      
-      setConfirmation("Session started successfully!");
-      setTimeout(() => setConfirmation(""), 2000);
-    } catch (err: any) {
-      console.error("Error starting session:", err);
-      setConfirmation(`Error starting session: ${err.message}`);
-      setTimeout(() => setConfirmation(""), 3000);
-      setSessionStarted(false);
-    } finally {
-      setIsLoading(false);
+
+      clearTimeout(timeoutId);
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      // setDebugInfo((prev: any) => ({
+      //   ...prev,
+      //   lastResponse: {
+      //     status: response.status,
+      //     statusText: response.statusText,
+      //     headers: Object.fromEntries(response.headers.entries()),
+      //     timestamp: new Date().toISOString()
+      //   }
+      // })); // Commented out debug
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorText = await response.text();
+          console.log('Error response body:', errorText);
+          // setDebugInfo((prev: any) => ({ ...prev, lastErrorBody: errorText })); // Commented out debug
+
+          // Try to parse as JSON for more details
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorJson.error || errorMessage;
+          } catch {
+            // If not JSON, use the text
+            if (errorText) errorMessage = errorText;
+          }
+        } catch (e) {
+          console.log('Could not read error response body:', e);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log('API Response:', result);
+      // setDebugInfo((prev: any) => ({ ...prev, lastResult: result })); // Commented out debug
+
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.error('API call failed:', error);
+
+      if (typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError') {
+        throw new Error('Request timed out after 5 minutes');
+      }
+
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error: Unable to connect to server. Check your internet connection and CORS settings.');
+      }
+
+      throw error;
     }
   };
 
-  // Search for jobs autonomously
-  const handleSearchJobs = async () => {
-    if (!sessionStarted) {
-      setConfirmation("Please start a session first!");
-      setTimeout(() => setConfirmation(""), 2000);
+  const startSession = async () => {
+    if (!user?.uid) {
+      setError('Please log in to start a session.');
       return;
     }
 
@@ -390,7 +431,56 @@ export default function JobListings() {
         }`
       );
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const searchJobs = async () => {
+    if (!sessionStarted || !user?.uid) {
+      setError('Please start a session first.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+
+      const result = await makeApiCall(`${API_BASE_URL}/run`, {
+        message: 'find me jobs',
+        context: { user_id: user.uid },
+        session_id: sessionId,
+      });
+
+      console.log('Jobs search result:', result);
+
+
+      const newJobs = parseJobListings(result);
+
+      if (newJobs.length > 0) {
+        console.log(`Successfully parsed ${newJobs.length} jobs:`, newJobs);
+        setJobs(newJobs);
+        await saveToStorageAndFirebase(newJobs);
+        setError(null);
+      } else {
+        console.warn('No jobs found in response:', result);
+
+        let errorMsg = 'No jobs found in the response.';
+        if (result.message) {
+          const preview = result.message.substring(0, 300);
+          errorMsg += ` Response preview: "${preview}${result.message.length > 300 ? '...' : ''}"`;
+        }
+
+        setError(errorMsg);
+      }
+    } catch (error) {
+      console.error('Failed to fetch jobs:', error);
+      setError(
+        `Failed to fetch jobs: ${error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
