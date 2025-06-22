@@ -17,7 +17,7 @@ interface DashboardProps {
 
 const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery] = useState('');
   const [jobListings, setJobListings] = useState<JobListing[]>([]);
 
   useEffect(() => {
@@ -108,56 +108,36 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
       </motion.div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search for jobs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <button
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
-            onClick={() => navigate('/jobs')}
-          >
-            Search
-          </button>
-        </div>
+
       </div>
+      {/* Scheduled Searches Section */}
+      <section className="mb-8">
+        <ScheduleStatusDisplay onEditSchedule={(schedule) => onOpenPreferences(schedule)} />
+      </section>
 
       <section className="mb-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Jobs</h2>
-          <button
-            onClick={() => navigate('/jobs')}
-            className="text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            View all
-          </button>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Saved Jobs</h2>
+
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredJobs.slice(0, 3).map((job) => (
             <JobCard
               key={job.id}
               job={job}
-                onFavoriteToggle={() => { } }
-                onResearch={() => { } }
-                onTailorResume={function (): void {
-                  throw new Error('Function not implemented.');
-                } }
-                onDelete={function (): void {
-                  throw new Error('Function not implemented.');
-                } }
-              />
+              onFavoriteToggle={() => { }}
+              onResearch={() => { }}
+              onTailorResume={function (): void {
+                throw new Error('Function not implemented.');
+              }}
+              onDelete={function (): void {
+                throw new Error('Function not implemented.');
+              }}
+            />
           ))}
         </div>
       </section>
 
-      {/* Scheduled Searches Section */}
-      <section className="mb-8">
-        <ScheduleStatusDisplay onEditSchedule={(schedule) => onOpenPreferences(schedule)} />
-      </section>
 
       {/* AI Agents Section */}
       <section>

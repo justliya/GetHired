@@ -4,7 +4,7 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { Search, CheckCircle, Clock, Loader2, AlertCircle, Play, ArrowRight } from 'lucide-react';
+import { Search, CheckCircle, Clock, Loader2, AlertCircle } from 'lucide-react';
 import JobCard from '../components/JobCard';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -385,141 +385,141 @@ export default function JobListings() {
     }
   };
 
-const handleResearch = async (jobId: string) => {
-  if (!user?.uid) {
-    setError('Please log in to research jobs.');
-    return;
-  }
+  const handleResearch = async (jobId: string) => {
+    if (!user?.uid) {
+      setError('Please log in to research jobs.');
+      return;
+    }
 
-  const jobIndex = jobs.findIndex(job => job.id === jobId);
-  if (jobIndex === -1) {
-    setError('Job not found.');
-    return;
-  }
+    const jobIndex = jobs.findIndex(job => job.id === jobId);
+    if (jobIndex === -1) {
+      setError('Job not found.');
+      return;
+    }
 
-  const currentJob = jobs[jobIndex];
-  setActionLoading(jobId);
-  setError(null);
+    const currentJob = jobs[jobIndex];
+    setActionLoading(jobId);
+    setError(null);
 
-  try {
-    const result = await makeApiCall(`${API_BASE_URL}/run`, {
-      message: `${jobIndex + 1}`,
-      context: { user_id: user.uid },
-      session_id: sessionId,
-    });
+    try {
+      const result = await makeApiCall(`${API_BASE_URL}/run`, {
+        message: `${jobIndex + 1}`,
+        context: { user_id: user.uid },
+        session_id: sessionId,
+      });
 
-    console.log('Research API result:', result);
+      console.log('Research API result:', result);
 
-    // Save the job listing to dedicated subcollection
-    const jobListingRef = doc(db, 'users', user.uid, 'jobListings', jobId);
-    await setDoc(jobListingRef, currentJob);
+      // Save the job listing to dedicated subcollection
+      const jobListingRef = doc(db, 'users', user.uid, 'jobListings', jobId);
+      await setDoc(jobListingRef, currentJob);
 
-    // Parse and save company research data
-    let parsedResearchData = null;
-    
-    // Try to parse the research data from the API response
-    const parseResearchData = (rawData: any) => {
-      if (!rawData) return null;
+      // Parse and save company research data
+      let parsedResearchData = null;
 
-      // Check if it's already in the right format
-      if (rawData.companyOverview && rawData.ratings) {
-        return rawData;
-      }
+      // Try to parse the research data from the API response
+      const parseResearchData = (rawData: any) => {
+        if (!rawData) return null;
 
-      // Try different nested structures
-      const possibleStructures = [
-        rawData?.companyResearch,
-        rawData?.data?.companyResearch,
-        rawData?.researchData,
-        rawData?.research,
-        rawData?.response?.companyResearch,
-        Array.isArray(rawData) ? rawData[0] : null,
-      ].filter(obj => obj && typeof obj === 'object');
-
-      for (const obj of possibleStructures) {
-        if (obj.companyOverview && obj.ratings) {
-          return obj;
+        // Check if it's already in the right format
+        if (rawData.companyOverview && rawData.ratings) {
+          return rawData;
         }
-      }
 
-      // Try to parse from message text
-      const messageText = rawData?.message || rawData?.data?.raw_events?.[0]?.parts?.[0]?.text || rawData?.text || "";
-      if (messageText) {
-        const patterns = [
-          /```json\s*([\s\S]+?)```/,
-          /```([\s\S]+?)```/,
-          /\{[\s\S]*"companyOverview"[\s\S]*\}/,
-          /\{[\s\S]*\}/,
-        ];
+        // Try different nested structures
+        const possibleStructures = [
+          rawData?.companyResearch,
+          rawData?.data?.companyResearch,
+          rawData?.researchData,
+          rawData?.research,
+          rawData?.response?.companyResearch,
+          Array.isArray(rawData) ? rawData[0] : null,
+        ].filter(obj => obj && typeof obj === 'object');
 
-        for (const pattern of patterns) {
-          const match = messageText.match(pattern);
-          if (match) {
-            const jsonStr = match[pattern.source.includes('```') ? 1 : 0];
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const dataObj = parsed.companyResearch ?? parsed;
-              if (dataObj.companyOverview && dataObj.ratings) {
-                return dataObj;
+        for (const obj of possibleStructures) {
+          if (obj.companyOverview && obj.ratings) {
+            return obj;
+          }
+        }
+
+        // Try to parse from message text
+        const messageText = rawData?.message || rawData?.data?.raw_events?.[0]?.parts?.[0]?.text || rawData?.text || "";
+        if (messageText) {
+          const patterns = [
+            /```json\s*([\s\S]+?)```/,
+            /```([\s\S]+?)```/,
+            /\{[\s\S]*"companyOverview"[\s\S]*\}/,
+            /\{[\s\S]*\}/,
+          ];
+
+          for (const pattern of patterns) {
+            const match = messageText.match(pattern);
+            if (match) {
+              const jsonStr = match[pattern.source.includes('```') ? 1 : 0];
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const dataObj = parsed.companyResearch ?? parsed;
+                if (dataObj.companyOverview && dataObj.ratings) {
+                  return dataObj;
+                }
+              } catch (e) {
+                console.warn('JSON parse error:', e);
               }
-            } catch (e) {
-              console.warn('JSON parse error:', e);
             }
           }
         }
+
+        return null;
+      };
+
+      parsedResearchData = parseResearchData(result);
+
+      // Save to both Firebase and localStorage
+      const researchDocData = {
+        jobId: jobId,
+        jobTitle: currentJob.title,
+        company: currentJob.company,
+        researchData: parsedResearchData || result, // Save raw data if parsing fails
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Save company research to its own subcollection
+      const companyResearchRef = doc(db, 'users', user.uid, 'companyResearch', jobId);
+      await setDoc(companyResearchRef, researchDocData);
+
+      // Also save to localStorage for immediate access
+      const localStorageKey = `company-research-${jobId}`;
+      if (parsedResearchData) {
+        localStorage.setItem(localStorageKey, JSON.stringify(parsedResearchData));
+      } else {
+        // Save the raw result if we couldn't parse it properly
+        localStorage.setItem(localStorageKey, JSON.stringify(result));
       }
 
-      return null;
-    };
+      // Update job status to viewed in the current session
+      const updatedJobs = jobs.map(job =>
+        job.id === jobId ? { ...job, status: 'viewed' as const } : job
+      );
+      setJobs(updatedJobs);
+      await saveToStorageAndFirebase(updatedJobs);
 
-    parsedResearchData = parseResearchData(result);
+      console.log('Job and research data saved to subcollections and localStorage:', {
+        jobId,
+        jobTitle: currentJob.title,
+        company: currentJob.company,
+        researchDataParsed: !!parsedResearchData
+      });
 
-    // Save to both Firebase and localStorage
-    const researchDocData = {
-      jobId: jobId,
-      jobTitle: currentJob.title,
-      company: currentJob.company,
-      researchData: parsedResearchData || result, // Save raw data if parsing fails
-      createdAt: new Date().toISOString(),
-      lastUpdated: new Date().toISOString()
-    };
-
-    // Save company research to its own subcollection
-    const companyResearchRef = doc(db, 'users', user.uid, 'companyResearch', jobId);
-    await setDoc(companyResearchRef, researchDocData);
-
-    // Also save to localStorage for immediate access
-    const localStorageKey = `company-research-${jobId}`;
-    if (parsedResearchData) {
-      localStorage.setItem(localStorageKey, JSON.stringify(parsedResearchData));
-    } else {
-      // Save the raw result if we couldn't parse it properly
-      localStorage.setItem(localStorageKey, JSON.stringify(result));
+      // Navigate to company research page
+      navigate(`/company-research/${jobId}`);
+    } catch (error) {
+      console.error('Failed to research job:', error);
+      setError(`Failed to research job: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setActionLoading(null);
     }
-
-    // Update job status to viewed in the current session
-    const updatedJobs = jobs.map(job =>
-      job.id === jobId ? { ...job, status: 'viewed' as const } : job
-    );
-    setJobs(updatedJobs);
-    await saveToStorageAndFirebase(updatedJobs);
-
-    console.log('Job and research data saved to subcollections and localStorage:', {
-      jobId,
-      jobTitle: currentJob.title,
-      company: currentJob.company,
-      researchDataParsed: !!parsedResearchData
-    });
-
-    // Navigate to company research page
-    navigate(`/company-research/${jobId}`);
-  } catch (error) {
-    console.error('Failed to research job:', error);
-    setError(`Failed to research job: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    setActionLoading(null);
-  }
-};
+  };
   const handleDelete = async (jobId: string) => {
     try {
       const updatedJobs = jobs.filter(job => job.id !== jobId);
@@ -643,44 +643,6 @@ const handleResearch = async (jobId: string) => {
             </p>
           )}
         </div>
-
-        {/* Getting Started Instructions */}
-        {!sessionStarted && jobs.length === 0 && (
-          <Card className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
-            <div className="text-center">
-              <Play className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                Let's Find Your Dream Job!
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
-                Follow these simple steps to get personalized job recommendations tailored to your skills and preferences.
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mb-3">1</div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Start Session</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Initialize your job search session with our AI agent</p>
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-10 h-10 bg-green-600 text-white rounded-full flex items-center justify-center font-bold mb-3">2</div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Search Jobs</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Let our AI find relevant job opportunities for you</p>
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-10 h-10 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold mb-3">3</div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Research & Apply</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Get company insights and apply to your favorite positions</p>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <ArrowRight className="w-6 h-6 text-blue-600 animate-bounce" />
-              </div>
-            </div>
-          </Card>
-        )}
-
         {/* Session Active Instructions */}
         {sessionStarted && jobs.length === 0 && !loading && (
           <Card className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
@@ -738,7 +700,7 @@ const handleResearch = async (jobId: string) => {
         {/* Control Panel */}
         <Card className="mb-8 bg-gradient-to-r from-blue-100 via-white to-indigo-100 dark:from-blue-900/40 dark:via-slate-800/60 dark:to-indigo-900/40 border border-blue-200 dark:border-slate-700 rounded-2xl shadow-md">
           <div className="flex flex-wrap gap-4 justify-center">
-          {/* <Button
+            {/* <Button
               onClick={testConnection}
               disabled={loading}
               variant="secondary"
