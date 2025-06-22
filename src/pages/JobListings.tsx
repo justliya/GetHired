@@ -1,34 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React from 'react';
-import { useState, useEffect } from 'react';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { Search, CheckCircle, Clock, Loader2, AlertCircle} from 'lucide-react';
-import JobCard from '../components/JobCard';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import { auth, db } from '../firebase';
-import { v4 as uuidv4 } from 'uuid';
-import { useNavigate } from 'react-router-dom';
-
-
-// Types
-interface JobListing {
-  id: string;
-  listingNumber?: number;
-  title: string;
-  company: string;
-  location: string;
-  salary: string;
-  datePosted: string;
-  description: string;
-  qualifications: string[];
-  benefits: string[];
-  url: string;
-  easyApply: boolean;
-  favorite: boolean;
-  status: 'new' | 'viewed' | 'applied' | 'rejected';
-  jobLink?: string;
 // pages/JobListings.tsx
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -48,334 +18,293 @@ import JobResults from "../components/JobResults";
 import type { JobListing } from "../types";
 import { ENV } from "../config/environment";
 
-interface SessionData {
-  agentJobs: JobListing[];
-  searchQuery: string;
-  filters: {
-    locationFilter: string[];
-    statusFilter: string[];
-  };
-  lastUpdated: string;
+
+// Types
+interface JobListing {
+  id: string;
+  listingNumber?: number;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  datePosted: string;
+  description: string;
+  qualifications: string[];
+  benefits: string[];
+  url: string;
+  easyApply: boolean;
+  favorite: boolean;
+  status: 'new' | 'viewed' | 'applied' | 'rejected';
+  jobLink?: string;
 }
 
-const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
+const API_BASE_URL = 'https://gethired-agents-104139545590.us-central1.run.app';
 
-const JobListings = () => {
-  const navigate = useNavigate();
-  const [user, loading, error] = useAuthState(auth);
-  const sessionId = useRef(`conv-${uuidv4()}`).current;
-  const sessionStorageKey = `session-${sessionId}`;
-  const [jobs, setJobs] = useState<JobListing[]>([]);
-  const [sessionStarted, setSessionStarted] = useState(() => {
-    const stored = sessionStorage.getItem(`session-started-${sessionId}`);
-    return stored === 'true';
+export default function JobListings() {
+  const [user, authLoading, authError] = useAuthState(auth);
+  const [sessionId] = useState(() => {
+    const existing = sessionStorage.getItem('active-session-id');
+    const newId = existing || `conv-${uuidv4()}`;
+    sessionStorage.setItem('active-session-id', newId);
+    return newId;
   });
-  const [loading, setLoading] = useState(false);
-  const [, setActionLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // const [debugInfo, setDebugInfo] = useState<any>(null); // Commented out debug info
+  const sessionStorageKey = `session-${sessionId}`;
+  const anonId = useRef(`anon-${uuidv4()}`).current;
+  const userId = user?.uid || anonId;
 
-  const navigate = useNavigate();
+  // Local state
+  const [profileJobs, setProfileJobs] = useState<JobListing[]>([]);
+  const [agentJobs, setAgentJobs] = useState<JobListing[]>([]);
+  const [useAgentJobs, setUseAgentJobs] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [sessionStarted, setSessionStarted] = useState(false);
 
-  const saveToStorageAndFirebase = React.useCallback(async (updatedJobs: JobListing[]) => {
-    try {
-      // Save to sessionStorage
-      sessionStorage.setItem(sessionStorageKey, JSON.stringify(updatedJobs));
-
-      // Save to Firebase if user is authenticated
-      if (user?.uid) {
-        const userRef = doc(db, 'users', user.uid, 'sessions', sessionId);
-        await setDoc(userRef, {
-          jobs: updatedJobs,
-          lastUpdated: new Date().toISOString(),
-          sessionId: sessionId
-        }, { merge: true });
-      }
-    } catch (error) {
-      console.error('Failed to save jobs:', error);
-      setError('Failed to save jobs. Please try again.');
+  // 1) Sign in anonymously if needed
+  useEffect(() => {
+    if (!loading && !user && !error) {
+      signInAnonymously(auth).catch(console.error);
     }
-  }, [user, sessionId, sessionStorageKey]);
+  }, [user, loading, error]);
+
+  // 2) Load profile jobs
+  const loadProfile = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const data = snap.data() as any;
+        if (Array.isArray(data.jobListings)) {
+          setProfileJobs(data.jobListings);
+        }
+      }
+    } catch (e) {
+      console.error("Error in JSON parsing:", e);
+    }
+  }, [user]);
+
+  // 3) Load session data
+  const loadSessionData = useCallback(async () => {
+    // Attempt sessionStorage first
+    const raw = sessionStorage.getItem(sessionStorageKey);
+    if (raw) {
+      const data: SessionData = JSON.parse(raw);
+      setAgentJobs(data.agentJobs);
+      setSearchQuery(data.searchQuery);
+      setLocationFilter(data.filters.locationFilter);
+      setStatusFilter(data.filters.statusFilter);
+      setUseAgentJobs(data.agentJobs.length > 0);
+      setSessionStarted(data.agentJobs.length > 0);
+    }
+
+    // Override with Firestore if available
+    if (user?.uid) {
+      const sessRef = doc(db, "users", user.uid, "sessions", sessionId);
+      const snap = await getDoc(sessRef);
+      if (snap.exists()) {
+        const data = snap.data() as SessionData;
+        setAgentJobs(data.agentJobs);
+        setSearchQuery(data.searchQuery);
+        setLocationFilter(data.filters.locationFilter);
+        setStatusFilter(data.filters.statusFilter);
+        setUseAgentJobs(data.agentJobs.length > 0);
+        setSessionStarted(data.agentJobs.length > 0);
+      }
+    }
+
+    // Load profile separately
+    await loadProfile();
+  }, [user, sessionId, sessionStorageKey, loadProfile]);
 
   useEffect(() => {
-    if (!user || authLoading) return;
+    if (!loading) {
+      loadSessionData();
+    }
+  }, [loading, loadSessionData]);
 
-    const loadJobs = async () => {
-      try {
-        const stored = sessionStorage.getItem(sessionStorageKey);
-        if (stored) {
-          const parsedJobs = JSON.parse(stored);
-          setJobs(parsedJobs);
-        }
-
-        // Then try to load from Firebase
-        const userDocRef = doc(db, 'users', user.uid, 'sessions', sessionId);
-        const snap = await getDoc(userDocRef);
-
-        if (snap.exists()) {
-          const data = snap.data();
-          const savedJobs = data.jobs || [];
-          // Only update if jobs from sessionStorage weren't already set
-          if (savedJobs.length > 0 && (!stored || jobs.length === 0)) {
-            setJobs(savedJobs);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load jobs from storage:', error);
-        setError('Failed to load saved jobs.');
-      }
+  // Auto-save session data whenever agentJobs changes
+  const autoSaveSession = useCallback(async (jobs: JobListing[]) => {
+    const payload: SessionData = {
+      agentJobs: jobs,
+      searchQuery,
+      filters: { locationFilter, statusFilter },
+      lastUpdated: new Date().toISOString(),
     };
 
-    loadJobs();
-  }, [user, authLoading, sessionId, sessionStorageKey]);
+    // Save to sessionStorage
+    sessionStorage.setItem(sessionStorageKey, JSON.stringify(payload));
 
-  useEffect(() => {
-    if (jobs.length > 0) {
-      saveToStorageAndFirebase(jobs);
+    // Save to Firestore if user is authenticated
+    if (user?.uid) {
+      const sessRef = doc(db, "users", user.uid, "sessions", sessionId);
+      await setDoc(sessRef, payload, { merge: true });
     }
-  }, [jobs.length, saveToStorageAndFirebase]);
+  }, [sessionStorageKey, user, sessionId, searchQuery, locationFilter, statusFilter]);
 
-  function parseJobListings(responseData: any): JobListing[] {
-    console.log('Full response data:', responseData);
-
-    // Try to find job arrays in various response structures
-    const possibleJobArrays = [
-      responseData?.jobs,
-      responseData?.data?.jobs,
-      responseData?.listings,
-      Array.isArray(responseData) ? responseData : null,
-      responseData?.response
-    ].filter(arr => Array.isArray(arr) && arr.length > 0);
-
-    for (const jobArray of possibleJobArrays) {
-      if (Array.isArray(jobArray) && jobArray.length > 0) {
-        return jobArray.map((job: any, index: number) => ({
-          id: `${sessionId}-${index}-${Date.now()}`,
-          listingNumber: job.listingNumber || job.listing_number || index + 1,
-          title: job.title || job.job_title || 'Job Title Not Available',
-          company: job.company || job.company_name || 'Company Not Specified',
-          location: job.location || job.job_location || 'Location Not Specified',
-          salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
-          datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
-          description: job.description || job.job_description || job.summary || 'No description available.',
-          qualifications: Array.isArray(job.qualifications) ? job.qualifications :
-            Array.isArray(job.requirements) ? job.requirements :
-              Array.isArray(job.skills) ? job.skills :
-                (job.qualifications || job.requirements || job.skills) ?
-                  [job.qualifications || job.requirements || job.skills] : [],
-          benefits: Array.isArray(job.benefits) ? job.benefits :
-            (job.benefits) ? [job.benefits] : [],
-          url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
-          easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
-          favorite: false,
-          status: 'new' as const,
-        }));
-      }
-    }
-
-    // Try to parse from message text if no direct jobs array found
-    const messageText = responseData?.message || responseData?.response || '';
-    if (messageText) {
-      const patterns = [
-        /```json\s*([\s\S]+?)```/,
-        /```([\s\S]+?)```/,
-        /\{[\s\S]*\}/,
-        /\[[\s\S]*\]/
-      ];
-
-      for (const pattern of patterns) {
-        const match = messageText.match(pattern);
-        if (match) {
-          const raw = match[pattern.source.includes('```') ? 1 : 0];
-          try {
-            const parsedData = JSON.parse(raw);
-            const arr = Array.isArray(parsedData)
-              ? parsedData
-              : parsedData.jobs ?? parsedData.listings ?? parsedData.results ?? [];
-
-            if (arr.length > 0) {
-              return arr.map((job: any, index: number) => ({
-                id: `${sessionId}-${index}-${Date.now()}`,
-                listingNumber: job.listingNumber || job.listing_number || index + 1,
-                title: job.title || job.job_title || 'Job Title Not Available',
-                company: job.company || job.company_name || 'Company Not Specified',
-                location: job.location || job.job_location || 'Location Not Specified',
-                salary: job.salary || job.salary_range || job.compensation || 'Salary Not Specified',
-                datePosted: job.datePosted || job.date_posted || job.posted_date || 'Recently Posted',
-                description: job.description || job.job_description || job.summary || 'No description available.',
-                qualifications: Array.isArray(job.qualifications) ? job.qualifications :
-                  Array.isArray(job.requirements) ? job.requirements :
-                    Array.isArray(job.skills) ? job.skills :
-                      (job.qualifications || job.requirements || job.skills) ?
-                        [job.qualifications || job.requirements || job.skills] : [],
-                benefits: Array.isArray(job.benefits) ? job.benefits :
-                  (job.benefits) ? [job.benefits] : [],
-                url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
-                easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
-                favorite: false,
-                status: 'new' as const,
-              }));
-            }
-          } catch (e) {
-            console.error('JSON parse error:', e);
-          }
-        }
-      }
-    }
-
-    return [];
-  }
-
-  // Fixed API call function - only sends the data, not method/headers in body
-  const makeApiCall = async (endpoint: string, requestData: any) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000);
-
-    try {
-      console.log('Making API call:', { endpoint, requestData });
-      // setDebugInfo((prev: any) => ({ ...prev, lastRequest: { endpoint, requestData, timestamp: new Date().toISOString() } })); // Commented out debug
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestData), // Only send the actual data
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-      // setDebugInfo((prev: any) => ({
-      //   ...prev,
-      //   lastResponse: {
-      //     status: response.status,
-      //     statusText: response.statusText,
-      //     headers: Object.fromEntries(response.headers.entries()),
-      //     timestamp: new Date().toISOString()
-      //   }
-      // })); // Commented out debug
-
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        try {
-          const errorText = await response.text();
-          console.log('Error response body:', errorText);
-          // setDebugInfo((prev: any) => ({ ...prev, lastErrorBody: errorText })); // Commented out debug
-
-          // Try to parse as JSON for more details
-          try {
-            const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.message || errorJson.error || errorMessage;
-          } catch {
-            // If not JSON, use the text
-            if (errorText) errorMessage = errorText;
-          }
-        } catch (e) {
-          console.log('Could not read error response body:', e);
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log('API Response:', result);
-      // setDebugInfo((prev: any) => ({ ...prev, lastResult: result })); // Commented out debug
-
-      return result;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      console.error('API call failed:', error);
-
-      if (typeof error === 'object' && error !== null && 'name' in error && (error as any).name === 'AbortError') {
-        throw new Error('Request timed out after 5 minutes');
-      }
-
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Network error: Unable to connect to server. Check your internet connection and CORS settings.');
-      }
-
-      throw error;
-    }
-  };
-
-  const startSession = async () => {
-    if (!user?.uid) {
-      setError('Please log in to start a session.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-
-      const result = await makeApiCall(`${API_BASE_URL}/run`, {
-        message: `Initialize session for user ${user.uid}`,
-        context: { user_id: user.uid },
-        session_id: sessionId,
-      });
-
-      console.log('Session started:', result);
-      setSessionStarted(true);
-      sessionStorage.setItem(`session-started-${sessionId}`, 'true');
-    } catch (error) {
-      console.error('Failed to start session:', error);
-      setError(`Failed to start session: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const searchJobs = async () => {
-    if (!sessionStarted || !user?.uid) {
-      setError('Please start a session first.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-
-      const result = await makeApiCall(`${API_BASE_URL}/run`, {
-        message: 'find me jobs',
-        context: { user_id: user.uid },
-        session_id: sessionId,
-      });
-
-      console.log('Jobs search result:', result);
-
-
-      const newJobs = parseJobListings(result);
-
-      if (newJobs.length > 0) {
-        console.log(`Successfully parsed ${newJobs.length} jobs:`, newJobs);
-        setJobs(newJobs);
-        await saveToStorageAndFirebase(newJobs);
-        setError(null);
-      } else {
-        console.warn('No jobs found in response:', result);
-
-        let errorMsg = 'No jobs found in the response.';
-        if (result.message) {
-          const preview = result.message.substring(0, 300);
-          errorMsg += ` Response preview: "${preview}${result.message.length > 300 ? '...' : ''}"`;
-        }
-
-        setError(errorMsg);
-      }
-    } catch (error) {
-      console.error('Failed to fetch jobs:', error);
-      setError(
-        `Failed to fetch jobs: ${error instanceof Error ? error.message : String(error)
-        }`
+  // Manual save function
+  const handleSave = async () => {
+    await autoSaveSession(agentJobs);
+    
+    // Also save to profile
+    if (user?.uid) {
+      await saveListingsToUserProfile(
+        user.uid,
+        useAgentJobs ? agentJobs : profileJobs
       );
+    }
+
+    setConfirmation("Saved!");
+    setTimeout(() => setConfirmation(""), 2000);
+  };
+
+  // Favorite toggle
+  const handleFavoriteToggle = async (job: JobListing) => {
+    const arr = useAgentJobs ? agentJobs : profileJobs;
+    const updated = arr.map((j) =>
+      j.id === job.id ? { ...j, favorite: !j.favorite } : j
+    );
+    
+    if (useAgentJobs) {
+      setAgentJobs(updated);
+      await autoSaveSession(updated);
+    } else {
+      setProfileJobs(updated);
+    }
+
+    if (user?.uid) {
+      const userRef = doc(db, "users", user.uid);
+      try {
+        if (!job.favorite) {
+          await updateDoc(userRef, { applications: arrayUnion(job) });
+        } else {
+          await updateDoc(userRef, { applications: arrayRemove(job) });
+        }
+      } catch (e) {
+        console.error("Error updating applications:", e);
+      }
+    }
+  };
+
+  const handleSearchChange = (q: string) => setSearchQuery(q);
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setLocationFilter([]);
+    setStatusFilter([]);
+  };
+
+  // Parse job listings from assistant reply
+  const parseJobListings = (text: string): JobListing[] => {
+    try {
+      const block = /```json([\s\S]*?)```/.exec(text)?.[1] || /{[\s\S]*}/.exec(text)?.[0];
+      if (!block) return [];
+      const data = JSON.parse(block);
+      const arr = Array.isArray(data) ? data : data.jobs ?? [];
+      return arr.map((j: any, i: number) => ({
+        id: j.id || `parsed-${Date.now()}-${i}`,
+        title: j.title,
+        company: j.company,
+        location: j.location,
+        salary: j.salary,
+        datePosted: j.datePosted,
+        status: "new",
+        favorite: false,
+        qualifications: j.qualifications || [],
+        description: j.description,
+        url: j.url,
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  // Start autonomous session
+  const handleStartSession = async () => {
+    setIsLoading(true);
+    setSessionStarted(true);
+    
+    try {
+      const res = await fetch(`${API_BASE_URL}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "${userId}",
+          context: {
+            user_id: userId,
+            firebase_uid: user?.uid,
+            is_anonymous: user?.isAnonymous,
+          },
+          session_id: sessionId,
+        }),
+      });
+      
+      if (!res.ok) throw new Error(res.statusText);
+      
+      setConfirmation("Session started successfully!");
+      setTimeout(() => setConfirmation(""), 2000);
+    } catch (err: any) {
+      console.error("Error starting session:", err);
+      setConfirmation(`Error starting session: ${err.message}`);
+      setTimeout(() => setConfirmation(""), 3000);
+      setSessionStarted(false);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Search for jobs autonomously
+  const handleSearchJobs = async () => {
+    if (!sessionStarted) {
+      setConfirmation("Please start a session first!");
+      setTimeout(() => setConfirmation(""), 2000);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "find me jobs",
+          context: {
+            user_id: userId,
+            firebase_uid: user?.uid,
+            is_anonymous: user?.isAnonymous,
+          },
+          session_id: sessionId,
+        }),
+      });
+
+      if (!res.ok) throw new Error(res.statusText);
+      
+      const { message: reply, data } = await res.json();
+      const newJobs = Array.isArray(data?.jobs) ? data.jobs : parseJobListings(reply);
+      
+      if (newJobs.length) {
+        const updatedJobs = [...agentJobs, ...newJobs];
+        setAgentJobs(updatedJobs);
+        setUseAgentJobs(true);
+        
+        // Auto-save to session storage
+        await autoSaveSession(updatedJobs);
+        
+        setConfirmation(`Found ${newJobs.length} new jobs and saved automatically!`);
+        setTimeout(() => setConfirmation(""), 3000);
+      } else {
+        setConfirmation("No new jobs found.");
+        setTimeout(() => setConfirmation(""), 2000);
+      }
+    } catch (err: any) {
+      console.error("Error searching jobs:", err);
+      setConfirmation(`Error searching jobs: ${err.message}`);
+      setTimeout(() => setConfirmation(""), 3000);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -606,67 +535,77 @@ const handleResearch = async (jobId: string) => {
   //   }
   // };
 
-  // Reset session
-  const handleNewSession = () => {
-    setAgentJobs([]);
-    setUseAgentJobs(false);
-    setSessionStarted(false);
-    sessionStorage.removeItem(sessionStorageKey);
-    setConfirmation("New session started!");
-    setTimeout(() => setConfirmation(""), 2000);
-  };
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (loading) return <div className="py-12 text-center text-gray-600">Initializing auth…</div>;
-  if (error) return <div className="py-12 text-center text-red-600">Auth Error: {error.message}</div>;
+  // Show error state if authentication failed
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">Authentication Error</div>
+          <p className="text-gray-600 dark:text-gray-300">Please try refreshing the page.</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Display and filter jobs
-  const displayJobs = useAgentJobs ? agentJobs : profileJobs;
-  const filteredJobs = displayJobs.filter((job) => {
-    if (searchQuery && ![job.title, job.company].some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))) return false;
-    if (locationFilter.length && !locationFilter.includes(job.location)) return false;
-    if (statusFilter.length && !statusFilter.includes(job.status)) return false;
-    return true;
-  });
+  // Show login required state
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Please log in to access job listings
+          </div>
+          <p className="text-gray-600 dark:text-gray-300">
+            You need to be authenticated to use this feature.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            Job Search Agent
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Find your next career opportunity with AI-powered job matching
-          </p>
-          {user && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Welcome {user.email}, after jobs appear select your favorites and the ones you would like to research
-              then click 'Complete Session' when you are done and researched listing will appear in the 'Resume Tailoring' tab!
-            </p>
-          )}
-        </div>
+    <div className="max-w-7xl mx-auto px-4">
+      <JobHeader
+        useAgentJobs={useAgentJobs}
+        agentJobsCount={agentJobs.length}
+        user={user ? {
+          isAnonymous: user.isAnonymous,
+          email: user.email || undefined,
+          uid: user.uid
+        } : null}
+        onToggleAgentJobs={() => setUseAgentJobs(v => !v)}
+        showChatBot={false}
+        onToggleChat={() => {}}
+        onNewChat={handleNewSession}
+        onSave={handleSave}
+      />
 
-        {/* Session Active Instructions */}
-        {sessionStarted && jobs.length === 0 && !loading && (
-          <Card className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
-            <div className="text-center">
-              <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                Session Active! 🎉
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Great! Your job search session is now active. Click "Search Jobs" below to find opportunities that match your profile.
-              </p>
-            </div>
-          </Card>
-        )}
-
-        {/* Commented out Debug Info section */}
-        {/* {debugInfo && (
-          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-6 text-xs">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold">Debug Information:</h3>
+      {/* Autonomous Agent Controls */}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Autonomous Job Agent</h2>
+        <div className="flex flex-wrap gap-3">
+          {!sessionStarted ? (
+            <button
+              onClick={handleStartSession}
+              disabled={isLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-6 py-2 rounded-md font-medium transition-colors"
+            >
+              {isLoading ? "Starting Session..." : "Start Session"}
+            </button>
+          ) : (
+            <>
               <button
                 onClick={() => setDebugInfo(null)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -801,39 +740,33 @@ const handleResearch = async (jobId: string) => {
             />
           ))}
         </div>
-        {sessionStarted && (
-          <p className="text-sm text-green-600 mt-2">
-            ✓ Session active - Jobs will be automatically saved to session storage
-          </p>
+
+        {/* Empty State */}
+        {jobs.length === 0 && !loading && (
+          <div className="text-center py-16">
+            <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No Jobs Found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Start a session and search for jobs to see opportunities here.
+            </p>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-16">
+            <Loader2 className="w-16 h-16 text-blue-600 mx-auto mb-4 animate-spin" />
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              {sessionStarted ? 'Searching for Jobs...' : 'Starting Session...'}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              Please wait while we process your request.
+            </p>
+          </div>
         )}
       </div>
-
-      {confirmation && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          className="bg-green-100 text-green-800 p-2 rounded mb-4 text-center"
-        >
-          {confirmation}
-        </motion.div>
-      )}
-
-      <JobFilters
-        searchQuery={searchQuery}
-        onSearchChange={handleSearchChange}
-        onClear={handleClearFilters}
-      />
-
-      <AnimatePresence>
-        <JobResults
-          jobs={filteredJobs}
-          onResearch={job => navigate(`/company-research/${job.id}`)}
-          onFavoriteToggle={handleFavoriteToggle}
-        />
-      </AnimatePresence>
     </div>
   );
-};
-
-export default JobListings;
+}
