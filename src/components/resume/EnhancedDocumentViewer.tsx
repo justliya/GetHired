@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   FileText, 
   Download, 
@@ -33,6 +33,8 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const [rotation, setRotation] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [proxyUrl, setProxyUrl] = useState<string | null>(null);
+  const [viewerFallback, setViewerFallback] = useState(0); // 0: primary, 1: fallback 1, 2: fallback 2
 
   // Get file extension to determine document type
   const getFileExtension = (url: string): string => {
@@ -49,51 +51,75 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const fileExtension = getFileExtension(documentUrl);
   const isWordDoc = ['doc', 'docx'].includes(fileExtension);
   const isPdf = fileExtension === 'pdf';
-  const [viewerFallback, setViewerFallback] = useState(0); // 0: primary, 1: fallback 1, 2: fallback 2
+
+  // Try to create proxy URL for better external viewer compatibility
+  useEffect(() => {
+    const createProxyUrl = async () => {
+      try {
+        // Import proxy service dynamically to avoid circular dependencies
+        const { getBestUrlForContext } = await import('../../services/fileProxyService');
+        
+        if (isWordDoc) {
+          const bestUrl = await getBestUrlForContext(documentUrl, 'office-viewer');
+          setProxyUrl(bestUrl);
+        } else {
+          const bestUrl = await getBestUrlForContext(documentUrl, 'google-viewer');
+          setProxyUrl(bestUrl);
+        }
+      } catch (error) {
+        console.warn('Failed to create proxy URL:', error);
+        setProxyUrl(documentUrl); // Fallback to original URL
+      }
+    };
+
+    createProxyUrl();
+  }, [documentUrl, isWordDoc]);
 
   // Generate viewer URL based on document type with fallback options
   const getViewerUrl = useCallback(() => {
+    const urlToUse = proxyUrl || documentUrl;
+    
     if (isWordDoc) {
       switch (viewerFallback) {
         case 0:
           // Primary: Microsoft Office Online viewer
-          return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(documentUrl)}`;
+          return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlToUse)}`;
         case 1:
           // Fallback 1: Google Drive viewer
-          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(documentUrl)}`;
+          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(urlToUse)}`;
         case 2:
           // Fallback 2: Direct download link
-          return documentUrl;
+          return urlToUse;
         default:
-          return documentUrl;
+          return urlToUse;
       }
     } else if (isPdf) {
       switch (viewerFallback) {
         case 0:
           // Primary: Direct PDF viewing
-          return documentUrl;
+          return urlToUse;
         case 1:
           // Fallback: Google Drive viewer for PDFs
-          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(documentUrl)}`;
+          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(urlToUse)}`;
         default:
-          return documentUrl;
+          return urlToUse;
       }
     } else {
       switch (viewerFallback) {
         case 0:
           // Primary: Google Drive viewer
-          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(documentUrl)}`;
+          return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(urlToUse)}`;
         case 1:
           // Fallback: Microsoft Office Online (for other office docs)
-          return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(documentUrl)}`;
+          return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(urlToUse)}`;
         case 2:
           // Fallback 2: Direct link
-          return documentUrl;
+          return urlToUse;
         default:
-          return documentUrl;
+          return urlToUse;
       }
     }
-  }, [documentUrl, isWordDoc, isPdf, viewerFallback]);
+  }, [documentUrl, proxyUrl, isWordDoc, isPdf, viewerFallback]);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 25, 300));
@@ -140,7 +166,12 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
     // Force iframe reload by updating the src
     const iframe = document.querySelector('.document-viewer-iframe') as HTMLIFrameElement;
     if (iframe) {
-      iframe.src = iframe.src;
+      // Force iframe reload by changing the src
+      const originalSrc = iframe.src;
+      iframe.src = 'about:blank';
+      setTimeout(() => {
+        iframe.src = originalSrc;
+      }, 100);
     }
   };
 

@@ -14,7 +14,7 @@ import type {
 import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getUserResumes, getResumeUrlForContext, uploadResume, updateUserPreferences } from '../../services/firebaseService';
+import { getUserResumes, getResumeUrlForContext, uploadResumeWithFallback, updateUserPreferences } from '../../services/firebaseService';
 import { handlePreferencesSubmissionSuccess, handleSchedulingAsync } from '../../utils/onboardingUtils';
 import { ENV } from '../../config/environment';
 
@@ -228,7 +228,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 keywords: formData.preferences.roles || [],
             };
             // Use the correct resume upload service endpoint
-            const result = await uploadResume(user.uid, file, metadata);
+            const result = await uploadResumeWithFallback(user.uid, file, metadata);
             if (result.success && result.data) {
                 setResumes(prev => [...prev, { ...result.data }]);
                 setSelectedResumeId(result.data.id);
@@ -314,7 +314,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     isOriginal: true,
                     keywords: formData.preferences.roles || [],
                 };
-                const result = await uploadResume(user.uid, formData.resumeFile, metadata);
+                const result = await uploadResumeWithFallback(user.uid, formData.resumeFile, metadata);
                 if (result.success && result.data) {
                     selectedResume = { ...result.data };
                 } else {
