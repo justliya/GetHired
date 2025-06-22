@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeProvider';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import JobListings from './pages/JobListings';
+import PageNotFound from "./pages/NotFound"; 
 import CompanyResearch from './pages/CompanyResearch';
 import ResumeTailoring from './pages/ResumeTailoring';
 import Settings from './pages/Settings';
@@ -96,6 +97,7 @@ function App() {
             <Route path="/resume-tailoring/:jobId" element={<ResumeTailoring />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="*" element={<PageNotFound />} />
           </Routes>
           
           {showUserPrefs && (

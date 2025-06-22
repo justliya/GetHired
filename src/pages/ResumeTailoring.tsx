@@ -35,7 +35,7 @@ const ResumeTailoring = () => {
   const [jobDescription, setJobDescription] = useState('');
   const [activeTab, setActiveTab] = useState<'resume' | 'coverLetter'>('resume');
   const [job, setJob] = useState<Job | null>(null);
-  
+
   // Resume selection state
   const [userResumes, setUserResumes] = useState<(Resume & { id: string })[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>('');
@@ -43,11 +43,11 @@ const ResumeTailoring = () => {
   const [isLoadingResumes, setIsLoadingResumes] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [resumeInputMethod, setResumeInputMethod] = useState<'manual' | 'upload' | 'saved'>('manual');
-  
+
   // Job selection state
   const [userJobs, setUserJobs] = useState<JobListing[]>([]);
   const [showJobSelector, setShowJobSelector] = useState(false);
-  
+
   // User profile state
   const [userName, setUserName] = useState<string>('');
 
@@ -82,16 +82,19 @@ const ResumeTailoring = () => {
         const jobsResult = await getJobListings(user.uid);
         if (jobsResult.success) {
           // Map the job listings to match the expected JobListing interface
-          const jobListings = (jobsResult.data || []).map(job => ({
-            id: job.id,
-            title: job.title,
-            company: job.company,
-            location: job.location,
-            description: job.description,
-            salary: job.salary,
-            url: job.url,
-            status: 'new' as const,
-            favorite: false
+          const jobListings: JobListing[] = (jobsResult.data || []).map((job: Record<string, unknown>) => ({
+            id: job.id as string,
+            title: job.title as string,
+            company: job.company as string,
+            location: job.location as string,
+            description: job.description as string,
+            salary: (job.salary as string) ?? 'Not specified',
+            url: job.url as string,
+            status: 'new',
+            favorite: false,
+            datePosted: (job.datePosted as string) || (job.postedDate as string) || 'Unknown',
+            qualifications: (job.qualifications as string[]) || [],
+            benefits: (job.benefits as string[]) || [],
           }));
           setUserJobs(jobListings);
         }
@@ -146,7 +149,7 @@ const ResumeTailoring = () => {
         setSelectedResumeId(newResume.id);
         setSelectedResumeUrl(getPublicUrlFromDownloadUrl(newResume.fileUrl));
         setResumeInputMethod('upload');
-        
+
         setResumeText(`The resume content will be processed automatically.`);
       }
     } catch (err) {
@@ -162,7 +165,7 @@ const ResumeTailoring = () => {
 
     setSelectedResumeUrl(getPublicUrlFromDownloadUrl(resume.fileUrl));
     setResumeInputMethod('saved');
-    
+
     setResumeText(`The resume content will be processed automatically. You can also paste additional text if needed.`);
   };
 
@@ -170,7 +173,7 @@ const ResumeTailoring = () => {
     setResumeInputMethod('manual');
     setSelectedResumeId('');
     setSelectedResumeUrl('');
-    
+
     const sampleResume = `John Doe
 Software Developer
 john.doe@email.com | (555) 123-4567 | LinkedIn: linkedin.com/in/johndoe
@@ -278,8 +281,8 @@ Join our team and help build the next generation of web applications that serve 
       job_title: job?.title || '',
       job_company: job?.company || ''
     };
-    
-    startAnalysis(resumeText,selectedResumeUrl, jobDescription, context, job, userName);
+
+    startAnalysis(resumeText, selectedResumeUrl, jobDescription, context, job, userName);
   };
 
   // Handlers for ResumeSelector component
@@ -370,7 +373,7 @@ Join our team and help build the next generation of web applications that serve 
             <div className="flex items-center text-sm text-amber-600 dark:text-amber-400">
               <div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div>
               {!resumeText && !jobDescription ? 'Add resume and job description to continue' :
-               !resumeText ? 'Add resume content to continue' : 'Add job description to continue'}
+                !resumeText ? 'Add resume content to continue' : 'Add job description to continue'}
             </div>
           ) : (
             <div className="flex items-center text-sm text-green-600 dark:text-green-400">
@@ -379,7 +382,7 @@ Join our team and help build the next generation of web applications that serve 
             </div>
           )}
         </div>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Resume Text Area */}
           <div className="flex flex-col">
@@ -389,6 +392,17 @@ Join our team and help build the next generation of web applications that serve 
               onResumeTextChange={setResumeText}
               onSwitchToManual={handleSwitchToManual}
             />
+            {resumeInputMethod === 'manual' && userResumes.length > 0 && (
+              <button
+                onClick={() => {
+                  setResumeInputMethod('saved');
+                  setResumeText('');
+                }}
+                className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline self-start"
+              >
+                Use Saved Resume
+              </button>
+            )}
           </div>
 
           {/* Job Description Area */}
