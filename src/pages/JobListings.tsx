@@ -3,7 +3,7 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { Search, CheckCircle, Clock, Loader2, AlertCircle, Play, ArrowRight } from 'lucide-react';
+import { Search, CheckCircle, Clock, Loader2, AlertCircle} from 'lucide-react';
 import JobCard from '../components/JobCard';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -641,43 +641,6 @@ const handleResearch = async (jobId: string) => {
             </p>
           )}
         </div>
-
-        {/* Getting Started Instructions */}
-        {!sessionStarted && jobs.length === 0 && (
-          <Card className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
-            <div className="text-center">
-              <Play className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                Let's Find Your Dream Job!
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
-                Follow these simple steps to get personalized job recommendations tailored to your skills and preferences.
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mb-3">1</div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Start Session</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Initialize your job search session with our AI agent</p>
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-10 h-10 bg-green-600 text-white rounded-full flex items-center justify-center font-bold mb-3">2</div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Search Jobs</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Let our AI find relevant job opportunities for you</p>
-                </div>
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-10 h-10 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold mb-3">3</div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Research & Apply</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">Get company insights and apply to your favorite positions</p>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <ArrowRight className="w-6 h-6 text-blue-600 animate-bounce" />
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* Session Active Instructions */}
         {sessionStarted && jobs.length === 0 && !loading && (
