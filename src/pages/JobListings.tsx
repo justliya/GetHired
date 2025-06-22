@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
+import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
@@ -205,67 +206,20 @@ export default function JobListings() {
     return [];
   }
 
-  // Fixed API call function - only sends the data, not method/headers in body
+  // Fixed API call function - now uses axios
   const makeApiCall = async (endpoint: string, requestData: any) => {
     const controller = new AbortController();
+    const signal = controller.signal;
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
       console.log('Making API call:', { endpoint, requestData });
       // setDebugInfo((prev: any) => ({ ...prev, lastRequest: { endpoint, requestData, timestamp: new Date().toISOString() } })); // Commented out debug
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestData), // Only send the actual data
-        signal: controller.signal,
-      });
-
+      const response = await axios.post(endpoint, requestData, { signal });
       clearTimeout(timeoutId);
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-      // setDebugInfo((prev: any) => ({
-      //   ...prev,
-      //   lastResponse: {
-      //     status: response.status,
-      //     statusText: response.statusText,
-      //     headers: Object.fromEntries(response.headers.entries()),
-      //     timestamp: new Date().toISOString()
-      //   }
-      // })); // Commented out debug
-
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        try {
-          const errorText = await response.text();
-          console.log('Error response body:', errorText);
-          // setDebugInfo((prev: any) => ({ ...prev, lastErrorBody: errorText })); // Commented out debug
-
-          // Try to parse as JSON for more details
-          try {
-            const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.message || errorJson.error || errorMessage;
-          } catch {
-            // If not JSON, use the text
-            if (errorText) errorMessage = errorText;
-          }
-        } catch (e) {
-          console.log('Could not read error response body:', e);
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log('API Response:', result);
-      // setDebugInfo((prev: any) => ({ ...prev, lastResult: result })); // Commented out debug
-
-      return result;
-    } catch (error) {
+      return response.data;
+    } catch (error: any) {
       clearTimeout(timeoutId);
       console.error('API call failed:', error);
 
@@ -273,11 +227,27 @@ export default function JobListings() {
         throw new Error('Request timed out after 5 minutes');
       }
 
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      // Axios error handling
+      if (error?.response) {
+        // Server responded with a status outside 2xx
+        let errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
+        if (error.response.data) {
+          if (typeof error.response.data === 'string') {
+            errorMessage = error.response.data;
+          } else if (error.response.data.message) {
+            errorMessage = error.response.data.message;
+          } else if (error.response.data.error) {
+            errorMessage = error.response.data.error;
+          }
+        }
+        throw new Error(errorMessage);
+      } else if (error?.request) {
+        // No response received
         throw new Error('Network error: Unable to connect to server. Check your internet connection and CORS settings.');
+      } else {
+        // Something else
+        throw error;
       }
-
-      throw error;
     }
   };
 
