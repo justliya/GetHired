@@ -147,7 +147,43 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
             "authenticated_url": ""
         }
 
-def create_formatted_resume(text: str, job_position_title: str = "Position", user_id: str = "anonymous") -> dict:
+from typing import Optional
+
+def extract_user_id_from_url(resume_url: str) -> str:
+    """Extract user_id from Firebase Storage or GCS URL"""
+    try:
+        import re
+        
+        # Pattern to match user_id in Firebase Storage URLs
+        # Example: /resumes/user123/filename.pdf
+        firebase_pattern = r'/resumes/([^/]+)/'
+        
+        # Pattern to match user_id in direct GCS URLs  
+        # Example: https://storage.googleapis.com/bucket/resumes/user123/filename.pdf
+        gcs_pattern = r'/resumes/([^/]+)/'
+        
+        # Try Firebase pattern first
+        match = re.search(firebase_pattern, resume_url)
+        if match:
+            user_id = match.group(1)
+            logger.debug("Extracted user_id from URL: %s", user_id)
+            return user_id
+            
+        # Try GCS pattern
+        match = re.search(gcs_pattern, resume_url)
+        if match:
+            user_id = match.group(1)
+            logger.debug("Extracted user_id from URL: %s", user_id)
+            return user_id
+            
+        logger.warning("Could not extract user_id from URL: %s", resume_url)
+        return ""
+        
+    except Exception as e:
+        logger.warning("Error extracting user_id from URL %s: %s", resume_url, e)
+        return ""
+
+def create_formatted_resume(text: str, job_position_title: str = "Position", user_id: Optional[str] = None, resume_url: Optional[str] = None) -> dict:
     """Create a formatted resume document and upload to Firebase Storage"""
     temp_file_path = None
     
@@ -169,9 +205,20 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
                 "message": error_msg
             }
         
+        # Validate and extract user_id with fallback logic
         if not user_id or user_id.strip() == "":
-            user_id = "anonymous"
-            logger.warning("⚠️ No user_id provided, using 'anonymous'")
+            if resume_url:
+                logger.info("🔍 Attempting to extract user_id from resume URL")
+                extracted_user_id = extract_user_id_from_url(resume_url)
+                if extracted_user_id:
+                    user_id = extracted_user_id
+                    logger.info("✅ Successfully extracted user_id from URL: %s", user_id)
+                else:
+                    user_id = "anonymous"
+                    logger.warning("⚠️ Could not extract user_id from URL, using 'anonymous'")
+            else:
+                user_id = "anonymous"
+                logger.warning("⚠️ No user_id or resume_url provided, using 'anonymous'")
         
         # Parse the resume text
         logger.info("🔍 Parsing resume text...")

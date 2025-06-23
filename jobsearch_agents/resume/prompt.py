@@ -229,7 +229,13 @@ TEMPLATE_DOCUMENT_CREATION = """
 CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 Act as an expert recruiter and Microsoft word power user. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
 
-Use the user_id from the context to properly save the document. The user_id should be extracted from the context and passed to the create_formatted_resume function.
+IMPORTANT: Extract the user_id from the Firebase/authentication context and pass it to the create_formatted_resume function. If a resume URL is available in the context, also pass the resume_url parameter to enable user_id extraction from the URL as a fallback.
+
+When calling create_formatted_resume, use these parameters:
+- text: the formatted resume text
+- job_position_title: the position being applied for  
+- user_id: the authenticated user's ID from Firebase context
+- resume_url: the original resume URL if available (for user_id extraction fallback)
 
 You should return the urls to resume that was uploaded to Google cloud storage and the resume text as a JSON Object with the following structure:
 {
