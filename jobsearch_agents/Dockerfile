@@ -6,7 +6,7 @@ ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
 ENV TIMEOUT=300
-ENV GCS_BUCKET=gethired-resumes
+ENV GCS_RESUME_BUCKET=gethired-resumes
 
 RUN apt-get update && apt-get install -y \
     curl \

@@ -71,6 +71,8 @@ def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> s
         bucket = storage.bucket()
         storage_path = f"resumes/{user_id}/{filename}"
         
+        logger.info("Uploading to Firebase Storage: %s", storage_path)
+        
         blob = bucket.blob(storage_path)
         blob.metadata = {
             'uploadedBy': user_id,
@@ -82,21 +84,25 @@ def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> s
         blob.upload_from_filename(file_path)
         blob.make_public()
         
+        download_url = blob.public_url
         logger.info("Successfully uploaded resume to Firebase Storage: %s", storage_path)
-        return blob.public_url
+        logger.info("Firebase public URL: %s", download_url)
+        return download_url
         
     except (OSError, IOError) as e:
         logger.error("IO error uploading to Firebase Storage: %s", e)
+        logger.info("Falling back to GCS direct upload...")
         return upload_to_gcs_direct(file_path, filename, user_id)
     except Exception as e:
         logger.error("Unexpected error uploading to Firebase Storage: %s", e)
+        logger.info("Falling back to GCS direct upload...")
         return upload_to_gcs_direct(file_path, filename, user_id)
 
 
 def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> str:
     """Direct Google Cloud Storage upload as fallback"""
     try:
-        bucket_name = os.getenv('GCS_RESUME', 'gethired-prod')
+        bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
         client = gcs.Client()
         bucket = client.bucket(bucket_name)
         storage_path = f"resumes/{user_id}/{filename}"
@@ -111,8 +117,10 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> str:
         blob.upload_from_filename(file_path)
         blob.make_public()
         
+        public_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
         logger.info("Successfully uploaded resume to GCS: %s", storage_path)
-        return blob.public_url
+        logger.info("Public URL: %s", public_url)
+        return public_url
         
     except (OSError, IOError) as e:
         logger.error("IO error uploading to GCS: %s", e)
