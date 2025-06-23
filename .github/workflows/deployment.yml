@@ -133,9 +133,6 @@ jobs:
           STAGING_BUCKET: 'gethired-prod'
           SA_PATH: ${{github.workspace}}/${{ secrets.SA_FILE_PATH }}
         run: |
-          # Capture the GOOGLE_APPLICATION_CREDENTIALS path
-          echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
-          
           gcloud run deploy $SERVICE_NAME \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
