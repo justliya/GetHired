@@ -33,6 +33,7 @@ const statusLabels: Record<JobListing['status'], string> = {
 const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [areQualificationsExpanded, setAreQualificationsExpanded] = useState(false);
+  const [isResearchSelected, setIsResearchSelected] = useState(false);
   const qualifications = job.qualifications ?? [];
   const visibleQualifications = areQualificationsExpanded ? qualifications : qualifications.slice(0, 3);
 
@@ -162,7 +163,7 @@ const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) 
 
       {/* Actions */}
       <div className="px-6 py-4 bg-gray-50 dark:bg-gray-750 border-t border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-evenly w-full">
           <button
             onClick={() => window.open(job.jobLink || '#', '_blank')}
             className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium flex items-center gap-1 hover:underline transition-colors"
@@ -170,22 +171,26 @@ const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) 
             <ExternalLink className="w-4 h-4" />
             Website
           </button>
-
-          <div className="flex items-center gap-1">
-
-            <button
-              onClick={() => onResearch(job)}
-              className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm font-medium hover:underline transition-colors"
-            >
-              Research
-            </button>
-            <button
-              onClick={() => onDelete(job)}
-              className="px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
-            >
-              Delete
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setIsResearchSelected(true);
+              onResearch(job);
+            }}
+            className={`
+              text-sm font-medium flex items-center gap-1 transition-colors
+              ${isResearchSelected
+                ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-300 rounded-lg px-2 py-1'
+                : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline'}
+            `}
+          >
+            Research
+          </button>
+          <button
+            onClick={() => onDelete(job)}
+            className="px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>

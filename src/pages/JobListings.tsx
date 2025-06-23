@@ -605,24 +605,21 @@ export default function JobListings() {
           <p className="text-gray-600 dark:text-gray-300">
             Find your next career opportunity with AI-powered job matching
           </p>
-          {user && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Welcome {user.email}, after jobs appear select your favorites and the ones you would like to research
-              then click 'Complete Session' when you are done and researched listing will appear in the 'Company Research' tab!
-            </p>
-          )}
         </div>
         {/* Session Active Instructions */}
         {sessionStarted && jobs.length === 0 && !loading && (
-          <Card className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+          <Card className="mb-8 bg-green-600 dark:bg-green-800 border border-green-700 dark:border-green-600 rounded-2xl shadow-lg">
             <div className="text-center">
-              <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              <CheckCircle className="w-12 h-12 text-white mx-auto mb-4" />
+              <h3 className="text-2xl font-semibold text-white mb-2">
                 Session Active! 🎉
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Great! Your job search session is now active. Click "Search Jobs" below to find opportunities that match your profile.
+              <p className="text-white text-lg mb-4">
+                Your job search session is active! Click “Search Jobs” to find opportunities.
+                                After jobs appear, select your favorites and the ones you want to research. When you’re done, click “Complete Session” and your researched listings will appear in the Company Research tab!
               </p>
+
+         
             </div>
           </Card>
         )}
