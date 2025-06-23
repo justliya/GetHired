@@ -3,10 +3,11 @@ FROM python:3.11-slim
 WORKDIR /app
 
 ENV PORT=8080
+ENV FIREBASE_MCP_PORT=3000
 ENV PYTHONUNBUFFERED=1
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
-ENV TIMEOUT=180
-ENV GCS_BUCKET=gethired-resumes
+ENV TIMEOUT=300
+ENV GCS_RESUME_BUCKET=gethired-resumes
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -35,5 +36,6 @@ COPY template/ ./template/
 COPY jobsearch_agents/ .
 
 EXPOSE ${PORT}
+EXPOSE ${FIREBASE_MCP_PORT}
 
 CMD ["python", "-m", "coordinator", "--host=0.0.0.0", "--port=8080"]

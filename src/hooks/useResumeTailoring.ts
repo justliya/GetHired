@@ -12,6 +12,7 @@ interface TailoringData {
   suggestedChanges?: SuggestedChange[];
   coverLetter?: string;
   tailoredResumeUrl?: string;
+  authenticatedUrl?: string;
   tailoredResumeText?: string;
   [key: string]: unknown;
 }
@@ -42,6 +43,7 @@ export const useResumeTailoring = () => {
       // Try to extract structured data from the response
       let resumeText = '';
       let resumeUrl = '';
+      let authenticatedUrl = '';
       let filename = '';
       
       // Check if the message contains structured data
@@ -55,9 +57,21 @@ export const useResumeTailoring = () => {
             const parsed = JSON.parse(jsonMatch[0]);
             console.log('✅ Parsed JSON:', parsed);
             resumeText = parsed.resume_text || parsed.final_resume || parsed.tailored_resume_text || '';
-            resumeUrl = parsed.document_url || parsed.download_url || parsed.resume_url || '';
+            resumeUrl = parsed.document_url || parsed.download_url || parsed.resume_url || parsed.public_url || '';
+            authenticatedUrl = parsed.authenticated_url || parsed.gcs_url || '';
             filename = parsed.filename || '';
-            console.log('🎯 Extracted from JSON - URL:', resumeUrl, 'Text length:', resumeText.length, 'Filename:', filename);
+            
+            // Validate URLs - reject URLs with literal "user_id"
+            if (resumeUrl && resumeUrl.includes('user_id')) {
+              console.warn('❌ Invalid resumeUrl contains literal "user_id":', resumeUrl);
+              resumeUrl = '';
+            }
+            if (authenticatedUrl && authenticatedUrl.includes('user_id')) {
+              console.warn('❌ Invalid authenticatedUrl contains literal "user_id":', authenticatedUrl);
+              authenticatedUrl = '';
+            }
+            
+            console.log('🎯 Extracted from JSON - Public URL:', resumeUrl, 'Authenticated URL:', authenticatedUrl, 'Text length:', resumeText.length, 'Filename:', filename);
           } catch (e) {
             console.warn('❌ Failed to parse JSON from message:', e);
           }
@@ -91,19 +105,22 @@ export const useResumeTailoring = () => {
         console.log('🔍 Checking responseData for additional fields...');
         const originalResumeText = resumeText;
         const originalResumeUrl = resumeUrl;
+        const originalAuthenticatedUrl = authenticatedUrl;
         const originalFilename = filename;
         
         resumeText = resumeText || (responseData.resume_text as string) || (responseData.final_resume as string) || (responseData.tailored_resume_text as string) || '';
-        resumeUrl = resumeUrl || (responseData.document_url as string) || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || '';
+        resumeUrl = resumeUrl || (responseData.document_url as string) || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || (responseData.public_url as string) || '';
+        authenticatedUrl = authenticatedUrl || (responseData.authenticated_url as string) || (responseData.signed_url as string) || (responseData.gcs_url as string) || '';
         filename = filename || (responseData.filename as string) || '';
         
-        if (resumeText !== originalResumeText || resumeUrl !== originalResumeUrl || filename !== originalFilename) {
-          console.log('🔄 Updated from responseData - URL:', resumeUrl, 'Text length:', resumeText.length, 'Filename:', filename);
+        if (resumeText !== originalResumeText || resumeUrl !== originalResumeUrl || authenticatedUrl !== originalAuthenticatedUrl || filename !== originalFilename) {
+          console.log('🔄 Updated from responseData - URL:', resumeUrl, 'Authenticated URL:', authenticatedUrl, 'Text length:', resumeText.length, 'Filename:', filename);
         }
       }
       
       console.log('🎯 Final extraction results:', {
         resumeUrl,
+        authenticatedUrl,
         resumeTextLength: resumeText.length,
         filename,
         hasChanges: Array.isArray(responseData.suggested_changes),
@@ -115,6 +132,7 @@ export const useResumeTailoring = () => {
         coverLetter: (responseData.cover_letter as string) || (responseData.coverLetter as string) || '',
         resumeText: resumeText,
         resumeUrl: resumeUrl,
+        authenticatedUrl: authenticatedUrl,
         filename: filename,
         status: response.status as string || 'unknown',
         rawResponse: response
@@ -126,6 +144,7 @@ export const useResumeTailoring = () => {
         coverLetter: '',
         resumeText: String(response.message || response),
         resumeUrl: '',
+        authenticatedUrl: '',
         filename: '',
         status: 'error',
         rawResponse: response
@@ -197,11 +216,21 @@ ${jobDescription}
         suggestedChanges: suggestions.changes,
         coverLetter: suggestions.coverLetter || result.message || '',
         tailoredResumeUrl: suggestions.resumeUrl,
+        authenticatedUrl: suggestions.authenticatedUrl,
         tailoredResumeText: suggestions.resumeText
       };
       
       console.log('📋 Setting tailoring data:', newTailoringData);
       console.log('🔗 Resume URL being set:', newTailoringData.tailoredResumeUrl);
+      console.log('🔐 Authenticated URL being set:', newTailoringData.authenticatedUrl);
+      
+      // Warn if URLs contain literal "user_id"
+      if (newTailoringData.tailoredResumeUrl?.includes('user_id')) {
+        console.error('❌ CRITICAL: tailoredResumeUrl contains literal "user_id" - LLM did not extract real user_id from context');
+      }
+      if (newTailoringData.authenticatedUrl?.includes('user_id')) {
+        console.error('❌ CRITICAL: authenticatedUrl contains literal "user_id" - LLM did not extract real user_id from context');
+      }
       
       setTailoringData(newTailoringData);
       
@@ -229,7 +258,8 @@ I am excited to apply for the ${job?.title || 'position'} at ${job?.company || '
 
 Best regards,
 ${userName || 'Your Name'}`,
-        tailoredResumeUrl: undefined
+        tailoredResumeUrl: undefined,
+        authenticatedUrl: undefined
       });
     } finally {
       setIsAnalyzing(false);

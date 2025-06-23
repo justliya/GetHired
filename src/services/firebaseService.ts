@@ -41,7 +41,8 @@ interface ServiceResponse<T> {
   error?: string;
 }
 
-const GCS_PRIMARY_BUCKET = 'gethired-resume-uploads';
+const GCS_USER_UPLOADS_BUCKET = 'gethired-resume-uploads';
+const GCS_AI_GENERATED_BUCKET = 'gethired-resumes';
 
 const defaultJobPreferences: JobPreferences = {
   titles: [],
@@ -101,10 +102,10 @@ const convertToDirectGCSUrl = (firebaseUrl: string): string => {
   }
 };
 
-const uploadToGCSBucket = async (file: File, userId: string): Promise<UploadResult> => {
+const uploadToGCSBucket = async (file: File, userId: string, bucketName: string = GCS_USER_UPLOADS_BUCKET): Promise<UploadResult> => {
   try {
     const uploadPath = generateSafeFileName(file.name, userId);
-    const gcsStorage = getStorage(undefined, `gs://${GCS_PRIMARY_BUCKET}`);
+    const gcsStorage = getStorage(undefined, `gs://${bucketName}`);
     const storageRef = ref(gcsStorage, uploadPath);
     
     const uploadResult = await uploadBytes(storageRef, file, {
@@ -118,7 +119,7 @@ const uploadToGCSBucket = async (file: File, userId: string): Promise<UploadResu
     });
     
     const downloadUrl = await getDownloadURL(uploadResult.ref);
-    const publicUrl = `https://storage.googleapis.com/${GCS_PRIMARY_BUCKET}/${uploadPath}`;
+    const publicUrl = `https://storage.googleapis.com/${bucketName}/${uploadPath}`;
     
     return {
       success: true,
@@ -183,9 +184,9 @@ const createDataUrlFallback = async (file: File): Promise<UploadResult> => {
   }
 };
 
-const uploadFileWithFallback = async (file: File, userId: string): Promise<UploadResult> => {
+const uploadFileWithFallback = async (file: File, userId: string, bucketName: string = GCS_USER_UPLOADS_BUCKET): Promise<UploadResult> => {
   // GCS-first strategy
-  const gcsResult = await uploadToGCSBucket(file, userId);
+  const gcsResult = await uploadToGCSBucket(file, userId, bucketName);
   if (gcsResult.success) {
     return gcsResult;
   }
@@ -220,7 +221,8 @@ export const uploadResume = async (
       throw new Error('Unauthorized access to user data');
     }
 
-    const uploadResult = await uploadFileWithFallback(file, userId);
+    // Use user uploads bucket for manually uploaded resumes
+    const uploadResult = await uploadFileWithFallback(file, userId, GCS_USER_UPLOADS_BUCKET);
     
     if (!uploadResult.success) {
       return {
@@ -307,6 +309,166 @@ export const getUserResumes = async (userId: string): Promise<ServiceResponse<(R
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error',
       data: [] 
+    };
+  }
+};
+
+export const saveTailoredResume = async (
+  userId: string,
+  resumeData: {
+    resumeText: string;
+    documentUrl?: string;
+    authenticatedUrl?: string;
+    jobTitle?: string;
+    jobCompany?: string;
+    originalResumeId?: string;
+  }
+): Promise<ServiceResponse<Resume & { id: string }>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+
+    // Create resume metadata
+    const metadata: Resume['metadata'] = {
+      title: resumeData.jobTitle && resumeData.jobCompany 
+        ? `Resume for ${resumeData.jobTitle} at ${resumeData.jobCompany}`
+        : 'Tailored Resume',
+      uploadSource: 'manual',
+      isOriginal: false,
+      keywords: [resumeData.jobTitle, resumeData.jobCompany].filter(Boolean) as string[],
+      relatedJobId: undefined, // Could be added if we have job ID
+      relatedCompany: resumeData.jobCompany,
+      relatedRole: resumeData.jobTitle,
+      originalResumeId: resumeData.originalResumeId,
+      customizations: ['AI-tailored resume content']
+    };
+
+    // Create the resume document
+    // For AI-generated resumes, prefer the documentUrl from AI generated bucket
+    const newResume: Resume = {
+      fileUrl: resumeData.documentUrl || `data:text/plain;charset=utf-8,${encodeURIComponent(resumeData.resumeText)}`,
+      publicUrl: resumeData.documentUrl || resumeData.authenticatedUrl,
+      createdAt: new Date().toISOString(),
+      type: 'tailored',
+      metadata
+    };
+
+    // Save to Firestore
+    const resumesRef = collection(db, 'users', userId, 'resumes');
+    const docRef = await addDoc(resumesRef, newResume);
+
+    // Update user document with new resume
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserData;
+        const updatedResumes = [...(userData.resumes || []), { ...newResume, id: docRef.id }];
+        
+        await setDoc(userRef, { 
+          resumes: updatedResumes 
+        }, { merge: true });
+      }
+    } catch (updateError) {
+      console.warn('Failed to update user document, but resume was saved:', updateError);
+    }
+
+    return {
+      success: true,
+      data: { id: docRef.id, ...newResume }
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to save tailored resume'
+    };
+  }
+};
+
+export const saveAIGeneratedResume = async (
+  userId: string,
+  resumeFile: File,
+  metadata: {
+    jobTitle?: string;
+    jobCompany?: string;
+    originalResumeId?: string;
+    description?: string;
+  }
+): Promise<ServiceResponse<Resume & { id: string }>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+
+    // Use AI-generated bucket for AI-created resumes
+    const uploadResult = await uploadFileWithFallback(resumeFile, userId, GCS_AI_GENERATED_BUCKET);
+    
+    if (!uploadResult.success) {
+      return {
+        success: false,
+        error: uploadResult.error || 'Upload failed'
+      };
+    }
+
+    // Create resume metadata for AI-generated resume
+    const resumeMetadata: Resume['metadata'] = {
+      title: metadata.jobTitle && metadata.jobCompany 
+        ? `AI Resume for ${metadata.jobTitle} at ${metadata.jobCompany}`
+        : 'AI Generated Resume',
+      uploadSource: 'ai_generated' as ResumeUploadSource,
+      isOriginal: false,
+      keywords: [metadata.jobTitle, metadata.jobCompany].filter(Boolean) as string[],
+      description: metadata.description,
+      relatedJobId: undefined,
+      relatedCompany: metadata.jobCompany,
+      relatedRole: metadata.jobTitle,
+      originalResumeId: metadata.originalResumeId,
+      customizations: ['AI-generated resume document']
+    };
+
+    const resumeData: Resume = {
+      fileUrl: uploadResult.fileUrl!,
+      publicUrl: uploadResult.downloadUrl || uploadResult.fileUrl!,
+      createdAt: new Date().toISOString(),
+      type: 'tailored',
+      metadata: resumeMetadata
+    };
+
+    try {
+      const resumesRef = collection(db, 'users', userId, 'resumes');
+      const docRef = await addDoc(resumesRef, resumeData);
+
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserData;
+        const updatedResumes = [...(userData.resumes || []), { ...resumeData, id: docRef.id }];
+        
+        await setDoc(userRef, { 
+          resumes: updatedResumes 
+        }, { merge: true });
+      }
+      
+      return { 
+        success: true, 
+        data: { id: docRef.id, ...resumeData } 
+      };
+    } catch {
+      return { 
+        success: true, 
+        data: { id: `temp_${Date.now()}`, ...resumeData } 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to save AI-generated resume' 
     };
   }
 };

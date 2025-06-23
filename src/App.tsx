@@ -27,6 +27,7 @@ function App() {
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'auth' | 'dashboard' | 'loading'>('loading');
   const [editingSchedule, setEditingSchedule] = useState<ScheduledSearch | null>(null);
+  const [isSubmittingPrefs, setIsSubmittingPrefs] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -116,6 +117,10 @@ function App() {
                 }
               }}
               onSubmit={async (formData) => {
+                // Prevent double submissions
+                if (isSubmittingPrefs) return;
+                
+                setIsSubmittingPrefs(true);
                 try {
                   const userId = auth.currentUser?.uid;
                   if (!userId) {
@@ -155,17 +160,52 @@ function App() {
                   // Handle successful submission with utility function
                   handlePreferencesSubmissionSuccess(userId);
                   
+                  // Close modal immediately for better UX
                   setShowUserPrefs(false);
                   setEditingSchedule(null);
                   
-                  // Small delay to ensure smooth transition between modals
+                  // Show success modal after a brief delay
                   setTimeout(() => {
                     setShowSuccessModal(true);
-                  }, 300);
+                  }, 150);
+                  
+                  // Handle background operations (scheduling, job search) asynchronously
+                  setTimeout(async () => {
+                    try {
+                      // Only trigger background job search if user has meaningful criteria
+                      const hasSearchCriteria = preferences.titles.length > 0 || 
+                                               preferences.locations.length > 0 ||
+                                               preferences.skills.length > 0;
+                      
+                      if (hasSearchCriteria && preferences.searchSchedule?.enabled) {
+                        // Background job search - don't await this
+                        fetch(`${import.meta.env.VITE_GETHIRED_AGENTS_API_URL}/run`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            message: "find me jobs based on my preferences",
+                            context: {
+                              user_id: userId,
+                              firebase_uid: userId,
+                              is_anonymous: auth.currentUser?.isAnonymous || false,
+                              source: "preferences_onboarding"
+                            },
+                            session_id: `onboarding-${Date.now()}`,
+                          }),
+                        }).catch(error => {
+                          console.warn('Background job search failed:', error);
+                        });
+                      }
+                    } catch (error) {
+                      console.warn('Background operations failed:', error);
+                    }
+                  }, 1000);
+                  
                 } catch (error) {
                   console.error('Failed to save preferences:', error);
-                  // You might want to show an error toast here
                   alert('Failed to save preferences. Please try again.');
+                } finally {
+                  setIsSubmittingPrefs(false);
                 }
               }}
             />
