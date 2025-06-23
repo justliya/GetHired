@@ -136,15 +136,42 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
     
     try:
         logger.info("🚀 Starting resume creation for user %s, position: %s", user_id, job_position_title)
-        logger.debug("📄 Input resume text length: %d characters", len(text))
+        logger.info("📄 Input resume text length: %d characters", len(text))
+        logger.debug("📋 First 500 chars of resume text: %s", text[:500])
+        
+        # Validate inputs
+        if not text or text.strip() == "":
+            error_msg = "Resume text is empty or None"
+            logger.error("❌ %s", error_msg)
+            return {
+                "resume_text": text,
+                "document_url": "",
+                "download_url": "",
+                "filename": "",
+                "status": "error",
+                "message": error_msg
+            }
+        
+        if not user_id or user_id.strip() == "":
+            user_id = "anonymous"
+            logger.warning("⚠️ No user_id provided, using 'anonymous'")
         
         # Parse the resume text
         logger.info("🔍 Parsing resume text...")
-        parsed_resume = ParsedResume(text)
-        candidate_data = parsed_resume.serialize()
-        
-        logger.info("✅ Resume parsed successfully")
-        logger.debug("👤 Candidate data structure: %s", candidate_data)
+        try:
+            parsed_resume = ParsedResume(text)
+            candidate_data = parsed_resume.serialize()
+            logger.info("✅ Resume parsed successfully")
+        except Exception as parse_error:
+            logger.error("❌ Failed to parse resume: %s", parse_error)
+            return {
+                "resume_text": text,
+                "document_url": "",
+                "download_url": "",
+                "filename": "",
+                "status": "error",
+                "message": f"Failed to parse resume: {str(parse_error)}"
+            }
         
         # Log the candidate data for debugging template issues
         candidate = candidate_data.get("candidate", {})
