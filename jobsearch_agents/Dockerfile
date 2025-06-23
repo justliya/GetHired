@@ -36,5 +36,6 @@ COPY template/ ./template/
 COPY jobsearch_agents/ .
 
 EXPOSE ${PORT}
-EXPOSE 
+EXPOSE ${FIREBASE_MCP_PORT}
+
 CMD ["python", "-m", "coordinator", "--host=0.0.0.0", "--port=8080"]
