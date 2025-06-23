@@ -3,6 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 ENV PORT=8080
+ENV FIREBASE_MCP_PORT=3000
 ENV PYTHONUNBUFFERED=1
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
 ENV TIMEOUT=300
@@ -35,5 +36,5 @@ COPY template/ ./template/
 COPY jobsearch_agents/ .
 
 EXPOSE ${PORT}
-
+EXPOSE 
 CMD ["python", "-m", "coordinator", "--host=0.0.0.0", "--port=8080"]

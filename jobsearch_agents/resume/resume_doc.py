@@ -66,19 +66,88 @@ def create_unique_filename(job_position_title: str, user_id: str) -> str:
 def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
     """Direct Google Cloud Storage upload with multiple URL formats"""
     try:
-        bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
-        client = gcs.Client()
-        bucket = client.bucket(bucket_name)
-        storage_path = f"resumes/{user_id}/{filename}"
+        # Log detailed upload start information
+        logger.info("🚀 Starting GCS upload process")
+        logger.info("  📁 File path: %s", file_path)
+        logger.info("  📄 Filename: %s", filename)
+        logger.info("  👤 User ID: %s", user_id)
         
+        # Validate file exists and has content
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Source file does not exist: {file_path}")
+        
+        file_size = os.path.getsize(file_path)
+        logger.info("  📊 File size: %d bytes", file_size)
+        
+        if file_size == 0:
+            raise ValueError(f"Source file is empty: {file_path}")
+        
+        # Get bucket configuration
+        bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
+        logger.info("  🪣 Target bucket: %s", bucket_name)
+        
+        # Initialize GCS client
+        logger.info("  🔗 Initializing GCS client...")
+        try:
+            client = gcs.Client()
+            logger.info("  ✅ GCS client initialized successfully")
+            
+            # Get project info to verify authentication
+            project_id = client.project
+            logger.info("  🆔 GCS project ID: %s", project_id)
+        except Exception as client_error:
+            logger.error("  ❌ Failed to initialize GCS client: %s", client_error)
+            raise
+        
+        # Get bucket
+        logger.info("  🪣 Getting bucket: %s", bucket_name)
+        try:
+            bucket = client.bucket(bucket_name)
+            # Test bucket access by checking if it exists
+            if bucket.exists():
+                logger.info("  ✅ Bucket exists and is accessible")
+            else:
+                logger.error("  ❌ Bucket does not exist: %s", bucket_name)
+                raise RuntimeError(f"Bucket does not exist: {bucket_name}")
+        except Exception as bucket_error:
+            logger.error("  ❌ Failed to access bucket: %s", bucket_error)
+            raise
+        
+        # Create storage path
+        storage_path = f"resumes/{user_id}/{filename}"
+        logger.info("  🗂️  Storage path: %s", storage_path)
+        
+        # Create blob with metadata
+        logger.info("  📦 Creating blob with metadata...")
         blob = bucket.blob(storage_path)
         blob.metadata = {
             'uploadedBy': user_id,
             'uploadTime': datetime.now().isoformat(),
-            'fileType': 'tailored_resume'
+            'fileType': 'tailored_resume',
+            'originalSize': str(file_size)
         }
         
+        # Perform the upload
+        logger.info("  ⬆️  Starting file upload...")
         blob.upload_from_filename(file_path)
+        logger.info("  ✅ File upload completed successfully")
+        
+        # Verify the upload by checking if blob exists and getting its size
+        logger.info("  🔍 Verifying upload...")
+        blob.reload()  # Refresh blob properties from GCS
+        uploaded_size = blob.size
+        logger.info("  📊 Uploaded file size: %d bytes", uploaded_size)
+        
+        if uploaded_size != file_size:
+            logger.warning("  ⚠️  Size mismatch! Original: %d bytes, Uploaded: %d bytes", file_size, uploaded_size)
+        else:
+            logger.info("  ✅ Size verification passed")
+        
+        # Check if blob exists
+        if not blob.exists():
+            raise RuntimeError(f"Upload verification failed - blob does not exist: {storage_path}")
+        
+        logger.info("  ✅ Upload verification completed successfully")
         
         # Try to make public (works with legacy ACL), but handle uniform bucket-level access gracefully
         try:
@@ -132,7 +201,14 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         }
         
     except (OSError, IOError) as e:
-        logger.error("IO error uploading to GCS: %s", e)
+        logger.error("❌ IO error during GCS upload:")
+        logger.error("  📁 File path: %s", file_path)
+        logger.error("  📄 Filename: %s", filename)
+        logger.error("  👤 User ID: %s", user_id)
+        logger.error("  🚨 Error details: %s", e)
+        logger.error("  📂 File exists: %s", os.path.exists(file_path) if file_path else "N/A")
+        if file_path and os.path.exists(file_path):
+            logger.error("  📊 File size: %d bytes", os.path.getsize(file_path))
         return {
             "success": False,
             "error": f"IO error: {str(e)}",
@@ -142,7 +218,13 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
             "authenticated_url": ""
         }
     except Exception as e:
-        logger.error("Unexpected error uploading to GCS: %s", e)
+        logger.error("❌ Unexpected error during GCS upload:")
+        logger.error("  📁 File path: %s", file_path)
+        logger.error("  📄 Filename: %s", filename)
+        logger.error("  👤 User ID: %s", user_id)
+        logger.error("  🚨 Error type: %s", type(e).__name__)
+        logger.error("  🚨 Error details: %s", e)
+        logger.exception("  📋 Full stack trace:")
         return {
             "success": False,
             "error": f"Upload error: {str(e)}",
@@ -371,21 +453,68 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         filename = create_unique_filename(job_position_title, user_id)
         logger.info("📁 Generated filename: %s", filename)
         
+        # Create temporary file and save document
+        logger.info("💾 Creating temporary file for document...")
         with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
             temp_file_path = temp_file.name
+            logger.info("📂 Temporary file path: %s", temp_file_path)
+            
+            # Save the document
+            logger.info("💾 Saving document to temporary file...")
             doc.save(temp_file_path)
-            logger.info("💾 Document saved to temporary file: %s", temp_file_path)
+            logger.info("✅ Document saved successfully")
         
-        # Check if the file was created and has content
+        # Verify the file was created and has content
+        logger.info("🔍 Verifying temporary document file...")
         if os.path.exists(temp_file_path):
             file_size = os.path.getsize(temp_file_path)
             logger.info("📊 Generated document size: %d bytes", file_size)
+            
             if file_size < 1000:  # Very small file might indicate rendering issues
                 logger.warning("⚠️  Generated document is very small (%d bytes), check template rendering", file_size)
+            elif file_size > 1024 * 1024:  # File larger than 1MB
+                logger.info("📈 Large document generated (%d bytes), this is good", file_size)
+            else:
+                logger.info("✅ Document size looks reasonable (%d bytes)", file_size)
+                
+            # Try to read a few bytes to ensure file is valid
+            try:
+                with open(temp_file_path, 'rb') as test_file:
+                    first_bytes = test_file.read(4)
+                    if first_bytes == b'PK\x03\x04':  # ZIP/DOCX file signature
+                        logger.info("✅ File has valid DOCX/ZIP signature")
+                    else:
+                        logger.warning("⚠️  File does not have valid DOCX signature: %s", first_bytes.hex())
+            except Exception as read_error:
+                logger.warning("⚠️  Could not verify file signature: %s", read_error)
         else:
-            raise FileNotFoundError("Temporary document file was not created")
+            raise FileNotFoundError(f"Temporary document file was not created: {temp_file_path}")
         
         logger.info("☁️  Uploading to Google Cloud Storage...")
+        logger.info("🔧 Environment check:")
+        logger.info("  GCS_RESUME_BUCKET: %s", os.getenv('GCS_RESUME_BUCKET', 'NOT_SET'))
+        logger.info("  GOOGLE_APPLICATION_CREDENTIALS: %s", os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'NOT_SET'))
+        
+        # Test GCS connectivity before attempting upload
+        connectivity_test = test_gcs_connectivity()
+        if not connectivity_test.get("success", False):
+            logger.error("❌ GCS connectivity test failed: %s", connectivity_test.get("error"))
+            return {
+                "resume_text": text,
+                "document_url": f"local://{filename}",
+                "download_url": f"local://{filename}",
+                "public_url": f"local://{filename}",
+                "firebase_url": f"local://{filename}",
+                "gcs_url": f"local://{filename}",
+                "authenticated_url": f"local://{filename}",
+                "filename": filename,
+                "status": "error",
+                "message": f"GCS connectivity failed: {connectivity_test.get('error')}",
+                "upload_error": connectivity_test.get("error")
+            }
+        else:
+            logger.info("✅ GCS connectivity test passed")
+        
         upload_result = upload_to_gcs_direct(temp_file_path, filename, user_id)
         
         if not upload_result.get("success", False):
@@ -589,3 +718,72 @@ def download_and_extract_resume_text(storage_url: str) -> str:
                 logger.debug("Cleaned up temporary download file: %s", temp_file_path)
             except OSError as e:
                 logger.warning("Failed to delete temporary download file %s: %s", temp_file_path, e)
+
+from typing import Optional
+
+def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
+    """Test Google Cloud Storage connectivity and bucket access"""
+    try:
+        if not bucket_name:
+            bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
+        
+        logger.info("🧪 Testing GCS connectivity...")
+        logger.info("  🪣 Target bucket: %s", bucket_name)
+        
+        # Initialize client
+        client = gcs.Client()
+        project_id = client.project
+        logger.info("  🆔 Project ID: %s", project_id)
+        
+        # Test bucket access
+        bucket = client.bucket(bucket_name)
+        
+        # Check if bucket exists
+        if not bucket.exists():
+            return {
+                "success": False,
+                "error": f"Bucket {bucket_name} does not exist",
+                "project_id": project_id
+            }
+        
+        # Try to list some objects (limited to 5)
+        blobs = list(bucket.list_blobs(max_results=5))
+        logger.info("  📁 Found %d objects in bucket", len(blobs))
+        
+        # Test write permission with a small test file
+        test_blob_name = f"test_connectivity_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        test_blob = bucket.blob(test_blob_name)
+        test_content = f"Test connectivity at {datetime.now().isoformat()}"
+        
+        logger.info("  ✍️  Testing write access with test file: %s", test_blob_name)
+        test_blob.upload_from_string(test_content, content_type='text/plain')
+        
+        # Verify the test file was uploaded
+        if test_blob.exists():
+            logger.info("  ✅ Write test successful")
+            # Clean up test file
+            test_blob.delete()
+            logger.info("  🧹 Test file cleaned up")
+            
+            return {
+                "success": True,
+                "message": "GCS connectivity test passed",
+                "project_id": project_id,
+                "bucket_name": bucket_name,
+                "objects_count": len(blobs)
+            }
+        else:
+            return {
+                "success": False,
+                "error": "Test file was not created successfully",
+                "project_id": project_id
+            }
+            
+    except Exception as e:
+        logger.error("❌ GCS connectivity test failed: %s", e)
+        logger.exception("Full error details:")
+        return {
+            "success": False,
+            "error": str(e),
+            "project_id": getattr(client, 'project', 'unknown') if 'client' in locals() else 'unknown'
+        }
