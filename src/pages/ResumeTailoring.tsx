@@ -10,6 +10,7 @@ import {
   ResumeSelector,
   JobDescriptionInput,
   ResumeTextInput,
+  DocumentViewer,
   EnhancedDocumentViewer,
   SuggestedChanges,
   DownloadBanner
@@ -72,7 +73,7 @@ const ResumeTailoring = () => {
           const defaultResume = resumesResult.data?.find(r => r.metadata?.isOriginal);
           if (defaultResume) {
             setSelectedResumeId(defaultResume.id);
-            setSelectedResumeUrl(getResumeUrlForContext(defaultResume, 'agent'));
+            setSelectedResumeUrl(getResumeUrlForContext(defaultResume));
             setResumeInputMethod('saved');
             setResumeText(`Upload resume content will be processed automatically.`);
           }
@@ -147,7 +148,7 @@ const ResumeTailoring = () => {
         const newResume = result.data;
         setUserResumes(prev => [...prev, newResume]);
         setSelectedResumeId(newResume.id);
-        setSelectedResumeUrl(getResumeUrlForContext(newResume, 'agent'));
+        setSelectedResumeUrl(getResumeUrlForContext(newResume));
         setResumeInputMethod('upload');
 
         setResumeText(`The resume content will be processed automatically.`);
@@ -163,7 +164,7 @@ const ResumeTailoring = () => {
     const resume = userResumes.find(r => r.id === resumeId);
     if (!resume) return;
 
-    setSelectedResumeUrl(getResumeUrlForContext(resume, 'agent'));
+    setSelectedResumeUrl(getResumeUrlForContext(resume));
     setResumeInputMethod('saved');
 
     setResumeText(`The resume content will be processed automatically. You can also paste additional text if needed.`);
@@ -452,7 +453,14 @@ Join our team and help build the next generation of web applications that serve 
           {activeTab === 'resume' && (
             <div className="space-y-6">
               {/* Document Viewer */}
-              {tailoringData.tailoredResumeUrl ? (
+              {tailoringData.tailoredResumeText ? (
+                <DocumentViewer
+                  resumeText={tailoringData.tailoredResumeText}
+                  resumeUrl={tailoringData.tailoredResumeUrl}
+                  job={job}
+                  onCopyText={copySuggestion}
+                />
+              ) : tailoringData.tailoredResumeUrl ? (
                 <EnhancedDocumentViewer
                   documentUrl={tailoringData.tailoredResumeUrl}
                   job={job}

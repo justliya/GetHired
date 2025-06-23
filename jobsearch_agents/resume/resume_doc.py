@@ -64,8 +64,8 @@ def create_unique_filename(job_position_title: str, user_id: str) -> str:
     return filename
 
 
-def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> str:
-    """Upload file to Firebase Storage and return download URL"""
+def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> dict:
+    """Upload file to Firebase Storage and return multiple URL formats"""
     try:
         initialize_firebase()
         bucket = storage.bucket()
@@ -84,10 +84,25 @@ def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> s
         blob.upload_from_filename(file_path)
         blob.make_public()
         
-        download_url = blob.public_url
+        # Generate multiple URL formats
+        public_url = blob.public_url
+        firebase_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{storage_path.replace('/', '%2F')}?alt=media"
+        direct_gcs_url = f"https://storage.googleapis.com/{bucket.name}/{storage_path}"
+        
         logger.info("Successfully uploaded resume to Firebase Storage: %s", storage_path)
-        logger.info("Firebase public URL: %s", download_url)
-        return download_url
+        logger.info("Firebase public URL: %s", public_url)
+        logger.info("Firebase download URL: %s", firebase_url)
+        logger.info("Direct GCS URL: %s", direct_gcs_url)
+        
+        return {
+            "success": True,
+            "public_url": public_url,
+            "firebase_url": firebase_url,
+            "gcs_url": direct_gcs_url,
+            "authenticated_url": firebase_url,
+            "storage_path": storage_path,
+            "bucket": bucket.name
+        }
         
     except (OSError, IOError) as e:
         logger.error("IO error uploading to Firebase Storage: %s", e)
@@ -99,7 +114,7 @@ def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> s
         return upload_to_gcs_direct(file_path, filename, user_id)
 
 
-def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> str:
+def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
     """Direct Google Cloud Storage upload as fallback"""
     try:
         bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
@@ -117,17 +132,51 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> str:
         blob.upload_from_filename(file_path)
         blob.make_public()
         
-        public_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
+        # Generate multiple URL formats for GCS
+        public_url = blob.public_url
+        direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
+        firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
+        
+        # Generate signed URL for authenticated access (valid for 1 hour)
+        from datetime import timedelta
+        signed_url = blob.generate_signed_url(expiration=timedelta(hours=1))
+        
         logger.info("Successfully uploaded resume to GCS: %s", storage_path)
         logger.info("Public URL: %s", public_url)
-        return public_url
+        logger.info("Direct URL: %s", direct_url)
+        logger.info("Firebase compatible URL: %s", firebase_compatible_url)
+        logger.info("Signed URL: %s", signed_url)
+        
+        return {
+            "success": True,
+            "public_url": public_url,
+            "firebase_url": firebase_compatible_url,
+            "gcs_url": direct_url,
+            "authenticated_url": signed_url,
+            "storage_path": storage_path,
+            "bucket": bucket_name
+        }
         
     except (OSError, IOError) as e:
         logger.error("IO error uploading to GCS: %s", e)
-        return ""
+        return {
+            "success": False,
+            "error": f"IO error: {str(e)}",
+            "public_url": "",
+            "firebase_url": "",
+            "gcs_url": "",
+            "authenticated_url": ""
+        }
     except Exception as e:
         logger.error("Unexpected error uploading to GCS: %s", e)
-        return ""
+        return {
+            "success": False,
+            "error": f"Upload error: {str(e)}",
+            "public_url": "",
+            "firebase_url": "",
+            "gcs_url": "",
+            "authenticated_url": ""
+        }
 
 
 def create_formatted_resume(text: str, job_position_title: str = "Position", user_id: str = "anonymous") -> dict:
@@ -172,7 +221,6 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
                 "status": "error",
                 "message": f"Failed to parse resume: {str(parse_error)}"
             }
-        
         # Log the candidate data for debugging template issues
         candidate = candidate_data.get("candidate", {})
         logger.info("📋 Parsed candidate info:")
@@ -243,10 +291,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         logger.info("🔧 Loading DocxTemplate...")
         doc = DocxTemplate(str(template_path))
         
-        # Prepare the context for template rendering
-        # The template expects variables to be available directly AND as 'candidate'
         template_context = candidate_data["candidate"].copy()
-        
         # Add the candidate object itself for templates that expect {{ candidate.name }}
         template_context["candidate"] = candidate_data["candidate"]
         
@@ -254,7 +299,6 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         candidate = candidate_data["candidate"]  # Define candidate for easier access
         skills_data = candidate.get("skills", {})
         if hasattr(skills_data, 'technical'):
-            # SkillSet object
             technical_skills = skills_data.technical or []
             soft_skills = skills_data.soft_skills or []
         elif isinstance(skills_data, dict):
@@ -268,8 +312,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         else:
             technical_skills = []
             soft_skills = []
-        
-        # Add some additional helper variables that might be useful in the template
+
         template_context.update({
             "full_name": candidate.get("name", ""),
             "contact_email": candidate.get("email", ""),
@@ -285,7 +328,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         })
         
         # Create a flat skills list for template compatibility
-        all_skills_list = []
+        all_skills_list: list[str] = []
         all_skills_list.extend(technical_skills)
         all_skills_list.extend(soft_skills)
         
@@ -323,21 +366,40 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
             raise FileNotFoundError("Temporary document file was not created")
         
         logger.info("☁️  Uploading to Firebase Storage...")
-        download_url = upload_to_firebase_storage(temp_file_path, filename, user_id)
+        upload_result = upload_to_firebase_storage(temp_file_path, filename, user_id)
         
-        if not download_url:
+        if not upload_result.get("success", False):
             logger.warning("⚠️  Failed to upload to storage, returning local file info")
-            download_url = f"local://{filename}"
+            return {
+                "resume_text": text,
+                "document_url": f"local://{filename}",
+                "download_url": f"local://{filename}",
+                "public_url": f"local://{filename}",
+                "firebase_url": f"local://{filename}",
+                "gcs_url": f"local://{filename}",
+                "authenticated_url": f"local://{filename}",
+                "filename": filename,
+                "status": "partial_success",
+                "message": f"Resume created but upload failed for {job_position_title}",
+                "upload_error": upload_result.get("error", "Unknown upload error")
+            }
         else:
-            logger.info("✅ Upload successful: %s", download_url)
+            logger.info("✅ Upload successful: %s", upload_result.get("public_url"))
         
         logger.info("🎉 Resume created successfully for %s (user: %s)", job_position_title, user_id)
         
         return {
             "resume_text": text,
-            "document_url": download_url,
-            "download_url": download_url, 
+            "document_url": upload_result.get("public_url", ""),
+            "download_url": upload_result.get("firebase_url", ""),
+            "public_url": upload_result.get("public_url", ""),
+            "firebase_url": upload_result.get("firebase_url", ""),
+            "gcs_url": upload_result.get("gcs_url", ""),
+            "authenticated_url": upload_result.get("authenticated_url", ""),
             "filename": filename,
+            "storage_path": upload_result.get("storage_path", ""),
+            "bucket": upload_result.get("bucket", ""),
+            "status": "success",
             "message": f"Resume successfully created and uploaded for {job_position_title}"
         }
         

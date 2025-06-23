@@ -175,17 +175,15 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         link.click();
         document.body.removeChild(link);
       } else {
-        // For regular URLs, fetch and download
-        const response = await fetch(urlToDownload);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        // For regular URLs, create download link
         const link = document.createElement('a');
-        link.href = url;
+        link.href = urlToDownload;
         link.download = `tailored_resume_${job?.company || 'document'}.${fileExtension}`;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
       }
       
       if (onDownload) {
@@ -230,7 +228,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
       return;
     }
     
-    setError('Failed to load document. The document might not be publicly accessible or may have CORS restrictions.');
+    setError('Document preview unavailable. You can still download or open the document in a new tab.');
   };
 
   const handleTryAlternativeViewer = () => {
@@ -324,7 +322,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
             title="Open in New Tab"
           >
             <ExternalLink className="w-4 h-4 mr-1" />
-            Open
+            Preview
           </a>
 
           {isFullscreen && (
