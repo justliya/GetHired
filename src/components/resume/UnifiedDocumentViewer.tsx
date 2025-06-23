@@ -46,9 +46,32 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
   const [viewerFallback, setViewerFallback] = useState(0);
   const [urlFallback, setUrlFallback] = useState(0);
 
-  // Prefer authenticated URL over public URL for security and access
-  // If documentUrl fails (like with access denied), use authenticatedUrl
-  const currentUrl = urlFallback === 0 ? (authenticatedUrl || documentUrl) : (documentUrl || authenticatedUrl);
+  // Validate URLs and prefer authenticated URL over public URL for security and access
+  const isValidUrl = (url: string | undefined): url is string => {
+    if (!url) return false;
+    try {
+      new URL(url);
+      return !url.includes('user_id'); // Reject URLs with literal "user_id"
+    } catch {
+      return false;
+    }
+  };
+
+  // Select the best available URL
+  const selectCurrentUrl = useCallback(() => {
+    if (urlFallback === 0) {
+      // First try: authenticated URL, then document URL
+      if (isValidUrl(authenticatedUrl)) return authenticatedUrl;
+      if (isValidUrl(documentUrl)) return documentUrl;
+    } else {
+      // Fallback: document URL, then authenticated URL
+      if (isValidUrl(documentUrl)) return documentUrl;
+      if (isValidUrl(authenticatedUrl)) return authenticatedUrl;
+    }
+    return null;
+  }, [authenticatedUrl, documentUrl, urlFallback]);
+
+  const currentUrl = selectCurrentUrl();
 
   // Debug logging
   React.useEffect(() => {
@@ -57,7 +80,9 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
       authenticatedUrl,
       currentUrl,
       urlFallback,
-      viewerFallback
+      viewerFallback,
+      documentUrlValid: isValidUrl(documentUrl),
+      authenticatedUrlValid: isValidUrl(authenticatedUrl)
     });
   }, [documentUrl, authenticatedUrl, currentUrl, urlFallback, viewerFallback]);
 
@@ -382,20 +407,45 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
           </div>
         )}
         
-        <iframe
-          src={getViewerUrl(currentUrl)}
-          className="w-full h-full border-0"
-          style={{
-            transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-            transformOrigin: 'center center'
-          }}
-          onLoad={() => setIsLoading(false)}
-          onError={() => {
-            setIsLoading(false);
-            setError(`Failed to load document with viewer ${viewerFallback + 1}`);
-          }}
-          title="Document Viewer"
-        />
+        {!error && currentUrl && (
+          <iframe
+            src={getViewerUrl(currentUrl)}
+            className="w-full h-full border-0"
+            style={{
+              transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+              transformOrigin: 'center center'
+            }}
+            onLoad={() => {
+              setIsLoading(false);
+              setError(null);
+            }}
+            onError={(e) => {
+              console.error('Iframe error:', e);
+              setIsLoading(false);
+              setError(`Failed to load document with viewer ${viewerFallback + 1}. Extension context may be invalidated.`);
+            }}
+            title="Document Viewer"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+          />
+        )}
+        
+        {!currentUrl && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="text-center p-8">
+              <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No Valid Document URL
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                The document URLs contain invalid user IDs or are malformed.
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500">
+                Document URL: {documentUrl || 'None'}<br />
+                Authenticated URL: {authenticatedUrl || 'None'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -60,6 +60,17 @@ export const useResumeTailoring = () => {
             resumeUrl = parsed.document_url || parsed.download_url || parsed.resume_url || parsed.public_url || '';
             authenticatedUrl = parsed.authenticated_url || parsed.gcs_url || '';
             filename = parsed.filename || '';
+            
+            // Validate URLs - reject URLs with literal "user_id"
+            if (resumeUrl && resumeUrl.includes('user_id')) {
+              console.warn('❌ Invalid resumeUrl contains literal "user_id":', resumeUrl);
+              resumeUrl = '';
+            }
+            if (authenticatedUrl && authenticatedUrl.includes('user_id')) {
+              console.warn('❌ Invalid authenticatedUrl contains literal "user_id":', authenticatedUrl);
+              authenticatedUrl = '';
+            }
+            
             console.log('🎯 Extracted from JSON - Public URL:', resumeUrl, 'Authenticated URL:', authenticatedUrl, 'Text length:', resumeText.length, 'Filename:', filename);
           } catch (e) {
             console.warn('❌ Failed to parse JSON from message:', e);
@@ -211,6 +222,15 @@ ${jobDescription}
       
       console.log('📋 Setting tailoring data:', newTailoringData);
       console.log('🔗 Resume URL being set:', newTailoringData.tailoredResumeUrl);
+      console.log('🔐 Authenticated URL being set:', newTailoringData.authenticatedUrl);
+      
+      // Warn if URLs contain literal "user_id"
+      if (newTailoringData.tailoredResumeUrl?.includes('user_id')) {
+        console.error('❌ CRITICAL: tailoredResumeUrl contains literal "user_id" - LLM did not extract real user_id from context');
+      }
+      if (newTailoringData.authenticatedUrl?.includes('user_id')) {
+        console.error('❌ CRITICAL: authenticatedUrl contains literal "user_id" - LLM did not extract real user_id from context');
+      }
       
       setTailoringData(newTailoringData);
       
