@@ -10,10 +10,9 @@ import {
   ResumeSelector,
   JobDescriptionInput,
   ResumeTextInput,
-  DocumentViewer,
-  EnhancedDocumentViewer,
   SuggestedChanges,
-  DownloadBanner
+  DownloadBanner,
+  UnifiedDocumentViewer
 } from '../components/resume';
 import type { Resume } from '../models/UserData';
 import type { JobListing } from '../types';
@@ -453,26 +452,20 @@ Join our team and help build the next generation of web applications that serve 
           {activeTab === 'resume' && (
             <div className="space-y-6">
               {/* Document Viewer */}
-              {tailoringData.tailoredResumeText ? (
-                <DocumentViewer
+              {(tailoringData.tailoredResumeText || tailoringData.tailoredResumeUrl) && (
+                <UnifiedDocumentViewer
                   resumeText={tailoringData.tailoredResumeText}
-                  resumeUrl={tailoringData.tailoredResumeUrl}
-                  authenticatedUrl={tailoringData.authenticatedUrl}
-                  job={job}
-                  onCopyText={copySuggestion}
-                />
-              ) : tailoringData.tailoredResumeUrl ? (
-                <EnhancedDocumentViewer
                   documentUrl={tailoringData.tailoredResumeUrl}
                   authenticatedUrl={tailoringData.authenticatedUrl}
                   job={job}
+                  onCopyText={copySuggestion}
                   onDownload={() => {
                     if (tailoringData.tailoredResumeUrl) {
                       window.open(tailoringData.tailoredResumeUrl, '_blank');
                     }
                   }}
                 />
-              ) : null}
+              )}
 
               {/* Suggested Changes */}
               {tailoringData.suggestedChanges && tailoringData.suggestedChanges.length > 0 && (

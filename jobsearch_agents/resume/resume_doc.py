@@ -63,10 +63,6 @@ def create_unique_filename(job_position_title: str, user_id: str) -> str:
     
     return filename
 
-
-# Firebase storage upload removed - now using only GCS direct upload
-
-
 def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
     """Direct Google Cloud Storage upload with multiple URL formats"""
     try:
@@ -87,12 +83,16 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         
         # Generate multiple URL formats for maximum compatibility
         public_url = blob.public_url
+        # Ensure public URL uses https and is properly formatted
+        if public_url.startswith('http://'):
+            public_url = public_url.replace('http://', 'https://')
+        
         direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
         firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
         
         # Generate signed URL for authenticated access (valid for 24 hours)
         from datetime import timedelta
-        signed_url = blob.generate_signed_url(expiration=timedelta(hours=24))
+        signed_url = blob.generate_signed_url(expiration=timedelta(hours=24), method='GET')
         
         logger.info("Successfully uploaded resume to GCS: %s", storage_path)
         logger.info("Public URL: %s", public_url)
@@ -130,7 +130,6 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
             "gcs_url": "",
             "authenticated_url": ""
         }
-
 
 def create_formatted_resume(text: str, job_position_title: str = "Position", user_id: str = "anonymous") -> dict:
     """Create a formatted resume document and upload to Firebase Storage"""
@@ -389,7 +388,6 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
                 logger.debug("🧹 Cleaned up temporary file: %s", temp_file_path)
             except OSError as e:
                 logger.warning("⚠️  Failed to delete temporary file %s: %s", temp_file_path, e)
-
 
 def download_and_extract_resume_text(storage_url: str) -> str:
     """
