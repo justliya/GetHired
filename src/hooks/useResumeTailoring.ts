@@ -57,10 +57,10 @@ export const useResumeTailoring = () => {
             const parsed = JSON.parse(jsonMatch[0]);
             console.log('✅ Parsed JSON:', parsed);
             resumeText = parsed.resume_text || parsed.final_resume || parsed.tailored_resume_text || '';
-            resumeUrl = parsed.document_url || parsed.download_url || parsed.resume_url || '';
+            resumeUrl = parsed.document_url || parsed.download_url || parsed.resume_url || parsed.public_url || '';
             authenticatedUrl = parsed.authenticated_url || parsed.gcs_url || '';
             filename = parsed.filename || '';
-            console.log('🎯 Extracted from JSON - URL:', resumeUrl, 'Authenticated URL:', authenticatedUrl, 'Text length:', resumeText.length, 'Filename:', filename);
+            console.log('🎯 Extracted from JSON - Public URL:', resumeUrl, 'Authenticated URL:', authenticatedUrl, 'Text length:', resumeText.length, 'Filename:', filename);
           } catch (e) {
             console.warn('❌ Failed to parse JSON from message:', e);
           }
@@ -98,7 +98,7 @@ export const useResumeTailoring = () => {
         const originalFilename = filename;
         
         resumeText = resumeText || (responseData.resume_text as string) || (responseData.final_resume as string) || (responseData.tailored_resume_text as string) || '';
-        resumeUrl = resumeUrl || (responseData.document_url as string) || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || '';
+        resumeUrl = resumeUrl || (responseData.document_url as string) || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || (responseData.public_url as string) || '';
         authenticatedUrl = authenticatedUrl || (responseData.authenticated_url as string) || (responseData.signed_url as string) || (responseData.gcs_url as string) || '';
         filename = filename || (responseData.filename as string) || '';
         

@@ -84,45 +84,41 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         try:
             blob.make_public()
             logger.debug("Successfully made blob public using ACL")
+            # Test if public URL actually works by checking if we get a valid response
+            public_url = blob.public_url
+            if public_url.startswith('http://'):
+                public_url = public_url.replace('http://', 'https://')
             use_public_urls = True
         except Exception as e:
             logger.warning("Cannot use make_public() due to uniform bucket-level access: %s", e)
+            public_url = None
             use_public_urls = False
         
-        # Generate multiple URL formats for maximum compatibility
-        if use_public_urls:
-            public_url = blob.public_url
-            # Ensure public URL uses https and is properly formatted
-            if public_url.startswith('http://'):
-                public_url = public_url.replace('http://', 'https://')
-        else:
-            # For uniform bucket-level access, use signed URLs as primary
-            public_url = None
-        
-        direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
-        firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
-        
-        # Generate signed URL for authenticated access (valid for 24 hours)
+        # Generate signed URL for authenticated access (valid for 24 hours)  
         from datetime import timedelta
         signed_url = blob.generate_signed_url(expiration=timedelta(hours=24), method='GET')
         
         # Generate cloud console compatible authenticated URL
         # Format: https://storage.cloud.google.com/bucket/path?authuser=X
-        cloud_console_url = f"https://storage.cloud.google.com/{bucket_name}/{storage_path}?authuser=0"
+        cloud_console_url = f"https://storage.cloud.google.com/{bucket_name}/{storage_path}?authuser=3"
         
         # For authenticated access, prefer the cloud console format, but keep signed URL as backup
         authenticated_url = cloud_console_url
         
-        # If we can't use public URLs, use signed URL as the primary URL
-        if not use_public_urls:
-            public_url = signed_url
+        # Always use signed URL as the primary public_url since public access may not work
+        # This ensures downloads work even with uniform bucket-level access
+        public_url = signed_url
+        
+        # Generate additional URL formats for compatibility
+        direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
+        firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
         
         logger.info("Successfully uploaded resume to GCS: %s", storage_path)
-        logger.info("Public URL: %s", public_url)
+        logger.info("Primary Public URL (signed): %s", public_url)
         logger.info("Direct URL: %s", direct_url)
         logger.info("Firebase compatible URL: %s", firebase_compatible_url)
-        logger.info("Signed URL: %s", signed_url)
-        logger.info("Cloud Console URL: %s", cloud_console_url)
+        logger.info("Authenticated URL (cloud console): %s", cloud_console_url)
+        logger.info("Signed URL (backup): %s", signed_url)
         
         return {
             "success": True,

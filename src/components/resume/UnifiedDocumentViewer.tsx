@@ -46,8 +46,20 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
   const [viewerFallback, setViewerFallback] = useState(0);
   const [urlFallback, setUrlFallback] = useState(0);
 
-  // Prefer authenticated URL over public URL for security
-  const currentUrl = urlFallback === 0 ? (authenticatedUrl || documentUrl) : documentUrl;
+  // Prefer authenticated URL over public URL for security and access
+  // If documentUrl fails (like with access denied), use authenticatedUrl
+  const currentUrl = urlFallback === 0 ? (authenticatedUrl || documentUrl) : (documentUrl || authenticatedUrl);
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('🔗 UnifiedDocumentViewer URLs:', {
+      documentUrl,
+      authenticatedUrl,
+      currentUrl,
+      urlFallback,
+      viewerFallback
+    });
+  }, [documentUrl, authenticatedUrl, currentUrl, urlFallback, viewerFallback]);
 
   const getFileExtension = (url: string): string => {
     try {
@@ -61,7 +73,8 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
   };
 
   const handleUrlFallback = useCallback(() => {
-    if (urlFallback === 0 && documentUrl) {
+    if (urlFallback === 0 && (documentUrl || authenticatedUrl)) {
+      // Try the secondary URL (whichever one we're not currently using)
       setUrlFallback(1);
       setError(null);
       setIsLoading(true);
@@ -69,7 +82,7 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
     } else {
       setError('No alternative URLs available');
     }
-  }, [urlFallback, documentUrl]);
+  }, [urlFallback, documentUrl, authenticatedUrl]);
 
   const handleViewerFallback = useCallback(() => {
     setViewerFallback(prev => {

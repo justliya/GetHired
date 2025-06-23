@@ -486,8 +486,8 @@ Join our team and help build the next generation of web applications that serve 
       {tailoringData && (
         <div>
           {/* Download Banner */}
-          {tailoringData.tailoredResumeUrl && (
-            <DownloadBanner resumeUrl={tailoringData.tailoredResumeUrl} />
+          {(tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl) && (
+            <DownloadBanner resumeUrl={(tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl)!} />
           )}
 
           {/* Resume Changes Tab */}
@@ -502,8 +502,10 @@ Join our team and help build the next generation of web applications that serve 
                   job={job}
                   onCopyText={copySuggestion}
                   onDownload={() => {
-                    if (tailoringData.tailoredResumeUrl) {
-                      window.open(tailoringData.tailoredResumeUrl, '_blank');
+                    // Prefer authenticated URL for downloads
+                    const downloadUrl = tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl;
+                    if (downloadUrl) {
+                      window.open(downloadUrl, '_blank');
                     }
                   }}
                   onSave={handleSaveResume}
