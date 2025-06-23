@@ -20,11 +20,12 @@ interface GCSConfig {
 
 // Get GCS configuration from environment
 const getGCSConfig = (): GCSConfig => {
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gethired-prod';
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gethired-6c623';
   
   return {
     projectId,
-    bucketName: 'gethired-upload-resumes'}
+    bucketName: 'gethired-resume-uploads'
+  };
 };
 
 // Upload to dedicated upload bucket with proper CORS configuration
@@ -40,7 +41,7 @@ export const uploadToUploadBucket = async (
     console.log('🔄 Uploading to dedicated upload bucket:', uploadPath);
     
     // Create a reference to the dedicated upload bucket
-    const uploadStorage = getStorage(undefined, 'gs://gethired-upload-resumes');
+    const uploadStorage = getStorage(undefined, 'gs://gethired-resume-uploads');
     const storageRef = ref(uploadStorage, uploadPath);
     
     // Set metadata for public access

@@ -688,98 +688,83 @@ export const checkResumeUrlAccess = async (resumeUrl: string): Promise<{
   }
 };
 
-// Enhanced upload function with GCS prioritized for CORS issues
+// Enhanced upload function with proper fallback strategy
 export const uploadResumeWithFallback = async (userId: string, file: File, metadata?: Partial<Resume['metadata']>) => {
-  console.log('🔄 Starting enhanced resume upload with GCS priority...');
-  
-  // Start with GCS multi-strategy upload (better CORS handling)
   try {
-    const { uploadWithMultipleStrategies } = await import('./gcsService');
-    console.log('🔄 Attempting GCS multi-strategy upload first...');
+    console.log('🚀 Starting enhanced upload with proper fallback for:', file.name);
     
-    const gcsUploadResult = await uploadWithMultipleStrategies(file, userId);
+    // Use the new enhanced upload service
+    const { uploadResumeWithProperFallback } = await import('./enhancedUploadService');
+    const uploadResult = await uploadResumeWithProperFallback(file, userId);
     
-    if (gcsUploadResult.success && gcsUploadResult.fileUrl) {
-      console.log('✅ GCS multi-strategy upload successful');
-      
-      // Create the metadata object
-      const meta: Resume['metadata'] = {
-        title: metadata?.title || file.name,
-        uploadSource: (gcsUploadResult.uploadSource as ResumeUploadSource) || 'manual',
-        isOriginal: metadata?.isOriginal ?? true,
-        keywords: metadata?.keywords || [],
-        ...(metadata?.description && { description: metadata.description }),
-        ...(metadata?.relatedJobId && { relatedJobId: metadata.relatedJobId }),
-        ...(metadata?.relatedCompany && { relatedCompany: metadata.relatedCompany }),
-        ...(metadata?.relatedRole && { relatedRole: metadata.relatedRole }),
-        ...(metadata?.originalResumeId && { originalResumeId: metadata.originalResumeId }),
-        ...(metadata?.customizations && { customizations: metadata.customizations })
+    if (!uploadResult.success) {
+      console.error('❌ Enhanced upload failed:', uploadResult.error);
+      return {
+        success: false,
+        error: uploadResult.error || 'Upload failed'
       };
+    }
+    
+    console.log('✅ Enhanced upload successful:', uploadResult.uploadMethod);
+    
+    // Create the metadata object
+    const meta: Resume['metadata'] = {
+      title: metadata?.title || file.name,
+      uploadSource: (uploadResult.uploadMethod === 'firebase' ? 'firebase' : 'public') as ResumeUploadSource,
+      isOriginal: metadata?.isOriginal ?? true,
+      keywords: metadata?.keywords || [],
+      ...(metadata?.description && { description: metadata.description }),
+      ...(metadata?.relatedJobId && { relatedJobId: metadata.relatedJobId }),
+      ...(metadata?.relatedCompany && { relatedCompany: metadata.relatedCompany }),
+      ...(metadata?.relatedRole && { relatedRole: metadata.relatedRole }),
+      ...(metadata?.originalResumeId && { originalResumeId: metadata.originalResumeId }),
+      ...(metadata?.customizations && { customizations: metadata.customizations })
+    };
+    
+    // Format the response to match the expected Resume structure
+    const resumeData: Resume & { id: string } = {
+      id: `upload_${Date.now()}`, // Generate a temporary ID
+      fileUrl: uploadResult.fileUrl!,
+      publicUrl: uploadResult.downloadUrl || uploadResult.fileUrl!,
+      createdAt: new Date().toISOString(),
+      type: metadata?.isOriginal ? 'original' : 'tailored',
+      metadata: meta
+    };
+    
+    // Try to save to Firebase Firestore
+    try {
+      const resumesRef = collection(db, 'users', userId, 'resumes');
+      const docRef = await addDoc(resumesRef, resumeData);
       
-      // Format the response to match the expected Resume structure
-      const resumeData: Resume & { id: string } = {
-        id: `gcs_${Date.now()}`, // Generate a temporary ID
-        fileUrl: gcsUploadResult.fileUrl,
-        publicUrl: gcsUploadResult.publicUrl || gcsUploadResult.fileUrl,
-        createdAt: new Date().toISOString(),
-        type: metadata?.isOriginal ? 'original' : 'tailored',
-        metadata: meta
-      };
+      // Update the ID with the actual Firestore document ID
+      resumeData.id = docRef.id;
       
-      // Try to save to Firebase Firestore 
-      try {
-        const resumesRef = collection(db, 'users', userId, 'resumes');
-        const docRef = await addDoc(resumesRef, resumeData);
+      // Also update the resumes array in main document
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserData;
+        const updatedResumes = [...(userData.resumes || []), resumeData];
         
-        // Update the ID with the actual Firestore document ID
-        resumeData.id = docRef.id;
-        
-        // Also update the resumes array in main document
-        const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as UserData;
-          const updatedResumes = [...(userData.resumes || []), resumeData];
-          
-          await setDoc(userRef, { 
-            resumes: updatedResumes 
-          }, { merge: true });
-        }
-        
-        console.log('📄 Resume metadata saved to Firestore with ID:', docRef.id);
-        resumeData.id = docRef.id;
-      } catch (firestoreError) {
-        console.warn('⚠️ Failed to save resume metadata to Firestore:', firestoreError);
-        // Continue with the upload result even if Firestore save fails
+        await setDoc(userRef, { 
+          resumes: updatedResumes 
+        }, { merge: true });
       }
       
-      return { success: true, data: resumeData };
+      console.log('📄 Resume metadata saved to Firestore with ID:', docRef.id);
+      resumeData.id = docRef.id;
+    } catch (firestoreError) {
+      console.warn('⚠️ Failed to save resume metadata to Firestore:', firestoreError);
+      // Continue with the upload result even if Firestore save fails
     }
     
-    console.warn('❌ GCS upload failed, trying direct Firebase Storage...', gcsUploadResult.error);
-  } catch (gcsError) {
-    console.warn('❌ GCS service failed, trying direct Firebase Storage...', gcsError);
+    return { success: true, data: resumeData };
+  } catch (error) {
+    console.error('❌ Enhanced upload with fallback failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Upload failed'
+    };
   }
-  
-  // Fallback to direct Firebase Storage if GCS fails
-  try {
-    console.log('🔄 Attempting direct Firebase Storage upload...');
-    const directUploadResult = await uploadResume(userId, file, metadata);
-    
-    if (directUploadResult.success) {
-      console.log('✅ Direct Firebase Storage upload successful');
-      return directUploadResult;
-    }
-    
-    console.warn('❌ Direct Firebase upload also failed:', directUploadResult.error);
-  } catch (directUploadError) {
-    console.warn('❌ Direct Firebase upload error:', directUploadError);
-  }
-  
-  // If both fail, return error
-  return {
-    success: false,
-    error: 'All upload methods failed. This might be due to Firebase authorization domains or CORS restrictions. Please try again or contact support.'
-  };
 };
