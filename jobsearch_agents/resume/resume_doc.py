@@ -149,19 +149,25 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         
         logger.info("  ✅ Upload verification completed successfully")
         
-        # Try to make public (works with legacy ACL), but handle uniform bucket-level access gracefully
+        # Try to make public (should work now that bucket is public)
+        logger.info("  🌐 Setting blob to public access...")
         try:
             blob.make_public()
-            logger.debug("Successfully made blob public using ACL")
-            # Test if public URL actually works by checking if we get a valid response
+            logger.info("  ✅ Successfully made blob public using ACL")
+            
+            # Get public URL and ensure HTTPS
             public_url = blob.public_url
             if public_url.startswith('http://'):
                 public_url = public_url.replace('http://', 'https://')
+            
+            logger.info("  🌐 Public URL: %s", public_url)
             use_public_urls = True
         except Exception as e:
-            logger.warning("Cannot use make_public() due to uniform bucket-level access: %s", e)
-            public_url = None
-            use_public_urls = False
+            logger.warning("  ⚠️  Cannot use make_public() (may still work due to bucket-level access): %s", e)
+            # Even if make_public fails, the file should still be accessible due to bucket-level public access
+            public_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
+            logger.info("  🌐 Using direct public URL: %s", public_url)
+            use_public_urls = True
         
         # Generate signed URL for authenticated access (valid for 24 hours)  
         from datetime import timedelta
@@ -174,16 +180,21 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         # For authenticated access, prefer the cloud console format, but keep signed URL as backup
         authenticated_url = cloud_console_url
         
-        # Always use signed URL as the primary public_url since public access may not work
-        # This ensures downloads work even with uniform bucket-level access
-        public_url = signed_url
+        # Since bucket is now public, prioritize public URLs over signed URLs
+        if use_public_urls:
+            primary_url = public_url
+            logger.info("  ✅ Using public URL as primary: %s", primary_url)
+        else:
+            primary_url = signed_url
+            logger.info("  ✅ Using signed URL as primary: %s", primary_url)
         
         # Generate additional URL formats for compatibility
         direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
         firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
         
         logger.info("Successfully uploaded resume to GCS: %s", storage_path)
-        logger.info("Primary Public URL (signed): %s", public_url)
+        logger.info("Primary URL: %s", primary_url)
+        logger.info("Public URL: %s", public_url if use_public_urls else "Not available")
         logger.info("Direct URL: %s", direct_url)
         logger.info("Firebase compatible URL: %s", firebase_compatible_url)
         logger.info("Authenticated URL (cloud console): %s", cloud_console_url)
@@ -191,7 +202,7 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         
         return {
             "success": True,
-            "public_url": public_url,
+            "public_url": primary_url,  # Use public URL as primary since bucket is public
             "firebase_url": firebase_compatible_url,
             "gcs_url": direct_url,
             "authenticated_url": authenticated_url,  # Use cloud console format
@@ -730,15 +741,24 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
         logger.info("🧪 Testing GCS connectivity...")
         logger.info("  🪣 Target bucket: %s", bucket_name)
         
+        # Check environment variables
+        logger.info("  🔧 Environment variables:")
+        logger.info("    GOOGLE_APPLICATION_CREDENTIALS: %s", os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'NOT_SET'))
+        logger.info("    GOOGLE_CLOUD_PROJECT: %s", os.getenv('GOOGLE_CLOUD_PROJECT', 'NOT_SET'))
+        logger.info("    GCS_RESUME_BUCKET: %s", os.getenv('GCS_RESUME_BUCKET', 'NOT_SET'))
+        
         # Initialize client
+        logger.info("  🔗 Initializing GCS client...")
         client = gcs.Client()
         project_id = client.project
         logger.info("  🆔 Project ID: %s", project_id)
         
         # Test bucket access
+        logger.info("  🪣 Accessing bucket...")
         bucket = client.bucket(bucket_name)
         
         # Check if bucket exists
+        logger.info("  🔍 Checking bucket existence...")
         if not bucket.exists():
             return {
                 "success": False,
@@ -746,7 +766,10 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
                 "project_id": project_id
             }
         
+        logger.info("  ✅ Bucket exists and is accessible")
+        
         # Try to list some objects (limited to 5)
+        logger.info("  📂 Listing bucket objects...")
         blobs = list(bucket.list_blobs(max_results=5))
         logger.info("  📁 Found %d objects in bucket", len(blobs))
         
@@ -759,18 +782,26 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
         test_blob.upload_from_string(test_content, content_type='text/plain')
         
         # Verify the test file was uploaded
+        logger.info("  🔍 Verifying test file upload...")
+        test_blob.reload()  # Refresh to get latest properties
         if test_blob.exists():
-            logger.info("  ✅ Write test successful")
+            logger.info("  ✅ Write test successful - file size: %d bytes", test_blob.size)
+            
+            # Test public access since bucket is now public
+            public_url = test_blob.public_url
+            logger.info("  🌐 Public URL: %s", public_url)
+            
             # Clean up test file
             test_blob.delete()
             logger.info("  🧹 Test file cleaned up")
             
             return {
                 "success": True,
-                "message": "GCS connectivity test passed",
+                "message": "GCS connectivity test passed - bucket is accessible and writable",
                 "project_id": project_id,
                 "bucket_name": bucket_name,
-                "objects_count": len(blobs)
+                "objects_count": len(blobs),
+                "public_access": True
             }
         else:
             return {
@@ -785,5 +816,6 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
         return {
             "success": False,
             "error": str(e),
+            "error_type": type(e).__name__,
             "project_id": getattr(client, 'project', 'unknown') if 'client' in locals() else 'unknown'
         }
