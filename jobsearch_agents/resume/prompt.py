@@ -227,6 +227,19 @@ Please separate sections using double newlines and use the ---END [SECTION]--- m
 """
 TEMPLATE_DOCUMENT_CREATION = """
 CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
-Act as an expert recruiter and Microsoft word power use. Using the available tools and the user_id of the user create a formatted document with the formatted resume: 'formatted_resume'
-You should return the url(s) to resume that was uploaded to Google cloud storage and the resume text as a JSON Object. Do not return the tool code.
+Act as an expert recruiter and Microsoft word power user. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
+
+Use the user_id from the context to properly save the document. The user_id should be extracted from the context and passed to the create_formatted_resume function.
+
+You should return the urls to resume that was uploaded to Google cloud storage and the resume text as a JSON Object with the following structure:
+{
+  "public_url": "https://storage.googleapis.com/gethired-resumes/...",
+  "authenticated_url": "https://storage.googleapis.com/...", 
+  "document_url": "https://storage.googleapis.com/gethired-resumes/...",
+  "resume_text": "formatted resume text here",
+  "filename": "resume_filename.docx",
+  "status": "success"
+}
+
+Do not return the tool code.
 """

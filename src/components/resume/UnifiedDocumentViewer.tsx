@@ -8,7 +8,8 @@ import {
   Maximize2, 
   ExternalLink,
   RefreshCw,
-  Copy
+  Copy,
+  Save
 } from 'lucide-react';
 
 interface Job {
@@ -25,6 +26,7 @@ interface UnifiedDocumentViewerProps {
   job?: Job | null;
   onCopyText?: (text: string) => void;
   onDownload?: () => void;
+  onSave?: () => void;
 }
 
 const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
@@ -33,7 +35,8 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
   authenticatedUrl,
   job,
   onCopyText,
-  onDownload
+  onDownload,
+  onSave
 }) => {
   const [zoom, setZoom] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -161,6 +164,14 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
                   <ExternalLink className="w-4 h-4 mr-1" /> Preview
                 </a>
               </>
+            )}
+            {onSave && (documentUrl || authenticatedUrl) && (
+              <button
+                onClick={onSave}
+                className="bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-3 py-1 rounded-md flex items-center text-sm hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors"
+              >
+                <Save className="w-4 h-4 mr-1" /> Save Resume
+              </button>
             )}
           </div>
         </div>

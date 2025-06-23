@@ -4,7 +4,7 @@ import { Loader2, ArrowLeft, FileText } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
-import { getUserResumes, getResumeUrlForContext, uploadResumeWithFallback, getJobListings, getUserData } from '../services/firebaseService';
+import { getUserResumes, getResumeUrlForContext, uploadResumeWithFallback, getJobListings, getUserData, saveTailoredResume } from '../services/firebaseService';
 import { useResumeTailoring } from '../hooks/useResumeTailoring';
 import {
   ResumeSelector,
@@ -310,6 +310,48 @@ Join our team and help build the next generation of web applications that serve 
     setShowJobSelector(!showJobSelector);
   };
 
+  // Handler for saving tailored resume
+  const handleSaveResume = async () => {
+    if (!user?.uid || !tailoringData) {
+      console.error('Cannot save resume: user not authenticated or no tailoring data');
+      return;
+    }
+
+    try {
+      console.log('💾 Saving tailored resume...');
+      
+      // Find the original resume ID if possible
+      const originalResumeId = selectedResumeId || userResumes.find(r => r.metadata?.isOriginal)?.id;
+      
+      const result = await saveTailoredResume(user.uid, {
+        resumeText: tailoringData.tailoredResumeText || '',
+        documentUrl: tailoringData.tailoredResumeUrl,
+        authenticatedUrl: tailoringData.authenticatedUrl,
+        jobTitle: job?.title,
+        jobCompany: job?.company,
+        originalResumeId: originalResumeId
+      });
+
+      if (result.success) {
+        console.log('✅ Resume saved successfully:', result.data);
+        
+        // Update the local resumes list to include the new saved resume
+        if (result.data) {
+          setUserResumes(prev => [...prev, result.data!]);
+        }
+        
+        // Show success feedback (you could add a toast notification here)
+        alert('Resume saved successfully! You can find it in your saved resumes.');
+      } else {
+        console.error('❌ Failed to save resume:', result.error);
+        alert('Failed to save resume. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Error saving resume:', error);
+      alert('An error occurred while saving the resume.');
+    }
+  };
+
   const title = job?.title || '';
   const company = job?.company || '';
 
@@ -464,6 +506,7 @@ Join our team and help build the next generation of web applications that serve 
                       window.open(tailoringData.tailoredResumeUrl, '_blank');
                     }
                   }}
+                  onSave={handleSaveResume}
                 />
               )}
 
