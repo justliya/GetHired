@@ -457,12 +457,14 @@ Join our team and help build the next generation of web applications that serve 
                 <DocumentViewer
                   resumeText={tailoringData.tailoredResumeText}
                   resumeUrl={tailoringData.tailoredResumeUrl}
+                  authenticatedUrl={tailoringData.authenticatedUrl}
                   job={job}
                   onCopyText={copySuggestion}
                 />
               ) : tailoringData.tailoredResumeUrl ? (
                 <EnhancedDocumentViewer
                   documentUrl={tailoringData.tailoredResumeUrl}
+                  authenticatedUrl={tailoringData.authenticatedUrl}
                   job={job}
                   onDownload={() => {
                     if (tailoringData.tailoredResumeUrl) {

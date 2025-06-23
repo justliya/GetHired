@@ -10,6 +10,7 @@ interface Job {
 interface DocumentViewerProps {
   resumeText: string;
   resumeUrl?: string;
+  authenticatedUrl?: string;
   job?: Job | null;
   onCopyText: (text: string) => void;
 }
@@ -17,6 +18,7 @@ interface DocumentViewerProps {
 const DocumentViewer: React.FC<DocumentViewerProps> = ({
   resumeText,
   resumeUrl,
+  authenticatedUrl,
   job,
   onCopyText
 }) => {
@@ -36,10 +38,10 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
           >
             <Copy className="w-4 h-4 mr-1" /> Copy Text
           </button>
-          {resumeUrl && (
+          {(resumeUrl || authenticatedUrl) && (
             <>
               <a
-                href={resumeUrl}
+                href={resumeUrl || authenticatedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-3 py-1 rounded-md flex items-center text-sm hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
@@ -47,7 +49,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 <Download className="w-4 h-4 mr-1" /> Download DOCX
               </a>
               <a
-                href={resumeUrl}
+                href={resumeUrl || authenticatedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-md flex items-center text-sm hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors"

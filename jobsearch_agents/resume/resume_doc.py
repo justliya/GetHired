@@ -64,58 +64,11 @@ def create_unique_filename(job_position_title: str, user_id: str) -> str:
     return filename
 
 
-def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> dict:
-    """Upload file to Firebase Storage and return multiple URL formats"""
-    try:
-        initialize_firebase()
-        bucket = storage.bucket()
-        storage_path = f"resumes/{user_id}/{filename}"
-        
-        logger.info("Uploading to Firebase Storage: %s", storage_path)
-        
-        blob = bucket.blob(storage_path)
-        blob.metadata = {
-            'uploadedBy': user_id,
-            'uploadTime': datetime.now().isoformat(),
-            'fileType': 'tailored_resume',
-            'originalName': filename
-        }
-        
-        blob.upload_from_filename(file_path)
-        blob.make_public()
-        
-        # Generate multiple URL formats
-        public_url = blob.public_url
-        firebase_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{storage_path.replace('/', '%2F')}?alt=media"
-        direct_gcs_url = f"https://storage.googleapis.com/{bucket.name}/{storage_path}"
-        
-        logger.info("Successfully uploaded resume to Firebase Storage: %s", storage_path)
-        logger.info("Firebase public URL: %s", public_url)
-        logger.info("Firebase download URL: %s", firebase_url)
-        logger.info("Direct GCS URL: %s", direct_gcs_url)
-        
-        return {
-            "success": True,
-            "public_url": public_url,
-            "firebase_url": firebase_url,
-            "gcs_url": direct_gcs_url,
-            "authenticated_url": firebase_url,
-            "storage_path": storage_path,
-            "bucket": bucket.name
-        }
-        
-    except (OSError, IOError) as e:
-        logger.error("IO error uploading to Firebase Storage: %s", e)
-        logger.info("Falling back to GCS direct upload...")
-        return upload_to_gcs_direct(file_path, filename, user_id)
-    except Exception as e:
-        logger.error("Unexpected error uploading to Firebase Storage: %s", e)
-        logger.info("Falling back to GCS direct upload...")
-        return upload_to_gcs_direct(file_path, filename, user_id)
+# Firebase storage upload removed - now using only GCS direct upload
 
 
 def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
-    """Direct Google Cloud Storage upload as fallback"""
+    """Direct Google Cloud Storage upload with multiple URL formats"""
     try:
         bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
         client = gcs.Client()
@@ -132,14 +85,14 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         blob.upload_from_filename(file_path)
         blob.make_public()
         
-        # Generate multiple URL formats for GCS
+        # Generate multiple URL formats for maximum compatibility
         public_url = blob.public_url
         direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
         firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
         
-        # Generate signed URL for authenticated access (valid for 1 hour)
+        # Generate signed URL for authenticated access (valid for 24 hours)
         from datetime import timedelta
-        signed_url = blob.generate_signed_url(expiration=timedelta(hours=1))
+        signed_url = blob.generate_signed_url(expiration=timedelta(hours=24))
         
         logger.info("Successfully uploaded resume to GCS: %s", storage_path)
         logger.info("Public URL: %s", public_url)
@@ -365,8 +318,8 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         else:
             raise FileNotFoundError("Temporary document file was not created")
         
-        logger.info("☁️  Uploading to Firebase Storage...")
-        upload_result = upload_to_firebase_storage(temp_file_path, filename, user_id)
+        logger.info("☁️  Uploading to Google Cloud Storage...")
+        upload_result = upload_to_gcs_direct(temp_file_path, filename, user_id)
         
         if not upload_result.get("success", False):
             logger.warning("⚠️  Failed to upload to storage, returning local file info")

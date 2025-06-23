@@ -19,12 +19,14 @@ interface Job {
 
 interface EnhancedDocumentViewerProps {
   documentUrl: string;
+  authenticatedUrl?: string;
   job?: Job | null;
   onDownload?: () => void;
 }
 
 const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   documentUrl,
+  authenticatedUrl,
   job,
   onDownload
 }) => {
@@ -34,6 +36,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewerFallback, setViewerFallback] = useState(0); // 0: primary, 1: fallback 1, 2: fallback 2
+  const [urlFallback, setUrlFallback] = useState(0); // 0: primary URL, 1: authenticated URL
   const [corsFixedUrl, setCorsFixedUrl] = useState<string | null>(null);
 
   // Get file extension to determine document type
@@ -48,10 +51,21 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
     }
   };
 
-  const fileExtension = getFileExtension(documentUrl);
+  // Get the current URL to use (fallback between primary and authenticated)
+  const getCurrentUrl = useCallback(() => {
+    if (urlFallback === 0) {
+      return documentUrl;
+    } else if (urlFallback === 1 && authenticatedUrl) {
+      return authenticatedUrl;
+    }
+    return documentUrl;
+  }, [documentUrl, authenticatedUrl, urlFallback]);
+
+  const currentUrl = getCurrentUrl();
+  const fileExtension = getFileExtension(currentUrl);
 
   // Check if URL is a data URL (base64) - these don't have CORS issues
-  const isDataUrl = documentUrl.startsWith('data:');
+  const isDataUrl = currentUrl.startsWith('data:');
 
   // Convert Firebase Storage URL to direct GCS URL for better CORS compatibility
   const createCorsFixedUrl = useCallback((url: string): string => {
@@ -86,18 +100,18 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
   // Update CORS-fixed URL when document URL changes
   useEffect(() => {
-    const fixedUrl = createCorsFixedUrl(documentUrl);
+    const fixedUrl = createCorsFixedUrl(currentUrl);
     setCorsFixedUrl(fixedUrl);
-    console.log('🔗 Original URL:', documentUrl);
+    console.log('🔗 Original URL:', currentUrl);
     console.log('🔧 CORS-fixed URL:', fixedUrl);
-  }, [documentUrl, createCorsFixedUrl]);
+  }, [currentUrl, createCorsFixedUrl]);
   
   const isWordDoc = ['doc', 'docx'].includes(fileExtension);
   const isPdf = fileExtension === 'pdf';
 
   // Generate viewer URL based on document type with fallback options
   const getViewerUrl = useCallback(() => {
-    const urlToUse = corsFixedUrl || documentUrl;
+    const urlToUse = corsFixedUrl || currentUrl;
     
     // If it's a data URL, return directly (no external viewer needed)
     if (isDataUrl) {
@@ -121,11 +135,14 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
     } else if (isPdf) {
       switch (viewerFallback) {
         case 0:
-          // Primary: Direct PDF viewing
-          return urlToUse;
+          // Primary: Direct PDF viewing with embedded PDF viewer
+          return `${urlToUse}#toolbar=0&navpanes=0&scrollbar=0`;
         case 1:
           // Fallback: Google Drive viewer for PDFs
           return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(urlToUse)}`;
+        case 2:
+          // Fallback 2: Mozilla PDF.js viewer
+          return `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(urlToUse)}`;
         default:
           return urlToUse;
       }
@@ -144,7 +161,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
           return urlToUse;
       }
     }
-  }, [documentUrl, corsFixedUrl, isWordDoc, isPdf, viewerFallback, isDataUrl]);
+  }, [corsFixedUrl, currentUrl, isWordDoc, isPdf, viewerFallback, isDataUrl]);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 25, 300));
@@ -164,7 +181,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
   const handleDownload = async () => {
     try {
-      const urlToDownload = corsFixedUrl || documentUrl;
+      const urlToDownload = corsFixedUrl || currentUrl;
       
       // Handle data URLs differently
       if (isDataUrl) {
@@ -192,7 +209,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
     } catch (err) {
       console.error('Download failed:', err);
       // Fallback: open in new tab
-      window.open(corsFixedUrl || documentUrl, '_blank');
+      window.open(corsFixedUrl || currentUrl, '_blank');
     }
   };
 
@@ -219,10 +236,20 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const handleIframeError = () => {
     setIsLoading(false);
     
-    // Try fallback viewers before showing error
+    // First try alternative URL if available
+    if (urlFallback === 0 && authenticatedUrl) {
+      console.log('Primary URL failed, trying authenticated URL');
+      setUrlFallback(1);
+      setIsLoading(true);
+      setError(null);
+      return;
+    }
+    
+    // Then try fallback viewers before showing error
     if (viewerFallback < 2) {
-      console.log(`Primary viewer failed, trying fallback ${viewerFallback + 1}`);
+      console.log(`Viewer failed, trying fallback ${viewerFallback + 1}`);
       setViewerFallback(prev => prev + 1);
+      setUrlFallback(0); // Reset URL fallback when trying new viewer
       setIsLoading(true);
       setError(null);
       return;
@@ -232,7 +259,12 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   };
 
   const handleTryAlternativeViewer = () => {
-    setViewerFallback(prev => (prev + 1) % 3);
+    if (viewerFallback < 2) {
+      setViewerFallback(prev => prev + 1);
+    } else {
+      setViewerFallback(0);
+    }
+    setUrlFallback(0); // Reset URL fallback when trying new viewer
     setIsLoading(true);
     setError(null);
   };
@@ -315,7 +347,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
           </button>
 
           <a
-            href={corsFixedUrl || documentUrl}
+            href={corsFixedUrl || currentUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -359,6 +391,11 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 {error}
               </p>
+              {authenticatedUrl && urlFallback === 0 && (
+                <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">
+                  Trying authenticated URL fallback...
+                </p>
+              )}
               <div className="space-x-2">
                 <button
                   onClick={handleTryAlternativeViewer}
@@ -375,7 +412,7 @@ const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
                   Download Document
                 </button>
                 <a
-                  href={corsFixedUrl || documentUrl}
+                  href={corsFixedUrl || currentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
