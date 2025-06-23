@@ -97,7 +97,7 @@ jobs:
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --image=${{ needs.build.outputs.image }} \
-            --update-secrets=$SA_PATH=firebase-service-account-key:latest \
+            --update-secrets=${{secrets.SA_PATH}}=firebase-service-account-key:latest \
             --port=8080 \
             --platform=managed \
             --allow-unauthenticated \
