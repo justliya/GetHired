@@ -1,6 +1,21 @@
 import { db, auth, storage } from '../firebase';
-import { doc, setDoc, getDoc, collection, addDoc, getDocs, DocumentReference, type DocumentData } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, getBlob } from 'firebase/storage';
+import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  addDoc, 
+  getDocs, 
+  DocumentReference, 
+  type DocumentData 
+} from 'firebase/firestore';
+import { 
+  ref, 
+  uploadBytes, 
+  getDownloadURL, 
+  getBlob,
+  getStorage 
+} from 'firebase/storage';
 import type { 
   JobPreferences, 
   Resume,
@@ -12,7 +27,22 @@ import type {
   UserData 
 } from '../models/UserData';
 
-// Default data structures
+interface UploadResult {
+  success: boolean;
+  fileUrl?: string;
+  downloadUrl?: string;
+  uploadMethod?: 'gcs' | 'firebase' | 'dataurl' | 'failed';
+  error?: string;
+}
+
+interface ServiceResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+const GCS_PRIMARY_BUCKET = 'gethired-resume-uploads';
+
 const defaultJobPreferences: JobPreferences = {
   titles: [],
   locations: [],
@@ -42,7 +72,249 @@ const getCurrentUserId = () => {
   return user.uid;
 };
 
-export const updateUserPreferences = async (userId: string, preferences: JobPreferences) => {
+const generateSafeFileName = (fileName: string, userId: string): string => {
+  const timestamp = Date.now();
+  const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  return `resumes/${userId}/${timestamp}_${safeFileName}`;
+};
+
+const convertToDirectGCSUrl = (firebaseUrl: string): string => {
+  try {
+    if (firebaseUrl.includes('storage.googleapis.com') && !firebaseUrl.includes('firebasestorage.googleapis.com')) {
+      return firebaseUrl;
+    }
+    
+    if (firebaseUrl.includes('firebasestorage.googleapis.com')) {
+      const urlObj = new URL(firebaseUrl);
+      const pathMatch = urlObj.pathname.match(/\/v0\/b\/(.+?)\/o\/(.+)/);
+      if (pathMatch) {
+        const [, bucket, encodedPath] = pathMatch;
+        const decodedPath = decodeURIComponent(encodedPath);
+        return `https://storage.googleapis.com/${bucket}/${decodedPath}`;
+      }
+    }
+
+    return firebaseUrl;
+  } catch (error) {
+    console.error('Failed to convert URL:', error);
+    return firebaseUrl;
+  }
+};
+
+const uploadToGCSBucket = async (file: File, userId: string): Promise<UploadResult> => {
+  try {
+    const uploadPath = generateSafeFileName(file.name, userId);
+    const gcsStorage = getStorage(undefined, `gs://${GCS_PRIMARY_BUCKET}`);
+    const storageRef = ref(gcsStorage, uploadPath);
+    
+    const uploadResult = await uploadBytes(storageRef, file, {
+      contentType: file.type,
+      cacheControl: 'public, max-age=31536000',
+      customMetadata: {
+        'publicAccess': 'true',
+        'uploadedBy': userId,
+        'uploadTimestamp': Date.now().toString()
+      }
+    });
+    
+    const downloadUrl = await getDownloadURL(uploadResult.ref);
+    const publicUrl = `https://storage.googleapis.com/${GCS_PRIMARY_BUCKET}/${uploadPath}`;
+    
+    return {
+      success: true,
+      fileUrl: downloadUrl,
+      downloadUrl: publicUrl,
+      uploadMethod: 'gcs'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'GCS upload failed',
+      uploadMethod: 'failed'
+    };
+  }
+};
+
+const uploadToFirebaseStorage = async (file: File, userId: string): Promise<UploadResult> => {
+  try {
+    const uploadPath = generateSafeFileName(file.name, userId);
+    const storageRef = ref(storage, uploadPath);
+    const uploadResult = await uploadBytes(storageRef, file);
+    const downloadUrl = await getDownloadURL(uploadResult.ref);
+    
+    return {
+      success: true,
+      fileUrl: downloadUrl,
+      downloadUrl: downloadUrl,
+      uploadMethod: 'firebase'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Firebase upload failed',
+      uploadMethod: 'failed'
+    };
+  }
+};
+
+const createDataUrlFallback = async (file: File): Promise<UploadResult> => {
+  try {
+    const reader = new FileReader();
+    const dataUrlPromise = new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    
+    const dataUrl = await dataUrlPromise;
+    
+    return {
+      success: true,
+      fileUrl: dataUrl,
+      downloadUrl: dataUrl,
+      uploadMethod: 'dataurl'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Data URL creation failed',
+      uploadMethod: 'failed'
+    };
+  }
+};
+
+const uploadFileWithFallback = async (file: File, userId: string): Promise<UploadResult> => {
+  // GCS-first strategy
+  const gcsResult = await uploadToGCSBucket(file, userId);
+  if (gcsResult.success) {
+    return gcsResult;
+  }
+  
+  // Firebase fallback
+  const firebaseResult = await uploadToFirebaseStorage(file, userId);
+  if (firebaseResult.success) {
+    return firebaseResult;
+  }
+  
+  // Data URL fallback
+  const dataUrlResult = await createDataUrlFallback(file);
+  if (dataUrlResult.success) {
+    return dataUrlResult;
+  }
+  
+  return {
+    success: false,
+    error: `All upload strategies failed. GCS: ${gcsResult.error}, Firebase: ${firebaseResult.error}, DataURL: ${dataUrlResult.error}`,
+    uploadMethod: 'failed'
+  };
+};
+
+export const uploadResume = async (
+  userId: string, 
+  file: File, 
+  metadata?: Partial<Resume['metadata']>
+): Promise<ServiceResponse<Resume & { id: string }>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+
+    const uploadResult = await uploadFileWithFallback(file, userId);
+    
+    if (!uploadResult.success) {
+      return {
+        success: false,
+        error: uploadResult.error || 'Upload failed'
+      };
+    }
+
+    const meta: Resume['metadata'] = {
+      title: metadata?.title || file.name,
+      uploadSource: (uploadResult.uploadMethod === 'firebase' ? 'firebase' : 
+                    uploadResult.uploadMethod === 'gcs' ? 'public' : 
+                    uploadResult.uploadMethod === 'dataurl' ? 'base64' : 'manual') as ResumeUploadSource,
+      isOriginal: metadata?.isOriginal ?? true,
+      keywords: metadata?.keywords || [],
+      ...(metadata?.description && { description: metadata.description }),
+      ...(metadata?.relatedJobId && { relatedJobId: metadata.relatedJobId }),
+      ...(metadata?.relatedCompany && { relatedCompany: metadata.relatedCompany }),
+      ...(metadata?.relatedRole && { relatedRole: metadata.relatedRole }),
+      ...(metadata?.originalResumeId && { originalResumeId: metadata.originalResumeId }),
+      ...(metadata?.customizations && { customizations: metadata.customizations })
+    };
+
+    const resumeData: Resume = {
+      fileUrl: uploadResult.fileUrl!,
+      publicUrl: uploadResult.downloadUrl || uploadResult.fileUrl!,
+      createdAt: new Date().toISOString(),
+      type: meta.isOriginal ? 'original' : 'tailored',
+      metadata: meta
+    };
+
+    try {
+      const resumesRef = collection(db, 'users', userId, 'resumes');
+      const docRef = await addDoc(resumesRef, resumeData);
+
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserData;
+        const updatedResumes = [...(userData.resumes || []), { ...resumeData, id: docRef.id }];
+        
+        await setDoc(userRef, { 
+          resumes: updatedResumes 
+        }, { merge: true });
+      }
+      
+      return { 
+        success: true, 
+        data: { id: docRef.id, ...resumeData } 
+      };
+    } catch {
+      return { 
+        success: true, 
+        data: { id: `temp_${Date.now()}`, ...resumeData } 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+};
+
+export const getUserResumes = async (userId: string): Promise<ServiceResponse<(Resume & { id: string })[]>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+    
+    const resumesRef = collection(db, 'users', userId, 'resumes');
+    const snapshot = await getDocs(resumesRef);
+    
+    const resumes = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Resume
+    }));
+
+    return { success: true, data: resumes };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      data: [] 
+    };
+  }
+};
+
+export const updateUserPreferences = async (
+  userId: string, 
+  preferences: JobPreferences
+): Promise<ServiceResponse<JobPreferences>> => {
   try {
     const currentUserId = getCurrentUserId();
     if (currentUserId !== userId) {
@@ -51,27 +323,22 @@ export const updateUserPreferences = async (userId: string, preferences: JobPref
     
     const userRef = doc(db, 'users', userId);
     
-    // Get existing user data
     const userDoc = await getDoc(userRef);
     if (!userDoc.exists()) {
       throw new Error('User document not found');
     }
     
-    // Update only the jobPreferences field
     await setDoc(userRef, {
       jobPreferences: preferences
     }, { merge: true });
 
-    // Handle scheduled search if enabled
     if (preferences.searchSchedule?.enabled) {
       try {
         const { createScheduledSearch, getUserScheduledSearches, updateScheduledSearch } = await import('./scheduledSearchService');
         
-        // Check if user already has a scheduled search
         const existingSearches = await getUserScheduledSearches(userId);
         
         if (existingSearches.success && existingSearches.data && existingSearches.data.length > 0) {
-          // Update existing scheduled search
           const existing = existingSearches.data[0];
           await updateScheduledSearch({
             scheduleId: existing.id!,
@@ -79,7 +346,6 @@ export const updateUserPreferences = async (userId: string, preferences: JobPref
             schedule: preferences.searchSchedule
           });
         } else {
-          // Create new scheduled search
           await createScheduledSearch({
             userId,
             preferences,
@@ -88,25 +354,22 @@ export const updateUserPreferences = async (userId: string, preferences: JobPref
         }
       } catch (scheduleError) {
         console.error('Failed to update scheduled search:', scheduleError);
-        // Don't fail the entire preference update if scheduled search fails
       }
     }
     
     return { success: true, data: preferences };
   } catch (error) {
-    console.error('Failed to update user preferences:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
 
-export const getUserPreferences = async (userId: string) => {
+export const getUserPreferences = async (userId: string): Promise<ServiceResponse<JobPreferences>> => {
   try {
     const currentUserId = getCurrentUserId();
     if (currentUserId !== userId) {
       throw new Error('Unauthorized access to user data');
     }
     
-    // Get from main user document
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
     
@@ -118,13 +381,11 @@ export const getUserPreferences = async (userId: string) => {
       };
     }
     
-    // Return default if user doesn't exist
     return { 
       success: true,
       data: defaultJobPreferences
     };
   } catch (error) {
-    console.error('Error getting preferences:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -151,13 +412,9 @@ export const initializeUserData = async (
       jobSearches: []
     };
 
-    // Create main user document
     await setDoc(userRef, userData);
-
-    console.log('Successfully initialized user data structure');
     return { success: true };
   } catch (error) {
-    console.error('Failed to initialize user data:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -165,300 +422,7 @@ export const initializeUserData = async (
   }
 };
 
-export const uploadResume = async (userId: string, file: File, metadata?: Partial<Resume['metadata']>) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-
-    // Upload file to storage with timestamp
-    const timestamp = Date.now();
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storageRef = ref(storage, `resumes/${userId}/${timestamp}_${safeFileName}`);
-    
-    const uploadResult = await uploadBytes(storageRef, file);
-    const fileUrl = await getDownloadURL(uploadResult.ref);
-
-    // Prepare metadata
-    const meta: Resume['metadata'] = {
-      title: metadata?.title || file.name,
-      uploadSource: metadata?.uploadSource || 'manual',
-      isOriginal: metadata?.isOriginal ?? true,
-      keywords: metadata?.keywords || [],
-      ...(metadata?.description && { description: metadata.description }),
-      ...(metadata?.relatedJobId && { relatedJobId: metadata.relatedJobId }),
-      ...(metadata?.relatedCompany && { relatedCompany: metadata.relatedCompany }),
-      ...(metadata?.relatedRole && { relatedRole: metadata.relatedRole }),
-      ...(metadata?.originalResumeId && { originalResumeId: metadata.originalResumeId }),
-      ...(metadata?.customizations && { customizations: metadata.customizations })
-    };
-
-    const resumeData: Resume = {
-      fileUrl,
-      publicUrl: getPublicUrlFromDownloadUrl(fileUrl), // Store both URLs
-      createdAt: new Date().toISOString(),
-      type: meta.isOriginal ? 'original' : 'tailored',
-      metadata: meta
-    };
-
-    // Save to resumes subcollection
-    const resumesRef = collection(db, 'users', userId, 'resumes');
-    const docRef = await addDoc(resumesRef, resumeData);
-
-    // Also update the resumes array in main document
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data() as UserData;
-      const updatedResumes = [...(userData.resumes || []), { ...resumeData, id: docRef.id }];
-      
-      await setDoc(userRef, { 
-        resumes: updatedResumes 
-      }, { merge: true });
-    }
-
-    return { success: true, data: { id: docRef.id, ...resumeData } };
-  } catch (error) {
-    console.error('Failed to upload resume:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
-export const getUserResumes = async (userId: string) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    // Get from subcollection
-    const resumesRef = collection(db, 'users', userId, 'resumes');
-    const snapshot = await getDocs(resumesRef);
-    
-    const resumes = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Resume
-    }));
-
-    return { success: true, data: resumes };
-  } catch (error) {
-    console.error('Failed to fetch user resumes:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      data: [] 
-    };
-  }
-};
-
-// Applications
-export const addApplication = async (userId: string, application: Application) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const applicationsRef = collection(db, 'users', userId, 'applications');
-    const docRef = await addDoc(applicationsRef, {
-      ...application,
-      updatedAt: new Date().toISOString()
-    });
-    
-    return { success: true, data: { id: docRef.id, ...application } };
-  } catch (error) {
-    console.error('Failed to add application:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
-export const updateApplication = async (userId: string, applicationId: string, application: Partial<Application>) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const applicationRef = doc(db, 'users', userId, 'applications', applicationId);
-    await setDoc(applicationRef, {
-      ...application,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to update application:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
-export const getApplications = async (userId: string) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const applicationsRef = collection(db, 'users', userId, 'applications');
-    const snapshot = await getDocs(applicationsRef);
-    const applications = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Application
-    }));
-    
-    return { success: true, data: applications };
-  } catch (error) {
-    console.error('Failed to fetch applications:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      data: [] 
-    };
-  }
-};
-
-// Job Listings
-export const addJobListing = async (userId: string, jobListing: JobListing) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const jobListingsRef = collection(db, 'users', userId, 'jobListings');
-    const docRef = await addDoc(jobListingsRef, jobListing);
-    
-    return { success: true, data: { id: docRef.id, ...jobListing } };
-  } catch (error) {
-    console.error('Failed to add job listing:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
-export const getJobListings = async (userId: string) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const jobListingsRef = collection(db, 'users', userId, 'jobListings');
-    const snapshot = await getDocs(jobListingsRef);
-    const jobListings = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as JobListing
-    }));
-    
-    return { success: true, data: jobListings };
-  } catch (error) {
-    console.error('Failed to fetch job listings:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      data: [] 
-    };
-  }
-};
-
-// Job Searches
-export const addJobSearch = async (userId: string, jobSearch: JobSearch) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const jobSearchesRef = collection(db, 'users', userId, 'jobSearches');
-    const docRef = await addDoc(jobSearchesRef, {
-      ...jobSearch,
-      initiatedAt: new Date().toISOString()
-    });
-    
-    return { success: true, data: { id: docRef.id, ...jobSearch } };
-  } catch (error) {
-    console.error('Failed to add job search:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
-export const getJobSearches = async (userId: string) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const jobSearchesRef = collection(db, 'users', userId, 'jobSearches');
-    const snapshot = await getDocs(jobSearchesRef);
-    const jobSearches = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as JobSearch
-    }));
-    
-    return { success: true, data: jobSearches };
-  } catch (error) {
-    console.error('Failed to fetch job searches:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      data: [] 
-    };
-  }
-};
-
-// User Profile Update
-export const updateUserProfile = async (userId: string, profile: Partial<Profile>) => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-    
-    const userRef = doc(db, 'users', userId);
-    
-    // Get existing data to merge properly
-    const userDoc = await getDoc(userRef);
-    if (!userDoc.exists()) {
-      throw new Error('User document not found');
-    }
-    
-    const existingData = userDoc.data() as UserData;
-    const updatedProfile = {
-      ...existingData.profile,
-      ...profile
-    };
-    
-    await setDoc(userRef, { profile: updatedProfile }, { merge: true });
-    
-    return { success: true, data: updatedProfile };
-  } catch (error) {
-    console.error('Failed to update profile:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
-  }
-};
-
-// Get complete user data
-export const getUserData = async (userId: string) => {
+export const getUserData = async (userId: string): Promise<ServiceResponse<UserData>> => {
   try {
     const currentUserId = getCurrentUserId();
     if (currentUserId !== userId) {
@@ -477,7 +441,6 @@ export const getUserData = async (userId: string) => {
       };
     }
   } catch (error) {
-    console.error('Failed to get user data:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -485,141 +448,107 @@ export const getUserData = async (userId: string) => {
   }
 };
 
-// Utility function to convert Firebase download URL to public URL for agent processing
-export const getPublicUrlFromDownloadUrl = (downloadUrl: string): string => {
+export const updateUserProfile = async (
+  userId: string, 
+  profile: Partial<Profile>
+): Promise<ServiceResponse<Profile>> => {
   try {
-    // Firebase Storage download URLs have the format:
-    // https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media&token={token}
-    // Public URLs have the format:
-    // https://storage.googleapis.com/{bucket}/{path}
-    
-    const url = new URL(downloadUrl);
-    
-    // Check if it's a Firebase Storage download URL
-    if (url.hostname === 'firebasestorage.googleapis.com') {
-      // Extract bucket and path from the URL
-      const pathParts = url.pathname.split('/');
-      if (pathParts.length >= 4 && pathParts[1] === 'v0' && pathParts[2] === 'b') {
-        const bucket = pathParts[3];
-        const encodedPath = pathParts.slice(5).join('/'); // Skip 'v0', 'b', bucket, 'o'
-        const decodedPath = decodeURIComponent(encodedPath);
-        
-        // Return public URL format
-        return `https://storage.googleapis.com/${bucket}/${decodedPath}`;
-      }
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
     }
     
-    // If it's already a public URL or not a Firebase Storage URL, return as is
-    return downloadUrl;
-  } catch (error) {
-    console.warn('Failed to convert download URL to public URL:', error);
-    return downloadUrl; // Return original URL as fallback
-  }
-};
-
-// Function to safely fetch resume content that handles CORS issues
-export const getResumeContent = async (resumeUrl: string): Promise<{
-  success: boolean;
-  data?: Blob;
-  downloadUrl?: string;
-  error?: string;
-}> => {
-  try {
-    // If it's a Firebase Storage URL, try to use Firebase SDK first
-    if (resumeUrl.includes('firebasestorage.googleapis.com')) {
-      try {
-        // Extract the storage path from the Firebase Storage URL
-        const url = new URL(resumeUrl);
-        const pathParts = url.pathname.split('/');
-        
-        if (pathParts.length >= 4 && pathParts[1] === 'v0' && pathParts[2] === 'b') {
-          const encodedPath = pathParts.slice(5).join('/'); // Skip 'v0', 'b', bucket, 'o'
-          const decodedPath = decodeURIComponent(encodedPath);
-          
-          // Create a reference to the file
-          const storageRef = ref(storage, decodedPath);
-          
-          // Get the blob using Firebase SDK (this handles auth properly)
-          const blob = await getBlob(storageRef);
-          
-          return {
-            success: true,
-            data: blob,
-            downloadUrl: resumeUrl
-          };
-        }
-      } catch (firebaseError) {
-        console.warn('Firebase SDK access failed:', firebaseError);
-        
-        // For agent processing, return the download URL as-is
-        // Agents can access Firebase Storage URLs server-side without CORS issues
-        return {
-          success: true,
-          downloadUrl: resumeUrl,
-          error: 'File content not accessible from browser, but download URL available for server-side processing'
-        };
-      }
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      throw new Error('User document not found');
     }
     
-    // For non-Firebase URLs or as a fallback, return the URL for server-side processing
-    return {
-      success: true,
-      downloadUrl: resumeUrl,
-      error: 'File accessible via server-side processing only'
+    const existingData = userDoc.data() as UserData;
+    const updatedProfile = {
+      ...existingData.profile,
+      ...profile
     };
     
+    await setDoc(userRef, { profile: updatedProfile }, { merge: true });
+    
+    return { success: true, data: updatedProfile };
   } catch (error) {
-    console.error('Failed to get resume content:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
 };
 
-// Enhanced function to get resume URL that's safe for different use cases
-export const getResumeUrlForContext = (resume: Resume, context: 'user' | 'agent' | 'download'): string => {
-  switch (context) {
-    case 'user':
-      // For user viewing in UI (including external viewers like Office Online), 
-      // use authenticated download URL which has better cross-origin support
-      return resume.fileUrl;
-    case 'agent':
-      // For agent processing, use authenticated download URL
-      // Server-side agents can access this without CORS restrictions
-      return resume.fileUrl;
-    case 'download':
-      // For downloads, use authenticated URL to ensure access
-      return resume.fileUrl;
-    default:
-      return resume.fileUrl;
+export const addApplication = async (
+  userId: string, 
+  application: Application
+): Promise<ServiceResponse<Application & { id: string }>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+    
+    const applicationsRef = collection(db, 'users', userId, 'applications');
+    const docRef = await addDoc(applicationsRef, {
+      ...application,
+      updatedAt: new Date().toISOString()
+    });
+    
+    return { success: true, data: { id: docRef.id, ...application } };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
   }
 };
 
-// Enhanced function to get user resumes with public URL option
-export const getUserResumesWithPublicUrls = async (userId: string, usePublicUrls: boolean = false) => {
+export const updateApplication = async (
+  userId: string, 
+  applicationId: string, 
+  application: Partial<Application>
+): Promise<ServiceResponse<void>> => {
   try {
-    const result = await getUserResumes(userId);
-    
-    if (!result.success || !result.data) {
-      return result;
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
     }
     
-    // If public URLs are requested, convert download URLs to public URLs
-    if (usePublicUrls) {
-      const resumesWithPublicUrls = result.data.map(resume => ({
-        ...resume,
-        fileUrl: getPublicUrlFromDownloadUrl(resume.fileUrl),
-        // Add a separate field for the public URL to maintain both
-        publicUrl: getPublicUrlFromDownloadUrl(resume.fileUrl)
-      }));
-      
-      return { success: true, data: resumesWithPublicUrls };
-    }
+    const applicationRef = doc(db, 'users', userId, 'applications', applicationId);
+    await setDoc(applicationRef, {
+      ...application,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
     
-    return result;
+    return { success: true };
   } catch (error) {
-    console.error('Failed to fetch user resumes with public URLs:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+};
+
+export const getApplications = async (userId: string): Promise<ServiceResponse<(Application & { id: string })[]>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+    
+    const applicationsRef = collection(db, 'users', userId, 'applications');
+    const snapshot = await getDocs(applicationsRef);
+    const applications = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Application
+    }));
+    
+    return { success: true, data: applications };
+  } catch (error) {
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -628,143 +557,162 @@ export const getUserResumesWithPublicUrls = async (userId: string, usePublicUrls
   }
 };
 
-// Function to get resume content for client-side access via server proxy
-export const getResumeContentViaProxy = async (resumeUrl: string): Promise<{
-  success: boolean;
-  data?: Blob;
-  proxyUrl?: string;
-  error?: string;
-}> => {
+export const addJobListing = async (
+  userId: string, 
+  jobListing: JobListing
+): Promise<ServiceResponse<JobListing & { id: string }>> => {
   try {
-    // Check if we're in a browser environment
-    if (typeof window === 'undefined') {
-      return {
-        success: false,
-        error: 'Proxy function only available in browser environment'
-      };
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
     }
-
-    // Use the Firebase authenticated download URL for server-side processing
-    // The backend can access this without CORS issues
-    return {
-      success: true,
-      proxyUrl: resumeUrl, // Return the original URL for server-side use
-      error: undefined
-    };
+    
+    const jobListingsRef = collection(db, 'users', userId, 'jobListings');
+    const docRef = await addDoc(jobListingsRef, jobListing);
+    
+    return { success: true, data: { id: docRef.id, ...jobListing } };
   } catch (error) {
-    console.error('Failed to create proxy URL:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
 };
 
-// Function to check if a resume URL is accessible from the client
-export const checkResumeUrlAccess = async (resumeUrl: string): Promise<{
-  success: boolean;
-  accessible: boolean;
-  error?: string;
-}> => {
+export const getJobListings = async (userId: string): Promise<ServiceResponse<(JobListing & { id: string })[]>> => {
   try {
-    // Try a HEAD request to check if the URL is accessible
-    const response = await fetch(resumeUrl, {
-      method: 'HEAD',
-      mode: 'cors',
-      credentials: 'omit'
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+    
+    const jobListingsRef = collection(db, 'users', userId, 'jobListings');
+    const snapshot = await getDocs(jobListingsRef);
+    const jobListings = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as JobListing
+    }));
+    
+    return { success: true, data: jobListings };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      data: [] 
+    };
+  }
+};
+
+export const addJobSearch = async (
+  userId: string, 
+  jobSearch: JobSearch
+): Promise<ServiceResponse<JobSearch & { id: string }>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+    
+    const jobSearchesRef = collection(db, 'users', userId, 'jobSearches');
+    const docRef = await addDoc(jobSearchesRef, {
+      ...jobSearch,
+      initiatedAt: new Date().toISOString()
     });
     
-    return {
-      success: true,
-      accessible: response.ok
-    };
+    return { success: true, data: { id: docRef.id, ...jobSearch } };
   } catch (error) {
-    // CORS errors or other network errors mean the URL is not accessible from client
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+};
+
+export const getJobSearches = async (userId: string): Promise<ServiceResponse<(JobSearch & { id: string })[]>> => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (currentUserId !== userId) {
+      throw new Error('Unauthorized access to user data');
+    }
+    
+    const jobSearchesRef = collection(db, 'users', userId, 'jobSearches');
+    const snapshot = await getDocs(jobSearchesRef);
+    const jobSearches = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as JobSearch
+    }));
+    
+    return { success: true, data: jobSearches };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      data: [] 
+    };
+  }
+};
+
+export const getPublicUrlFromDownloadUrl = (downloadUrl: string): string => {
+  return convertToDirectGCSUrl(downloadUrl);
+};
+
+export const getBestDownloadUrl = (originalUrl: string): string => {
+  if (originalUrl.includes('firebasestorage.googleapis.com') && originalUrl.includes('token=')) {
+    return originalUrl;
+  }
+  return convertToDirectGCSUrl(originalUrl);
+};
+
+export const getResumeContent = async (resumeUrl: string): Promise<{
+  success: boolean;
+  data?: Blob;
+  downloadUrl?: string;
+  error?: string;
+}> => {
+  try {
+    if (resumeUrl.includes('firebasestorage.googleapis.com')) {
+      try {
+        const url = new URL(resumeUrl);
+        const pathParts = url.pathname.split('/');
+        
+        if (pathParts.length >= 4 && pathParts[1] === 'v0' && pathParts[2] === 'b') {
+          const encodedPath = pathParts.slice(5).join('/');
+          const decodedPath = decodeURIComponent(encodedPath);
+          
+          const storageRef = ref(storage, decodedPath);
+          const blob = await getBlob(storageRef);
+          
+          return {
+            success: true,
+            data: blob,
+            downloadUrl: resumeUrl
+          };
+        }
+      } catch {
+        return {
+          success: true,
+          downloadUrl: resumeUrl,
+          error: 'File content not accessible from browser, but download URL available for server-side processing'
+        };
+      }
+    }
+    
     return {
       success: true,
-      accessible: false,
+      downloadUrl: resumeUrl,
+      error: 'File accessible via server-side processing only'
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 };
 
-// Enhanced upload function with proper fallback strategy
-export const uploadResumeWithFallback = async (userId: string, file: File, metadata?: Partial<Resume['metadata']>) => {
-  try {
-    console.log('🚀 Starting enhanced upload with proper fallback for:', file.name);
-    
-    // Use the new enhanced upload service
-    const { uploadResumeWithProperFallback } = await import('./enhancedUploadService');
-    const uploadResult = await uploadResumeWithProperFallback(file, userId);
-    
-    if (!uploadResult.success) {
-      console.error('❌ Enhanced upload failed:', uploadResult.error);
-      return {
-        success: false,
-        error: uploadResult.error || 'Upload failed'
-      };
-    }
-    
-    console.log('✅ Enhanced upload successful:', uploadResult.uploadMethod);
-    
-    // Create the metadata object
-    const meta: Resume['metadata'] = {
-      title: metadata?.title || file.name,
-      uploadSource: (uploadResult.uploadMethod === 'firebase' ? 'firebase' : 'public') as ResumeUploadSource,
-      isOriginal: metadata?.isOriginal ?? true,
-      keywords: metadata?.keywords || [],
-      ...(metadata?.description && { description: metadata.description }),
-      ...(metadata?.relatedJobId && { relatedJobId: metadata.relatedJobId }),
-      ...(metadata?.relatedCompany && { relatedCompany: metadata.relatedCompany }),
-      ...(metadata?.relatedRole && { relatedRole: metadata.relatedRole }),
-      ...(metadata?.originalResumeId && { originalResumeId: metadata.originalResumeId }),
-      ...(metadata?.customizations && { customizations: metadata.customizations })
-    };
-    
-    // Format the response to match the expected Resume structure
-    const resumeData: Resume & { id: string } = {
-      id: `upload_${Date.now()}`, // Generate a temporary ID
-      fileUrl: uploadResult.fileUrl!,
-      publicUrl: uploadResult.downloadUrl || uploadResult.fileUrl!,
-      createdAt: new Date().toISOString(),
-      type: metadata?.isOriginal ? 'original' : 'tailored',
-      metadata: meta
-    };
-    
-    // Try to save to Firebase Firestore
-    try {
-      const resumesRef = collection(db, 'users', userId, 'resumes');
-      const docRef = await addDoc(resumesRef, resumeData);
-      
-      // Update the ID with the actual Firestore document ID
-      resumeData.id = docRef.id;
-      
-      // Also update the resumes array in main document
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserData;
-        const updatedResumes = [...(userData.resumes || []), resumeData];
-        
-        await setDoc(userRef, { 
-          resumes: updatedResumes 
-        }, { merge: true });
-      }
-      
-      console.log('📄 Resume metadata saved to Firestore with ID:', docRef.id);
-      resumeData.id = docRef.id;
-    } catch (firestoreError) {
-      console.warn('⚠️ Failed to save resume metadata to Firestore:', firestoreError);
-      // Continue with the upload result even if Firestore save fails
-    }
-    
-    return { success: true, data: resumeData };
-  } catch (error) {
-    console.error('❌ Enhanced upload with fallback failed:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Upload failed'
-    };
-  }
+export const getResumeUrlForContext = (resume: Resume): string => {
+  return resume.fileUrl;
 };
+
+export const uploadResumeWithFallback = uploadResume;
