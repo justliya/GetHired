@@ -33,16 +33,11 @@ const statusLabels: Record<JobListing['status'], string> = {
 const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [areQualificationsExpanded, setAreQualificationsExpanded] = useState(false);
+  const [isResearchSelected, setIsResearchSelected] = useState(false);
   const qualifications = job.qualifications ?? [];
   const visibleQualifications = areQualificationsExpanded ? qualifications : qualifications.slice(0, 3);
 
-  const handleViewJob = () => {
-    if (job.jobLink && job.jobLink.trim() !== '') {
-      window.open(job.jobLink, '_blank');
-    } else {
-      alert('No job link available for this position');
-    }
-  };
+
 
   return (
     <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden">
@@ -60,16 +55,15 @@ const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) 
               </p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => onFavoriteToggle(job)}
             className="flex-shrink-0 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
           >
-            <Bookmark 
-              className={`w-5 h-5 transition-colors ${
-                job.favorite 
-                  ? 'text-yellow-500 fill-yellow-500' 
+            <Bookmark
+              className={`w-5 h-5 transition-colors ${job.favorite
+                  ? 'text-yellow-500 fill-yellow-500'
                   : 'text-gray-400 hover:text-yellow-500'
-              }`} 
+                }`}
             />
           </button>
         </div>
@@ -154,8 +148,8 @@ const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) 
             </div>
             <div className="flex flex-wrap gap-2">
               {visibleQualifications.map((qual, index) => (
-                <span 
-                  key={index} 
+                <span
+                  key={index}
                   className="inline-flex items-center bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200"
                   title={qual.length > 30 ? qual : undefined}
                 >
@@ -169,40 +163,34 @@ const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) 
 
       {/* Actions */}
       <div className="px-6 py-4 bg-gray-50 dark:bg-gray-750 border-t border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-evenly w-full">
           <button
-            onClick={handleViewJob}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-              job.jobLink && job.jobLink.trim() !== '' 
-                ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/20' 
-                : 'text-gray-400 cursor-not-allowed'
-            }`}
-            disabled={!job.jobLink || job.jobLink.trim() === ''}
+            onClick={() => window.open(job.jobLink || '#', '_blank')}
+            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium flex items-center gap-1 hover:underline transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
-            View Job
+            Website
           </button>
-          
-          <div className="flex items-center gap-1">
-            <label className="inline-flex items-center space-x-2 text-sm font-medium text-gray-600 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={job.status === 'researching'}
-                onChange={() => {
-                  window.getSelection()?.removeAllRanges();
-                  onResearch(job);
-                }}
-                className="form-checkbox rounded border-gray-300 text-purple-600 dark:border-gray-600 dark:bg-gray-800"
-              />
-              <span>Research</span>
-            </label>
-            <button
-              onClick={() => onDelete(job)}
-              className="px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
-            >
-              Delete
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setIsResearchSelected(true);
+              onResearch(job);
+            }}
+            className={`
+              text-sm font-medium flex items-center gap-1 transition-colors
+              ${isResearchSelected
+                ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-300 rounded-lg px-2 py-1'
+                : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline'}
+            `}
+          >
+            Research
+          </button>
+          <button
+            onClick={() => onDelete(job)}
+            className="px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
