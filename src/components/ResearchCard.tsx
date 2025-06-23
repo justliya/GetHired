@@ -4,7 +4,6 @@ import {
   MapPin,
   Star,
   DollarSign,
-  Bookmark,
   ExternalLink,
   Award,
   TrendingUp,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 
 interface CompanyResearch {
+   jobId:string;
   companyOverview: {
     name: string;
     id: string;
@@ -90,13 +90,10 @@ interface CompanyResearch {
     concerns: string[];
     recommendation: string;
   };
-  favorite?: boolean;
 }
 
 interface ResearchCardProps {
   companyResearch: CompanyResearch;
-  onFavoriteToggle: (company: CompanyResearch) => void;
-  onResearch: (company: CompanyResearch) => void;
   onDelete: (company: CompanyResearch) => void;
   onViewReviews: (company: CompanyResearch) => void;
   variant?: 'compact' | 'detailed';
@@ -217,7 +214,6 @@ const CollapsibleSection: React.FC<{
 
 const ResearchCard: React.FC<ResearchCardProps> = ({
   companyResearch,
-  onFavoriteToggle,
   onDelete,
   onViewReviews,
   variant = 'compact',
@@ -280,12 +276,6 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
               <p className="text-sm opacity-90">{companyOverview.industry}</p>
             </div>
           </div>
-          <button
-            onClick={() => onFavoriteToggle(companyResearch)}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-          >
-            <Bookmark className={`w-5 h-5 ${companyResearch.favorite ? 'text-yellow-300 fill-current' : 'text-white/70'}`} />
-          </button>
         </div>
 
         {/* Header Stats */}

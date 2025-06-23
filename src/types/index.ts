@@ -14,7 +14,8 @@ export interface JobListing {
   favorite: boolean;
   status: string;
 }
-export interface CompanyResearch {
+export interface companyResearch {
+  jobId:string;
   companyOverview: {
     name: string;
     id: string;

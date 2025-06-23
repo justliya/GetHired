@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
+// Dashboard.tsx
+import  { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Briefcase, Building2, FileText, Sparkles,
+  Search,
+  Briefcase,
+  Building2,
+  FileText,
+  Sparkles,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import JobCard from '../components/JobCard';
 import ScheduleStatusDisplay from '../components/ui/ScheduleStatusDisplay';
@@ -19,17 +24,19 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
   const navigate = useNavigate();
   const [searchQuery] = useState('');
   const [jobListings, setJobListings] = useState<JobListing[]>([]);
+  const [showAllSaved, setShowAllSaved] = useState(false);
 
+  // Fetch saved jobs from Firestore
   useEffect(() => {
     const fetchJobs = async () => {
       const user = auth.currentUser;
       if (!user) return;
 
       const snapshot = await getDocs(collection(db, 'users', user.uid, 'jobListings'));
-      const jobs: JobListing[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as JobListing[];
+      const jobs: JobListing[] = snapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<JobListing, 'id'>),
+      }));
 
       setJobListings(jobs);
     };
@@ -37,62 +44,99 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
     fetchJobs();
   }, []);
 
-  const filteredJobs = jobListings.filter(job =>
-    job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    job.company.toLowerCase().includes(searchQuery.toLowerCase())
+  // Handler to delete a saved job
+  const handleDelete = async (job: JobListing) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const jobRef = doc(db, 'users', user.uid, 'jobListings', job.id);
+      await deleteDoc(jobRef);
+      setJobListings(prev => prev.filter(j => j.id !== job.id));
+    } catch (error) {
+      console.error('Error deleting job:', error);
+    }
+  };
+
+  // (Optional) Handler to toggle favorite status locally
+  const handleFavoriteToggle = (job: JobListing) => {
+    setJobListings(prev =>
+      prev.map(j => (j.id === job.id ? { ...j, favorite: !j.favorite } : j))
+    );
+  };
+
+  const filteredJobs = jobListings.filter(
+    job =>
+      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.company.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const stats = [
-    { label: 'Jobs Found', value: jobListings.length, icon: <Search className="w-5 h-5 text-blue-500" /> },
-    { label: 'Applications', value: jobListings.filter(j => j.status === 'applying' || j.status === 'applied').length, icon: <Briefcase className="w-5 h-5 text-purple-500" /> },
-    { label: 'Interviews', value: jobListings.filter(j => j.status === 'interviewing').length, icon: <Building2 className="w-5 h-5 text-teal-500" /> },
-    { label: 'Offers', value: jobListings.filter(j => j.status === 'offered').length, icon: <FileText className="w-5 h-5 text-green-500" /> },
+    {
+      label: 'Jobs Found',
+      value: jobListings.length,
+      icon: <Search className="w-5 h-5 text-blue-500" />,
+    },
+    {
+      label: 'Applications',
+      value: jobListings.filter(
+        j => j.status === 'applying' || j.status === 'applied'
+      ).length,
+      icon: <Briefcase className="w-5 h-5 text-purple-500" />,
+    },
+    {
+      label: 'Interviews',
+      value: jobListings.filter(j => j.status === 'interviewing').length,
+      icon: <Building2 className="w-5 h-5 text-teal-500" />,
+    },
+    {
+      label: 'Offers',
+      value: jobListings.filter(j => j.status === 'offered').length,
+      icon: <FileText className="w-5 h-5 text-green-500" />,
+    },
   ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: { duration: 0.4 },
-    },
+    visible: { y: 0, opacity: 1, transition: { duration: 0.4 } },
   };
 
   return (
     <div className="max-w-7xl mx-auto">
+      {/* Dashboard Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">Track your job search progress</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            Dashboard
+          </h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">
+            Track your job search progress
+          </p>
         </div>
-        <div className="mt-4 md:mt-0">
-          <button
-            onClick={() => onOpenPreferences()}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
-          >
-            <Sparkles className="w-5 h-5 mr-2" />
-            Job Preferences
-          </button>
-        </div>
+        <button
+          onClick={() => onOpenPreferences()}
+          className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-200"
+        >
+          <Sparkles className="w-5 h-5 mr-2" />
+          Job Preferences
+        </button>
       </div>
 
+      {/* Stats */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
       >
-        {stats.map((stat, index) => (
+        {stats.map((stat, idx) => (
           <motion.div
-            key={index}
+            key={idx}
             variants={itemVariants}
             className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 flex items-center"
           >
@@ -100,45 +144,52 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
               {stat.icon}
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.label}</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stat.value}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {stat.label}
+              </p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {stat.value}
+              </p>
             </div>
           </motion.div>
         ))}
       </motion.div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
-
-      </div>
-      {/* Scheduled Searches Section */}
+      {/* Scheduled Searches */}
       <section className="mb-8">
-        <ScheduleStatusDisplay onEditSchedule={(schedule) => onOpenPreferences(schedule)} />
+        <ScheduleStatusDisplay onEditSchedule={onOpenPreferences} />
       </section>
 
+      {/* Saved Jobs */}
       <section className="mb-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Saved Jobs</h2>
-
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Saved Jobs
+          </h2>
+          {filteredJobs.length > 3 && (
+            <button
+              onClick={() => setShowAllSaved(prev => !prev)}
+              className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+            >
+              {showAllSaved ? 'Show Less' : `View All (${filteredJobs.length})`}
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredJobs.slice(0, 3).map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              onFavoriteToggle={() => { }}
-              onResearch={() => { }}
-              onTailorResume={function (): void {
-                throw new Error('Function not implemented.');
-              }}
-              onDelete={function (): void {
-                throw new Error('Function not implemented.');
-              }}
-            />
-          ))}
+          {filteredJobs
+            .slice(0, showAllSaved ? filteredJobs.length : 3)
+            .map(job => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onFavoriteToggle={handleFavoriteToggle}
+                onResearch={() => {}}
+                onTailorResume={() => {}}
+                onDelete={handleDelete}
+              />
+            ))}
         </div>
       </section>
-
-
       {/* AI Agents Section */}
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Your AI Assistants</h2>

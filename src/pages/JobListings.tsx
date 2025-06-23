@@ -27,11 +27,10 @@ interface JobListing {
   description: string;
   qualifications: string[];
   benefits: string[];
-  url: string;
+  jobLink: string;
   easyApply: boolean;
   favorite: boolean;
   status: 'new' | 'viewed' | 'applied' | 'rejected';
-  jobLink?: string;
 }
 
 const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
@@ -145,7 +144,7 @@ export default function JobListings() {
                   [job.qualifications || job.requirements || job.skills] : [],
           benefits: Array.isArray(job.benefits) ? job.benefits :
             (job.benefits) ? [job.benefits] : [],
-          url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
+          jobLink: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
           easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
           favorite: false,
           status: 'new' as const,
@@ -190,7 +189,7 @@ export default function JobListings() {
                         [job.qualifications || job.requirements || job.skills] : [],
                 benefits: Array.isArray(job.benefits) ? job.benefits :
                   (job.benefits) ? [job.benefits] : [],
-                url: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
+                jobLink: job.jobLink || job.job_link || job.url || job.link || job.apply_url || '#',
                 easyApply: Boolean(job.easyApply || job.easy_apply || job.quick_apply),
                 favorite: false,
                 status: 'new' as const,
@@ -609,7 +608,7 @@ export default function JobListings() {
           {user && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
               Welcome {user.email}, after jobs appear select your favorites and the ones you would like to research
-              then click 'Complete Session' when you are done and researched listing will appear in the 'Resume Tailoring' tab!
+              then click 'Complete Session' when you are done and researched listing will appear in the 'Company Research' tab!
             </p>
           )}
         </div>

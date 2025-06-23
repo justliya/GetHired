@@ -1,4 +1,4 @@
-name: Test and Deploy Frontend to Vercel
+name: Deploy Frontend to Vercel
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
