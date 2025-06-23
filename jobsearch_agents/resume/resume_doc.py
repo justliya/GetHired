@@ -106,6 +106,13 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         from datetime import timedelta
         signed_url = blob.generate_signed_url(expiration=timedelta(hours=24), method='GET')
         
+        # Generate cloud console compatible authenticated URL
+        # Format: https://storage.cloud.google.com/bucket/path?authuser=X
+        cloud_console_url = f"https://storage.cloud.google.com/{bucket_name}/{storage_path}?authuser=0"
+        
+        # For authenticated access, prefer the cloud console format, but keep signed URL as backup
+        authenticated_url = cloud_console_url
+        
         # If we can't use public URLs, use signed URL as the primary URL
         if not use_public_urls:
             public_url = signed_url
@@ -115,13 +122,15 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         logger.info("Direct URL: %s", direct_url)
         logger.info("Firebase compatible URL: %s", firebase_compatible_url)
         logger.info("Signed URL: %s", signed_url)
+        logger.info("Cloud Console URL: %s", cloud_console_url)
         
         return {
             "success": True,
             "public_url": public_url,
             "firebase_url": firebase_compatible_url,
             "gcs_url": direct_url,
-            "authenticated_url": signed_url,
+            "authenticated_url": authenticated_url,  # Use cloud console format
+            "signed_url": signed_url,  # Keep signed URL for fallback
             "storage_path": storage_path,
             "bucket": bucket_name
         }

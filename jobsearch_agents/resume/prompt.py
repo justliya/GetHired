@@ -240,12 +240,14 @@ When calling create_formatted_resume, use these parameters:
 You should return the urls to resume that was uploaded to Google cloud storage and the resume text as a JSON Object with the following structure:
 {
   "public_url": "https://storage.googleapis.com/gethired-resumes/...",
-  "authenticated_url": "https://storage.googleapis.com/...", 
+  "authenticated_url": "https://storage.cloud.google.com/gethired-resumes/resumes/user_id/filename.docx?authuser=0", 
   "document_url": "https://storage.googleapis.com/gethired-resumes/...",
   "resume_text": "formatted resume text here",
   "filename": "resume_filename.docx",
   "status": "success"
 }
+
+NOTE: The authenticated_url should use the storage.cloud.google.com domain with the authuser parameter for proper Google Cloud Console access.
 
 Do not return the tool code.
 """

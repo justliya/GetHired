@@ -99,7 +99,7 @@ export const useResumeTailoring = () => {
         
         resumeText = resumeText || (responseData.resume_text as string) || (responseData.final_resume as string) || (responseData.tailored_resume_text as string) || '';
         resumeUrl = resumeUrl || (responseData.document_url as string) || (responseData.download_url as string) || (responseData.tailored_resume_url as string) || '';
-        authenticatedUrl = authenticatedUrl || (responseData.authenticated_url as string) || (responseData.gcs_url as string) || '';
+        authenticatedUrl = authenticatedUrl || (responseData.authenticated_url as string) || (responseData.signed_url as string) || (responseData.gcs_url as string) || '';
         filename = filename || (responseData.filename as string) || '';
         
         if (resumeText !== originalResumeText || resumeUrl !== originalResumeUrl || authenticatedUrl !== originalAuthenticatedUrl || filename !== originalFilename) {

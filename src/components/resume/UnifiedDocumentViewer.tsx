@@ -46,8 +46,8 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
   const [viewerFallback, setViewerFallback] = useState(0);
   const [urlFallback, setUrlFallback] = useState(0);
 
-  // If we only have a URL, show enhanced viewer
-  const currentUrl = urlFallback === 0 ? documentUrl : authenticatedUrl;
+  // Prefer authenticated URL over public URL for security
+  const currentUrl = urlFallback === 0 ? (authenticatedUrl || documentUrl) : documentUrl;
 
   const getFileExtension = (url: string): string => {
     try {
@@ -61,7 +61,7 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
   };
 
   const handleUrlFallback = useCallback(() => {
-    if (urlFallback === 0 && authenticatedUrl) {
+    if (urlFallback === 0 && documentUrl) {
       setUrlFallback(1);
       setError(null);
       setIsLoading(true);
@@ -69,7 +69,7 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
     } else {
       setError('No alternative URLs available');
     }
-  }, [urlFallback, authenticatedUrl]);
+  }, [urlFallback, documentUrl]);
 
   const handleViewerFallback = useCallback(() => {
     setViewerFallback(prev => {
@@ -145,10 +145,10 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
                 <Copy className="w-4 h-4 mr-1" /> Copy Text
               </button>
             )}
-            {(documentUrl || authenticatedUrl) && (
+            {(authenticatedUrl || documentUrl) && (
               <>
                 <a
-                  href={documentUrl || authenticatedUrl}
+                  href={authenticatedUrl || documentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-3 py-1 rounded-md flex items-center text-sm hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
@@ -156,7 +156,7 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
                   <Download className="w-4 h-4 mr-1" /> Download DOCX
                 </a>
                 <a
-                  href={documentUrl || authenticatedUrl}
+                  href={authenticatedUrl || documentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-md flex items-center text-sm hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors"
@@ -165,7 +165,7 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
                 </a>
               </>
             )}
-            {onSave && (documentUrl || authenticatedUrl) && (
+            {onSave && (authenticatedUrl || documentUrl) && (
               <button
                 onClick={onSave}
                 className="bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-3 py-1 rounded-md flex items-center text-sm hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors"
