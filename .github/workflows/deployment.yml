@@ -92,22 +92,20 @@ jobs:
           GOOGLE_CLOUD_LOCATION: 'us-central1'
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           STAGING_BUCKET: 'gethired-staging'
+          SA_PATH: ${{github.workspace}}/${{ secrets.SA_FILE_PATH }}
         run: |
-          # Capture the GOOGLE_APPLICATION_CREDENTIALS path
-          echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
-          
           gcloud run deploy $SERVICE_NAME \
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --image=${{ needs.build.outputs.image }} \
-            --update-secrets=${{secrets.SA_PATH}}=firebase-service-account-key:latest \
+            --update-secrets=$SA_PATH=firebase-service-account-key:latest \
             --port=8080 \
             --platform=managed \
             --allow-unauthenticated \
             --memory=2Gi \
             --cpu=2.0 \
             --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,MCP_SERVER_URL=${{ secrets.MCP_SERVER_URL }},GCS_RESUME_BUCKET=gethired-resumes,GOOGLE_APPLICATION_CREDENTIALS=/secrets/firebase-service-account-key,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT" \
-            --set-env-vars="FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.SA_PATH }}"
+            --set-env-vars="FIREBASE_SERVICE_ACCOUNT_KEY=${{ env.SA_PATH }},MODE=staging,"
 
   deploy-production:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -142,7 +140,7 @@ jobs:
             --project=$GOOGLE_CLOUD_PROJECT \
             --region=$GOOGLE_CLOUD_LOCATION \
             --image=${{ needs.build.outputs.image }} \
-            --update-secrets=${{secrets.SA_PATH}}=firebase-service-account-key:latest \
+            --update-secrets=${{env.SA_PATH}}=firebase-service-account-key:latest \
             --port=8080 \
             --platform=managed \
             --allow-unauthenticated \
