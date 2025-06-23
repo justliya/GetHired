@@ -79,13 +79,25 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         }
         
         blob.upload_from_filename(file_path)
-        blob.make_public()
+        
+        # Try to make public (works with legacy ACL), but handle uniform bucket-level access gracefully
+        try:
+            blob.make_public()
+            logger.debug("Successfully made blob public using ACL")
+            use_public_urls = True
+        except Exception as e:
+            logger.warning("Cannot use make_public() due to uniform bucket-level access: %s", e)
+            use_public_urls = False
         
         # Generate multiple URL formats for maximum compatibility
-        public_url = blob.public_url
-        # Ensure public URL uses https and is properly formatted
-        if public_url.startswith('http://'):
-            public_url = public_url.replace('http://', 'https://')
+        if use_public_urls:
+            public_url = blob.public_url
+            # Ensure public URL uses https and is properly formatted
+            if public_url.startswith('http://'):
+                public_url = public_url.replace('http://', 'https://')
+        else:
+            # For uniform bucket-level access, use signed URLs as primary
+            public_url = None
         
         direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
         firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
@@ -93,6 +105,10 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         # Generate signed URL for authenticated access (valid for 24 hours)
         from datetime import timedelta
         signed_url = blob.generate_signed_url(expiration=timedelta(hours=24), method='GET')
+        
+        # If we can't use public URLs, use signed URL as the primary URL
+        if not use_public_urls:
+            public_url = signed_url
         
         logger.info("Successfully uploaded resume to GCS: %s", storage_path)
         logger.info("Public URL: %s", public_url)
