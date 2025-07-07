@@ -1,4 +1,5 @@
 export interface JobListing {
+  jobId: string;
   id: string;
   listingNumber?: number;
   title: string;

@@ -6,7 +6,6 @@ import { Building2, Grid3X3, List, RefreshCw, Loader2, Briefcase } from 'lucide-
 import { db, auth } from "../firebase";
 import type { CompanyResearch, JobListing } from "../types";
 import { useLocation } from 'react-router-dom';
-
 import ResearchCard from "../components/ResearchCard";
 
 interface EnhancedCompanyResearch extends CompanyResearch {
@@ -31,23 +30,23 @@ const CompanyResearchPage = () => {
     if (!user?.uid) return;
     setLoading(true);
     setError(null);
-    
+
     try {
       let allResearch: EnhancedCompanyResearch[] = [];
-      
+
       // Get active session ID from sessionStorage
       const activeSessionId = sessionStorage.getItem('active-session-id');
       if (activeSessionId) {
         setCurrentSessionId(activeSessionId);
-        
+
         // First, check localStorage for recent research data
         const localDataKey = `companyResearch-${activeSessionId}`;
         const localData = localStorage.getItem(localDataKey);
-        
+
         if (localData) {
           try {
             const parsedLocalData = JSON.parse(localData);
-            
+
             // Data is already pre-parsed as an array
             if (Array.isArray(parsedLocalData)) {
               allResearch = parsedLocalData.map(research => ({
@@ -59,11 +58,11 @@ const CompanyResearchPage = () => {
             console.error('Failed to parse localStorage data:', err);
           }
         }
-        
+
         // Load from Firebase using session ID
         const researchRef = doc(db, 'users', user.uid, 'companyResearch', activeSessionId);
         const researchSnap = await getDoc(researchRef);
-        
+
         if (researchSnap.exists()) {
           const data = researchSnap.data();
           if (data.researchData && Array.isArray(data.researchData)) {
@@ -82,19 +81,19 @@ const CompanyResearchPage = () => {
           }
         }
       }
-      
+
       // Also load all company research sessions from Firebase
       const snapshot = await getDocs(collection(db, 'users', user.uid, 'companyResearch'));
-      
+
       for (const doc of snapshot.docs) {
         const data = doc.data();
         const sessionId = doc.id;
-        
+
         if (data.researchData && Array.isArray(data.researchData)) {
           data.researchData.forEach((research: CompanyResearch) => {
             const exists = allResearch.some(
-              r => r.companyOverview.name === research.companyOverview.name && 
-                  r.sessionId === sessionId
+              r => r.companyOverview.name === research.companyOverview.name &&
+                r.sessionId === sessionId
             );
             if (!exists) {
               allResearch.push({
@@ -105,7 +104,7 @@ const CompanyResearchPage = () => {
           });
         }
       }
-      
+
       // If coming from JobListings with specific research data
       const locationState = location.state as any;
       if (locationState?.allCompanyResearch && locationState?.sessionId) {
@@ -114,7 +113,7 @@ const CompanyResearchPage = () => {
           stateResearch.forEach((research: CompanyResearch) => {
             const exists = allResearch.some(
               r => r.companyOverview.name === research.companyOverview.name &&
-                  r.sessionId === locationState.sessionId
+                r.sessionId === locationState.sessionId
             );
             if (!exists) {
               allResearch.push({
@@ -125,9 +124,9 @@ const CompanyResearchPage = () => {
           });
         }
       }
-      
+
       setResearchList(allResearch);
-      
+
       // If navigated from job listings with a specific company
       if (locationState?.selectedJob && locationState?.companyResearch) {
         const index = allResearch.findIndex(
@@ -138,7 +137,7 @@ const CompanyResearchPage = () => {
           setViewMode('detailed');
         }
       }
-      
+
     } catch (err) {
       console.error('Failed to load research data:', err);
       setError("Failed to load research data. Please try again.");
@@ -194,19 +193,19 @@ const CompanyResearchPage = () => {
 
   const handleDelete = async (company: EnhancedCompanyResearch) => {
     if (!user?.uid) return;
-    
+
     try {
       // If it has a sessionId, update the session data
       if (company.sessionId) {
         const researchRef = doc(db, "users", user.uid, "companyResearch", company.sessionId);
         const researchSnap = await getDoc(researchRef);
-        
+
         if (researchSnap.exists()) {
           const data = researchSnap.data();
           const updatedResearch = data.researchData.filter(
             (r: CompanyResearch) => r.companyOverview.name !== company.companyOverview.name
           );
-          
+
           if (updatedResearch.length > 0) {
             // Update the document with remaining research
             await setDoc(researchRef, {
@@ -218,7 +217,7 @@ const CompanyResearchPage = () => {
             // Delete the document if no research left
             await deleteDoc(researchRef);
           }
-          
+
           // Update localStorage
           const localDataKey = `companyResearch-${company.sessionId}`;
           if (updatedResearch.length > 0) {
@@ -230,8 +229,8 @@ const CompanyResearchPage = () => {
       }
 
       // Remove from local list
-      const newList = researchList.filter(r => 
-        !(r.companyOverview.name === company.companyOverview.name && 
+      const newList = researchList.filter(r =>
+        !(r.companyOverview.name === company.companyOverview.name &&
           r.sessionId === company.sessionId)
       );
       setResearchList(newList);
@@ -303,22 +302,20 @@ const CompanyResearchPage = () => {
         <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
             onClick={() => setViewMode('grid')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'grid'
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${viewMode === 'grid'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <Grid3X3 className="w-4 h-4" />
             Grid
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-              viewMode === 'list'
+            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${viewMode === 'list'
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
+                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+              }`}
           >
             <List className="w-4 h-4" />
             List

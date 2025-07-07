@@ -159,6 +159,7 @@ export const useResumeTailoring = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           message: `Please tailor this resume for this job description:

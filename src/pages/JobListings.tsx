@@ -1,4 +1,3 @@
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { useState, useEffect } from 'react';
@@ -13,7 +12,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
 import type { JobListing } from '../types';
 import { ENV } from "../config/environment";
-// Get API URL from environment variable or use default
+
+
 const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
 
 
@@ -207,7 +207,6 @@ export default function JobListings() {
       const responseData = await response.json();
       console.log('Parsed response data:', responseData);
 
-      // Check for error in response
       if (responseData.error) {
         throw new Error(responseData.error);
       }
@@ -257,7 +256,7 @@ export default function JobListings() {
       }
     } catch (error) {
       console.error('Job search error:', error);
-      
+
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         setError('Cannot connect to server. Make sure the server is running at ' + API_BASE_URL);
       } else if (error instanceof Error) {
@@ -265,8 +264,8 @@ export default function JobListings() {
       } else {
         setError('An unexpected error occurred');
       }
-      
-      return false; // Indicate failure
+
+      return false;
     } finally {
       setLoading(false);
     }
@@ -277,41 +276,62 @@ export default function JobListings() {
     const selectedJob = jobs.find(j => j.listingNumber === listingNumber);
     console.log('Selected job:', selectedJob);
     console.log('Company research data:', companyResearchData);
-    
+
     // Find the company research for this specific job
     let specificCompanyResearch = null;
     if (companyResearchData && Array.isArray(companyResearchData) && selectedJob) {
-      specificCompanyResearch = companyResearchData.find((research: any) => 
+      specificCompanyResearch = companyResearchData.find((research: any) =>
         research.companyOverview?.name === selectedJob.company
       );
     }
-    
+
     // Navigate to company research page with all the data
-    navigate('/company-research', { 
-      state: { 
+    navigate('/company-research', {
+      state: {
         sessionId,
         listingNumber,
         selectedJob,
         companyResearch: specificCompanyResearch,
         allCompanyResearch: companyResearchData,
-        jobs 
-      } 
+        jobs
+      }
     });
   };
 
-  const handleFavoriteToggle = (job: JobListing) => {
-    const updatedJobs = jobs.map(j => 
-      j.id === job.id ? { ...j, favorite: !j.favorite } : j
-    );
-    setJobs(updatedJobs);
-    saveToUserProfile(updatedJobs, companyResearchData);
+  const handleFavoriteToggle = async (jobId: string) => {
+    try {
+      const updatedJobs = jobs.map(job =>
+        job.id === jobId ? { ...job, favorite: !job.favorite } : job
+      );
+      setJobs(updatedJobs);
+
+
+      if (user?.uid) {
+        const favoritedJob = updatedJobs.find(job => job.id === jobId);
+        const favoriteRef = doc(db, 'users', user.uid, 'favorites', jobId);
+
+        if (favoritedJob?.favorite) {
+          await setDoc(favoriteRef, favoritedJob);
+          const jobListingRef = doc(db, 'users', user.uid, 'jobListings', jobId);
+          await setDoc(jobListingRef, favoritedJob);
+        } else {
+          await deleteDoc(favoriteRef);
+          const jobListingRef = doc(db, 'users', user.uid, 'jobListings', jobId);
+          await deleteDoc(jobListingRef);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update favorite:', error);
+      setError('Failed to update favorite status.');
+    }
   };
+
 
   const handleTailorResume = (job: JobListing) => {
     navigate(`/resume-tailoring/${job.id}`, { state: { job } });
   };
 
-    const handleDeleteJob = (job: JobListing) => {
+  const handleDeleteJob = (job: JobListing) => {
     const updatedJobs = jobs.filter(j => j.id !== job.id);
     setJobs(updatedJobs);
     saveToUserProfile(updatedJobs, companyResearchData);
@@ -344,25 +364,27 @@ export default function JobListings() {
   return (
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
+      <div className="mb-10 border-b border-gray-200 dark:border-gray-700 pb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Job Listings</h1>
-            <p className="mt-1 text-gray-600 dark:text-gray-400">
-              {sessionStarted 
-                ? `Found ${jobs.length} job opportunities for you`
-                : 'Start your personalized job search'
-              }
+            <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
+              <Search className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+              Job Listings
+            </h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400 text-sm md:text-base">
+              {sessionStarted
+                ? `Found ${jobs.length} job opportunities tailored to your profile`
+                : 'Start your personalized job search to discover opportunities'}
             </p>
           </div>
           {sessionStarted && (
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Button
                 onClick={startJobSearch}
                 size="sm"
                 variant="secondary"
                 disabled={loading}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 shadow-sm"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 New Search
@@ -372,7 +394,7 @@ export default function JobListings() {
                 size="sm"
                 variant="error"
                 disabled={clearingData}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 shadow-sm"
               >
                 <Trash2 className="w-4 h-4" />
                 Clear All
@@ -401,17 +423,22 @@ export default function JobListings() {
 
       {/* Start session button */}
       {!sessionStarted && !loading && (
-        <Card className="p-8 text-center">
-          <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Ready to Find Your Next Opportunity?
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-6">
-            We'll search for jobs based on your preferences and provide company insights
-          </p>
-          <Button onClick={startJobSearch} size="lg">
-            Start Job Search
-          </Button>
+        <Card className="relative overflow-hidden p-10 text-center shadow-xl border border-blue-200 dark:border-blue-700 rounded-2xl bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-200 dark:bg-blue-900 rounded-full blur-3xl opacity-20 transform translate-x-1/2 -translate-y-1/2" />
+          <div className="flex flex-col items-center justify-center space-y-5 relative z-10">
+            <Search className="w-16 h-16 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">Jumpstart Your Career</h2>
+            <p className="text-gray-700 dark:text-gray-300 max-w-xl text-base">
+              Start a personalized job search powered by AI. Discover relevant opportunities and get actionable company insights—instantly.
+            </p>
+            <Button
+              onClick={startJobSearch}
+              size="lg"
+              className="px-7 py-3 text-base font-semibold shadow-lg hover:shadow-xl transition-all bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            >
+              Start Your Search
+            </Button>
+          </div>
         </Card>
       )}
 
@@ -450,7 +477,7 @@ export default function JobListings() {
               <JobCard
                 key={job.id}
                 job={job}
-                onFavoriteToggle={handleFavoriteToggle}
+                onFavoriteToggle={(job) => handleFavoriteToggle(job.id)}
                 onResearch={handleResearch}
                 onTailorResume={handleTailorResume}
                 onDelete={handleDeleteJob}
@@ -462,13 +489,21 @@ export default function JobListings() {
 
       {/* Empty state */}
       {sessionStarted && !loading && !clearingData && jobs.length === 0 && (
-        <Card className="p-8 text-center">
-          <p className="text-gray-500 dark:text-gray-400">
-            No jobs found. Try adjusting your preferences.
-          </p>
-          <Button onClick={startJobSearch} className="mt-4">
-            Search Again
-          </Button>
+        <Card className="p-10 text-center shadow-lg border border-gray-200 dark:border-gray-700 rounded-xl">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <AlertCircle className="w-14 h-14 text-yellow-500 dark:text-yellow-400" />
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">No Jobs Found</h2>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md">
+              We couldn’t find any job listings matching your preferences right now. Try starting a new search with updated filters.
+            </p>
+            <Button
+              onClick={startJobSearch}
+              size="lg"
+              className="px-6 py-3 text-base shadow-md hover:shadow-lg transition-all"
+            >
+              Try Again
+            </Button>
+          </div>
         </Card>
       )}
     </div>

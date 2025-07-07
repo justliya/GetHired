@@ -1,5 +1,5 @@
 // Dashboard.tsx
-import  { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -183,8 +183,8 @@ const Dashboard = ({ onOpenPreferences }: DashboardProps) => {
                 key={job.id}
                 job={job}
                 onFavoriteToggle={handleFavoriteToggle}
-                onResearch={() => {}}
-                onTailorResume={() => {}}
+                onResearch={() => { }}
+                onTailorResume={() => { }}
                 onDelete={handleDelete}
               />
             ))}

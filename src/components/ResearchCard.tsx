@@ -303,11 +303,10 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
             aria-label={companyResearch.favorite ? "Remove from favorites" : "Add to favorites"}
           >
             <Bookmark
-              className={`w-5 h-5 ${
-                companyResearch.favorite
+              className={`w-5 h-5 ${companyResearch.favorite
                   ? "text-yellow-300 fill-current"
                   : "text-white/70"
-              }`}
+                }`}
             />
           </button>
         </div>
@@ -368,9 +367,8 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
               <p className="text-sm text-gray-700 dark:text-gray-300">
                 {showSummary
                   ? summaryDescription
-                  : `${summaryDescription.slice(0, 120)}${
-                      summaryDescription.length > 120 ? "..." : ""
-                    }`}
+                  : `${summaryDescription.slice(0, 120)}${summaryDescription.length > 120 ? "..." : ""
+                  }`}
               </p>
               {summaryDescription.length > 120 && (
                 <button
