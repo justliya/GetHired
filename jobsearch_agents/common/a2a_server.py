@@ -62,13 +62,7 @@ def create_agent_server(
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "https://get-hired-one.vercel.app",
-            "http://0.0.0.0",
-            "https://firebasestorage.googleapis.com",
-            "https://gethired-6c623.firebaseapp.com"
-        ],
+        allow_origins=[ "https://get-hired-one.vercel.app"],
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         allow_credentials=True,
@@ -333,6 +327,7 @@ def create_agent_server(
                 "Access-Control-Allow-Origin": "https://get-hired-one.vercel.app",
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true",
             },
         )
     
@@ -344,7 +339,7 @@ def create_agent_server(
             headers={
                 "Access-Control-Allow-Origin": "https://get-hired-one.vercel.app",
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
-                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true",
             },
         )
 
