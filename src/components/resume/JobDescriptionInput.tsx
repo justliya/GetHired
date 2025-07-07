@@ -21,7 +21,7 @@ const JobDescriptionInput: React.FC<JobDescriptionInputProps> = ({
   onLoadSampleJob
 }) => {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       <div className="flex items-center justify-between mb-3">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Job Description
@@ -48,7 +48,7 @@ const JobDescriptionInput: React.FC<JobDescriptionInputProps> = ({
       </div>
 
       {showJobSelector && (
-        <div className="mb-4 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg bg-white dark:bg-gray-800 overflow-hidden">
+        <div className="absolute top-full left-0 right-0 z-10 mt-2 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg bg-white dark:bg-gray-800 overflow-hidden">
           <div className="p-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
             <h4 className="text-sm font-medium text-gray-900 dark:text-white">Select from your saved jobs</h4>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click on a job to load its description</p>

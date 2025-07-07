@@ -818,4 +818,6 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
             "error": str(e),
             "error_type": type(e).__name__,
             "project_id": getattr(client, 'project', 'unknown') if 'client' in locals() else 'unknown'
+
         }
+

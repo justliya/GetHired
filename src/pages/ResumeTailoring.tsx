@@ -4,15 +4,15 @@ import { Loader2, ArrowLeft, FileText } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
-import { getUserResumes, getPublicUrlFromDownloadUrl, uploadResume, getJobListings, getUserData } from '../services/firebaseService';
+import { getUserResumes, getResumeUrlForContext, uploadResumeWithFallback, getJobListings, getUserData, saveTailoredResume } from '../services/firebaseService';
 import { useResumeTailoring } from '../hooks/useResumeTailoring';
 import {
   ResumeSelector,
   JobDescriptionInput,
   ResumeTextInput,
-  EnhancedDocumentViewer,
   SuggestedChanges,
-  DownloadBanner
+  DownloadBanner,
+  UnifiedDocumentViewer
 } from '../components/resume';
 import type { Resume } from '../models/UserData';
 import type { JobListing } from '../types';
@@ -72,7 +72,7 @@ const ResumeTailoring = () => {
           const defaultResume = resumesResult.data?.find(r => r.metadata?.isOriginal);
           if (defaultResume) {
             setSelectedResumeId(defaultResume.id);
-            setSelectedResumeUrl(getPublicUrlFromDownloadUrl(defaultResume.fileUrl));
+            setSelectedResumeUrl(getResumeUrlForContext(defaultResume));
             setResumeInputMethod('saved');
             setResumeText(`Upload resume content will be processed automatically.`);
           }
@@ -138,7 +138,7 @@ const ResumeTailoring = () => {
 
     try {
       setIsUploading(true);
-      const result = await uploadResume(user.uid, file, {
+      const result = await uploadResumeWithFallback(user.uid, file, {
         title: file.name,
         isOriginal: true,
         uploadSource: 'manual',
@@ -148,7 +148,7 @@ const ResumeTailoring = () => {
         const newResume = result.data;
         setUserResumes(prev => [...prev, newResume]);
         setSelectedResumeId(newResume.id);
-        setSelectedResumeUrl(getPublicUrlFromDownloadUrl(newResume.fileUrl));
+        setSelectedResumeUrl(getResumeUrlForContext(newResume));
         setResumeInputMethod('upload');
 
         setResumeText(`The resume content will be processed automatically.`);
@@ -164,7 +164,7 @@ const ResumeTailoring = () => {
     const resume = userResumes.find(r => r.id === resumeId);
     if (!resume) return;
 
-    setSelectedResumeUrl(getPublicUrlFromDownloadUrl(resume.fileUrl));
+    setSelectedResumeUrl(getResumeUrlForContext(resume));
     setResumeInputMethod('saved');
 
     setResumeText(`The resume content will be processed automatically. You can also paste additional text if needed.`);
@@ -311,6 +311,48 @@ Join our team and help build the next generation of web applications that serve 
     setShowJobSelector(!showJobSelector);
   };
 
+  // Handler for saving tailored resume
+  const handleSaveResume = async () => {
+    if (!user?.uid || !tailoringData) {
+      console.error('Cannot save resume: user not authenticated or no tailoring data');
+      return;
+    }
+
+    try {
+      console.log('💾 Saving tailored resume...');
+      
+      // Find the original resume ID if possible
+      const originalResumeId = selectedResumeId || userResumes.find(r => r.metadata?.isOriginal)?.id;
+      
+      const result = await saveTailoredResume(user.uid, {
+        resumeText: tailoringData.tailoredResumeText || '',
+        documentUrl: tailoringData.tailoredResumeUrl,
+        authenticatedUrl: tailoringData.authenticatedUrl,
+        jobTitle: job?.title,
+        jobCompany: job?.company,
+        originalResumeId: originalResumeId
+      });
+
+      if (result.success) {
+        console.log('✅ Resume saved successfully:', result.data);
+        
+        // Update the local resumes list to include the new saved resume
+        if (result.data) {
+          setUserResumes(prev => [...prev, result.data!]);
+        }
+        
+        // Show success feedback (you could add a toast notification here)
+        alert('Resume saved successfully! You can find it in your saved resumes.');
+      } else {
+        console.error('❌ Failed to save resume:', result.error);
+        alert('Failed to save resume. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Error saving resume:', error);
+      alert('An error occurred while saving the resume.');
+    }
+  };
+
   const title = job?.title || '';
   const company = job?.company || '';
 
@@ -445,25 +487,31 @@ Join our team and help build the next generation of web applications that serve 
       {tailoringData && (
         <div>
           {/* Download Banner */}
-          {tailoringData.tailoredResumeUrl && (
-            <DownloadBanner resumeUrl={tailoringData.tailoredResumeUrl} />
+          {(tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl) && (
+            <DownloadBanner resumeUrl={(tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl)!} />
           )}
 
           {/* Resume Changes Tab */}
           {activeTab === 'resume' && (
             <div className="space-y-6">
               {/* Document Viewer */}
-              {tailoringData.tailoredResumeUrl ? (
-                <EnhancedDocumentViewer
+              {(tailoringData.tailoredResumeText || tailoringData.tailoredResumeUrl) && (
+                <UnifiedDocumentViewer
+                  resumeText={tailoringData.tailoredResumeText}
                   documentUrl={tailoringData.tailoredResumeUrl}
+                  authenticatedUrl={tailoringData.authenticatedUrl}
                   job={job}
+                  onCopyText={copySuggestion}
                   onDownload={() => {
-                    if (tailoringData.tailoredResumeUrl) {
-                      window.open(tailoringData.tailoredResumeUrl, '_blank');
+                    // Prefer authenticated URL for downloads
+                    const downloadUrl = tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl;
+                    if (downloadUrl) {
+                      window.open(downloadUrl, '_blank');
                     }
                   }}
+                  onSave={handleSaveResume}
                 />
-              ) : null}
+              )}
 
               {/* Suggested Changes */}
               {tailoringData.suggestedChanges && tailoringData.suggestedChanges.length > 0 && (

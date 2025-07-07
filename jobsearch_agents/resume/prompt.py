@@ -227,6 +227,33 @@ Please separate sections using double newlines and use the ---END [SECTION]--- m
 """
 TEMPLATE_DOCUMENT_CREATION = """
 CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
-Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
-You should return the url to resume that was uploaded  to firebase or GCS and the resume text as a VALID JSON Object ```json   ```. Do not return the tool code.
+Act as an expert recruiter and Microsoft word power user. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
+
+IMPORTANT: Extract the user_id from the Firebase/authentication context and pass it to the create_formatted_resume function. If a resume URL is available in the context, also pass the resume_url parameter to enable user_id extraction from the URL as a fallback.
+
+When calling create_formatted_resume, use these parameters:
+- text: the formatted resume text
+- job_position_title: the position being applied for  
+- user_id: the authenticated user's ID from Firebase context (NOT the literal string "user_id")
+- resume_url: the original resume URL if available (for user_id extraction fallback)
+
+CRITICAL: Look for the user_id in the context object provided. It will be under context.user_id or context.firebase_uid. Use the actual ID value, not placeholder text.
+
+You should return the urls to resume that was uploaded to Google cloud storage and the resume text as a JSON Object with the following structure:
+{
+  "public_url": "https://storage.googleapis.com/gethired-resumes/resumes/ACTUAL_USER_ID/filename.docx",
+  "authenticated_url": "https://storage.cloud.google.com/gethired-resumes/resumes/ACTUAL_USER_ID/filename.docx?authuser=3", 
+  "resume_text": "formatted resume text here",
+  "filename": "resume_filename.docx",
+  "status": "success"
+}
+
+NOTE: 
+- The public_url should be a working URL (signed URL if bucket requires authentication)
+- The authenticated_url should use the storage.cloud.google.com domain with the authuser parameter for proper Google Cloud Console access
+- Use the actual user_id in the URL path and an appropriate authuser parameter value
+- Replace ACTUAL_USER_ID with the real user_id from the context
+
+Do not return the tool code.
+
 """

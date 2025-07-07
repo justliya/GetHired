@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { User } from '../../context/UserContext';
 import ChipInput from './ChipInput';
 import RangeSlider from './RangeSlider';
-import SuccessModal from './SuccessModal';
 import type { 
     JobPreferences, 
     SalaryRange, 
@@ -14,9 +13,7 @@ import type {
 import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getUserResumes, getPublicUrlFromDownloadUrl, uploadResume, updateUserPreferences } from '../../services/firebaseService';
-import { handlePreferencesSubmissionSuccess, handleSchedulingAsync } from '../../utils/onboardingUtils';
-import { ENV } from '../../config/environment';
+import { getUserResumes, getResumeUrlForContext, uploadResumeWithFallback } from '../../services/firebaseService';
 
 type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern';
 type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead';
@@ -90,7 +87,6 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [resumes, setResumes] = useState<ResumeData[]>([]);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-    const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
     const [formData, setFormData] = useState<FormDataType>({
         resumeFile: null,
         currentRole: '',
@@ -117,7 +113,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
             }
         }
-    });    const { user, setUser } = User();
+    });    const { user } = User();
     const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
     const [resumeError, setResumeError] = useState<string | null>(null);
 
@@ -221,23 +217,44 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
         setResumeError(null);
         try {
             const file = e.target.files[0];
+            
+            // Validate file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                setResumeError('File size must be less than 10MB');
+                return;
+            }
+            
+            // Validate file type
+            const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+            if (!allowedTypes.includes(file.type)) {
+                setResumeError('Please upload a PDF, DOCX, or TXT file');
+                return;
+            }
+            
             const metadata = {
                 title: file.name,
                 uploadSource: 'manual' as const,
                 isOriginal: true,
                 keywords: formData.preferences.roles || [],
             };
-            // Use the correct resume upload service endpoint
-            const result = await uploadResume(user.uid, file, metadata);
+            
+            console.log('🔄 Starting resume upload in UserPreferencesModal...', file.name);
+            
+            // Use the enhanced upload service with GCS priority
+            const result = await uploadResumeWithFallback(user.uid, file, metadata);
+            
             if (result.success && result.data) {
-                setResumes(prev => [...prev, { ...result.data }]);
+                console.log('✅ Resume upload successful:', result.data);
+                setResumes(prev => [...prev, result.data as ResumeData]);
                 setSelectedResumeId(result.data.id);
                 setFormData(prev => ({ ...prev, resumeFile: file }));
             } else {
-                setResumeError('Failed to upload resume.');
+                console.error('❌ Resume upload failed:', result);
+                setResumeError(result.error || 'Failed to upload resume. Please try again.');
             }
-        } catch {
-            setResumeError('Error uploading resume.');
+        } catch (error) {
+            console.error('❌ Resume upload error:', error);
+            setResumeError('Error uploading resume. Please check your connection and try again.');
         }
     };
 
@@ -246,120 +263,15 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
         setFormData(prev => ({ ...prev, resumeFile: null }));
     };
 
-    const handlePostSuccessJobSearch = async () => {
-        try {
-            // Check if user has preferences that would benefit from immediate job search
-            if (!user?.uid || !formData.preferences.roles.length) {
-                return;
-            }
-
-            // Only trigger job search if user has meaningful search criteria
-            const hasSearchCriteria = formData.preferences.roles.length > 0 || 
-                                     formData.preferences.locations.length > 0 ||
-                                     formData.preferences.skills.length > 0;
-
-            if (!hasSearchCriteria) {
-                return;
-            }
-
-            // Import job search service dynamically to avoid circular dependencies
-            const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
-            
-            // Use a simple job search request in the background
-            fetch(`${API_BASE_URL}/run`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    message: "find me jobs based on my preferences",
-                    context: {
-                        user_id: user.uid,
-                        firebase_uid: user.uid,
-                        is_anonymous: user.isAnonymous || false,
-                        source: "preferences_onboarding"
-                    },
-                    session_id: `onboarding-${Date.now()}`,
-                }),
-            }).then(response => {
-                if (response.ok) {
-                    console.log('Job search initiated successfully after preferences save');
-                } else {
-                    console.warn('Background job search failed:', response.status);
-                }
-            }).catch(error => {
-                console.warn('Background job search error:', error);
-                // Fail silently - this is a background enhancement, not critical
-            });
-
-        } catch (error) {
-            console.warn('Error in post-success job search:', error);
-            // Fail silently - this shouldn't block the user experience
-        }
-    };
-
     const handleSubmit = async () => {
         // Prevent multiple submissions
         if (isSubmitting) return;
         
         setIsSubmitting(true);
         try {
-            if (!user?.uid) {
-                setResumeError('No user ID found.');
-                return;
-            }
-            let selectedResume = resumes.find(r => r.id === selectedResumeId);
-            if (!selectedResume && formData.resumeFile) {
-                const metadata = {
-                    title: formData.resumeFile.name,
-                    uploadSource: 'manual' as const,
-                    isOriginal: true,
-                    keywords: formData.preferences.roles || [],
-                };
-                const result = await uploadResume(user.uid, formData.resumeFile, metadata);
-                if (result.success && result.data) {
-                    selectedResume = { ...result.data };
-                } else {
-                    setResumeError('Failed to upload resume on submit.');
-                    return;
-                }
-            }
-
-            // Map form data to JobPreferences interface
-            const preferencesToSave: JobPreferences = {
-                titles: formData.preferences.roles,
-                locations: formData.preferences.locations,
-                skills: formData.preferences.skills,
-                jobType: formData.preferences.jobType,
-                seniority: formData.preferences.seniority,
-                salaryRange: formData.preferences.salaryRange,
-                searchSchedule: formData.preferences.searchSchedule,
-                companies: formData.preferences.companies,
-                other: formData.preferences.other,
-                includeKeywords: formData.preferences.includeKeywords,
-                excludeKeywords: formData.preferences.excludeKeywords
-            };
-
-            // Save preferences using the correct API endpoint
-            const result = await updateUserPreferences(user.uid, preferencesToSave);
-            if (result.success) {
-                // Update local user state with new preferences
-                setUser(prev => prev ? { ...prev, jobPreferences: preferencesToSave } : prev);
-                
-                // Handle successful submission with utility function
-                handlePreferencesSubmissionSuccess(user.uid);
-                
-                // Handle scheduling asynchronously (won't block the success modal)
-                handleSchedulingAsync(user.uid, preferencesToSave).catch(error => {
-                    console.warn('Async scheduling failed:', error);
-                    // Could show a toast notification here if needed
-                });
-                
-                onSubmit({ ...formData });
-                
-                // Show success modal immediately - don't wait for scheduling API
-                setShowSuccessModal(true);
-            } else {
-                setResumeError('Failed to save preferences.');
-            }
+            // Let the parent handle all the complex logic
+            // Just pass the form data and close the modal
+            onSubmit({ ...formData });
         } catch (error) {
             console.error('Error in handleSubmit:', error);
             setResumeError('Error saving preferences.');
@@ -390,7 +302,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                                 {resumes[0]?.metadata?.title || resumes[0]?.fileUrl?.split('/').pop() || 'Untitled Resume'}
                             </span>
                             <a 
-                                href={getPublicUrlFromDownloadUrl(resumes[0]?.fileUrl)} 
+                                href={getResumeUrlForContext(resumes[0])} 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
                                 className="ml-2 text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
@@ -867,8 +779,7 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
     if (!show) return null;
 
     return (
-        <>
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
             <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
                 {/* Close button */}
                 <div className="absolute top-0 right-0 pt-4 pr-4">
@@ -927,24 +838,6 @@ const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 </div>
             </div>
         </div>
-        
-        {/* Success Modal */}
-        <SuccessModal
-            show={showSuccessModal}
-            onHide={() => {
-                setShowSuccessModal(false);
-                onHide();
-                // Trigger job search API request after modal closes
-                handlePostSuccessJobSearch();
-            }}
-            title="Success! 🎉"
-            message={
-                formData.preferences.searchSchedule.enabled 
-                    ? "Your preferences have been saved! We're now searching for jobs and you can expect to receive an email with findings soon."
-                    : "Your preferences have been saved successfully! You can now search for jobs that match your criteria."
-            }
-        />
-        </>
     );
 };
 
