@@ -2,7 +2,6 @@
 """
 Initializes and starts the Job Search AI Assistant server.
 """
-
 import os
 import sys
 import logging
@@ -13,7 +12,7 @@ import signal
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-# Load environment variables
+
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, override=True)
 
@@ -105,7 +104,7 @@ async def main():
         agent_instance, exit_stack = await root_agent
         global_exit_stack = exit_stack
         logger.info(f"Agent instance created: {agent_instance.name}")
-        logger.info("Sub-agents loaded: profile analyzer, job searcher, company researcher")
+        logger.info("Sub-agents loaded: profile analyzer, job searcher, company researcher, resume tailor")  # Updated
 
         # Initialize TaskManager
         tm = TaskManager(agent=agent_instance, timeout=args.timeout)
@@ -135,8 +134,10 @@ async def main():
             app.routes.append(route)
 
         logger.info(f"Job Search AI Assistant server starting on {host}:{port}")
-        logger.info(f"API documentation available at http://{host}:{port}/docs")
-        logger.info(f"Main endpoint: POST http://{host}:{port}/run-job-search")
+        logger.info(f"API documentation and testing available at http://{host}:{port}/docs")
+        logger.info(f"Main endpoints:")  
+        logger.info(f"  - Job Search: POST http://{host}:{port}/run-job-search")
+        logger.info(f"  - Resume Tailoring: POST http://{host}:{port}/tailor-resume") 
         
         config = uvicorn.Config(
             app, 

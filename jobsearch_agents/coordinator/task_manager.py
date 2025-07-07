@@ -45,7 +45,7 @@ class TaskManager:
 
     async def process_task(self, message: str, context: Dict[str, Any], session_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Process a job search task request by running the agent.
+        Process a job search or resume tailoring task request by running the agent.
         
         Args:
             message: The text message to process.
@@ -55,21 +55,23 @@ class TaskManager:
         Returns:
             Response dict with message, status, and data.
         """
-        # Get user_id from context (required for job search)
-        user_id = context.get("user_id")
-        if not user_id:
-            return {
-                "message": "user_id is required in the request",
-                "status": "error",
-                "data": {"error_type": "ValidationError"}
-            }
+        # Get user_id from context (required for all operations)
+        user_id = context.get("user_id", "anonymous")
+        
+        # Determine task type based on session_id or message content
+        is_resume_task = session_id and session_id.startswith("resume-")
+        if is_resume_task:
+            logger.info(f"Processing resume tailoring task for user: {user_id}")
+        else:
+            logger.info(f"Processing job search task for user: {user_id}")
         
         # Generate session_id if not provided
         if not session_id:
-            session_id = f"{user_id}_job_search_{uuid.uuid4().hex[:8]}"
+            task_type = "resume" if "tailor" in message.lower() or "resume" in message.lower() else "job_search"
+            session_id = f"{user_id}_{task_type}_{uuid.uuid4().hex[:8]}"
             logger.info(f"Generated new session_id: {session_id}")
         
-        # Create or get session - THIS IS THE FIX
+        # Create or get session
         try:
             # Try to get existing session
             session = await self.session_service.get_session(
@@ -108,12 +110,15 @@ class TaskManager:
         
         try:
             # Run the agent with timeout
-            logger.info(f"Running job search for user: {user_id} with timeout: {self.timeout}s")
+            logger.info(f"Running agent for user: {user_id} with timeout: {self.timeout}s")
             
             # Initialize variables to store results
             job_listings = None
             company_research = None
-            final_message = "Processing job search..."
+            formatted_resume = None
+            final_resume = None
+            document_url = None
+            final_message = "Processing request..."
             raw_events = []
             runner_generator = None
             
@@ -128,13 +133,15 @@ class TaskManager:
                 # Create a task to process events with timeout
                 async def process_events_with_timeout():
                     nonlocal job_listings, company_research, final_message, raw_events
+                    nonlocal formatted_resume, final_resume, document_url
                     
                     try:
                         async for event in runner_generator:
                             raw_events.append(event.model_dump(exclude_none=True))
                             
-                            # Check for state updates (job listings and company research)
+                            # Check for state updates
                             if hasattr(event, 'state_update') and event.state_update:
+                                # Job search related outputs
                                 if 'job_listings' in event.state_update:
                                     job_listings = event.state_update['job_listings']
                                     logger.info("Received job listings update")
@@ -142,6 +149,19 @@ class TaskManager:
                                 if 'company_research_report' in event.state_update:
                                     company_research = event.state_update['company_research_report']
                                     logger.info("Received company research update")
+                                
+                                # Resume tailoring related outputs
+                                if 'formatted_resume' in event.state_update:
+                                    formatted_resume = event.state_update['formatted_resume']
+                                    logger.info("Received formatted resume update")
+                                
+                                if 'final_resume' in event.state_update:
+                                    final_resume = event.state_update['final_resume']
+                                    logger.info("Received final resume update")
+                                
+                                if 'document_url' in event.state_update:
+                                    document_url = event.state_update['document_url']
+                                    logger.info("Received document URL update")
                             
                             # Extract final message
                             if event.is_final_response() and event.content and event.content.role == "model":
@@ -193,14 +213,41 @@ class TaskManager:
                 )
                 
                 if final_session and final_session.state:
-                    # Extract outputs from session state
-                    if not job_listings and 'job_listings' in final_session.state:
-                        job_listings = final_session.state['job_listings']
-                        logger.info("Retrieved job listings from session state")
-                    
-                    if not company_research and 'company_research_report' in final_session.state:
-                        company_research = final_session.state['company_research_report']
-                        logger.info("Retrieved company research from session state")
+                    # Extract outputs from session state based on task type
+                    if is_resume_task:
+                        # Resume tailoring outputs
+                        if not formatted_resume and 'formatted_resume' in final_session.state:
+                            formatted_resume = final_session.state['formatted_resume']
+                            logger.info("Retrieved formatted resume from session state")
+                        
+                        if not final_resume and 'final_resume' in final_session.state:
+                            final_resume = final_session.state['final_resume']
+                            logger.info("Retrieved final resume from session state")
+                        
+                        if not document_url and 'document_url' in final_session.state:
+                            document_url = final_session.state['document_url']
+                            logger.info("Retrieved document URL from session state")
+                        
+                        # Check in final message if it contains JSON with document info
+                        if final_message and not document_url:
+                            try:
+                                import json
+                                # Try to extract JSON from the message
+                                json_match = re.search(r'\{[^}]+\}', final_message)
+                                if json_match:
+                                    result_data = json.loads(json_match.group())
+                                    document_url = result_data.get('document_url') or result_data.get('download_url')
+                            except:
+                                pass
+                    else:
+                        # Job search outputs
+                        if not job_listings and 'job_listings' in final_session.state:
+                            job_listings = final_session.state['job_listings']
+                            logger.info("Retrieved job listings from session state")
+                        
+                        if not company_research and 'company_research_report' in final_session.state:
+                            company_research = final_session.state['company_research_report']
+                            logger.info("Retrieved company research from session state")
                         
             except Exception as e:
                 logger.warning(f"Error retrieving final session state: {e}")
@@ -210,30 +257,38 @@ class TaskManager:
                 "raw_events": raw_events[-3:] if raw_events else []
             }
             
-            # Add job listings and company research if available
-            if job_listings:
-                try:
-                    # Try to parse JSON if it's a string
-                    import json
-                    import re
-                    if isinstance(job_listings, str):
-                        # Remove markdown code blocks if present
-                        clean_json = re.sub(r"^```(?:json)?\n|```$", "", job_listings.strip())
-                        job_listings = json.loads(clean_json)
-                    response_data["job_listings"] = job_listings
-                except Exception as e:
-                    logger.warning(f"Failed to parse job listings: {e}")
-            
-            if company_research:
-                try:
-                    # Try to parse JSON if it's a string
-                    if isinstance(company_research, str):
-                        # Remove markdown code blocks if present
-                        clean_json = re.sub(r"^```(?:json)?\n|```$", "", company_research.strip())
-                        company_research = json.loads(clean_json)
-                    response_data["company_research"] = company_research
-                except Exception as e:
-                    logger.warning(f"Failed to parse company research: {e}")
+            # Add appropriate outputs based on task type
+            if is_resume_task:
+                # Resume tailoring response
+                response_data["formatted_resume"] = formatted_resume
+                response_data["final_resume"] = final_resume
+                response_data["document_url"] = document_url
+                response_data["resume_text"] = final_resume or formatted_resume
+            else:
+                # Job search response
+                if job_listings:
+                    try:
+                        # Try to parse JSON if it's a string
+                        import json
+                        import re
+                        if isinstance(job_listings, str):
+                            # Remove markdown code blocks if present
+                            clean_json = re.sub(r"^```(?:json)?\n|```$", "", job_listings.strip())
+                            job_listings = json.loads(clean_json)
+                        response_data["job_listings"] = job_listings
+                    except Exception as e:
+                        logger.warning(f"Failed to parse job listings: {e}")
+                
+                if company_research:
+                    try:
+                        # Try to parse JSON if it's a string
+                        if isinstance(company_research, str):
+                            # Remove markdown code blocks if present
+                            clean_json = re.sub(r"^```(?:json)?\n|```$", "", company_research.strip())
+                            company_research = json.loads(clean_json)
+                        response_data["company_research"] = company_research
+                    except Exception as e:
+                        logger.warning(f"Failed to parse company research: {e}")
             
             # Return formatted response
             return {

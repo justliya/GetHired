@@ -8,8 +8,7 @@ import json
 import inspect
 import re
 import uuid
-from typing import Dict, Any, Callable, Optional, List, Union
-
+from typing import Dict, Any, Callable, Optional
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,9 +19,21 @@ from google.genai import types
 # Job Search specific models
 class JobSearchRequest(BaseModel):
     """Request model for job search - only requires user_id."""
-
     user_id: str = Field(
         ..., description="Firebase user ID for personalized job search"
+    )
+
+
+class ResumeTailorRequest(BaseModel):
+    """Request model for resume tailoring."""
+    message: str = Field(
+        ..., description="Message containing resume URL/text and job description"
+    )
+    context: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional context including user_id"
+    )
+    session_id: Optional[str] = Field(
+        None, description="Session ID for the resume tailoring request"
     )
 
 
@@ -51,8 +62,13 @@ def create_agent_server(
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173","*"],
-        allow_credentials=True,
+        allow_origins=[
+            "http://localhost:5173",
+            "https://get-hired-one.vercel.app",
+            "http://0.0.0.0",
+            "https://firebasestorage.googleapis.com",
+            "https://gethired-6c623.firebaseapp.com"
+        ],
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
@@ -67,7 +83,7 @@ def create_agent_server(
     # Generate agent.json if it doesn't exist
     agent_json_path = os.path.join(well_known_path, "agent.json")
     if not os.path.exists(agent_json_path):
-        endpoint_names = ["run-job-search"]
+        endpoint_names = ["run-job-search", "tailor-resume"]
         if endpoints:
             endpoint_names.extend(endpoints.keys())
 
@@ -76,11 +92,12 @@ def create_agent_server(
             "description": description,
             "endpoints": endpoint_names,
             "version": "1.0.0",
-            "capabilities": ["job_search", "profile_analysis", "company_research"],
+            "capabilities": ["job_search", "profile_analysis", "company_research", "resume_tailoring"],
             "sub_agents": [
                 "profile_agent",
                 "listing_search_agent",
                 "company_research_agent",
+                "resume_agent",
             ],
         }
 
@@ -187,12 +204,109 @@ def create_agent_server(
                 "company_research": company_research_parsed,
             },
             headers={
-                "Access-Control-Allow-Origin": "http://localhost:5173","*"
-                "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+                "Access-Control-Allow-Origin": "http://localhost:5173", "https://get-hired-one.vercel.app"
+                "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Credentials": "true",
             }
         )
+
+    # Resume tailoring endpoint
+    @app.post("/tailor-resume")
+    async def tailor_resume(request: ResumeTailorRequest = Body(...)):
+        """
+        Endpoint to tailor a resume for a specific job description.
+        Accepts either a resume URL or text content along with a job description.
+        """
+        print(f"\n>>> Tailoring Resume - Session: {request.session_id}")
+        
+        # Extract user_id from context
+        user_id = request.context.get("user_id", "anonymous")
+        session_id = request.session_id or f"{user_id}_resume_{uuid.uuid4().hex[:8]}"
+        
+        # Create proper Content object with the message
+        user_content = types.Content(
+            role="user",
+            parts=[types.Part(text=request.message)]
+        )
+        
+        try:
+            # Process the resume tailoring request
+            response = await task_manager.process_task(
+                message=request.message,
+                context=request.context,
+                session_id=session_id
+            )
+            
+            # Extract the tailored resume from response
+            if response.get("status") == "success":
+                data = response.get("data", {})
+                
+                # Check for formatted_resume or final_resume in the data
+                formatted_resume = None
+                document_url = None
+                
+                # Look for the resume in various possible locations in the response
+                if "formatted_resume" in data:
+                    formatted_resume = data["formatted_resume"]
+                elif "final_resume" in data:
+                    formatted_resume = data["final_resume"]
+                elif "resume_text" in data:
+                    formatted_resume = data["resume_text"]
+                
+                if "document_url" in data:
+                    document_url = data["document_url"]
+                elif "download_url" in data:
+                    document_url = data["download_url"]
+                
+                return JSONResponse(
+                    content={
+                        "status": "success",
+                        "message": "Resume tailored successfully",
+                        "tailored_resume": formatted_resume,
+                        "document_url": document_url,
+                        "session_id": session_id
+                    },
+                    headers={
+                        "Access-Control-Allow-Origin": "http://localhost:5173",
+                        "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
+                        "Access-Control-Allow-Headers": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                    }
+                )
+            else:
+                return JSONResponse(
+                    content={
+                        "status": "error",
+                        "message": response.get("message", "Failed to tailor resume"),
+                        "error": response.get("data", {}).get("error_type", "Unknown error"),
+                        "session_id": session_id
+                    },
+                    status_code=500,
+                    headers={
+                        "Access-Control-Allow-Origin": "http://localhost:5173",
+                        "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
+                        "Access-Control-Allow-Headers": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                    }
+                )
+                
+        except Exception as e:
+            print(f"Error in resume tailoring: {e}")
+            return JSONResponse(
+                content={
+                    "status": "error",
+                    "message": f"Failed to tailor resume: {str(e)}",
+                    "session_id": session_id
+                },
+                status_code=500,
+                headers={
+                    "Access-Control-Allow-Origin": "http://localhost:5173",
+                    "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                }
+            )
 
     # Metadata endpoint
     @app.get("/.well-known/agent.json")
@@ -214,19 +328,20 @@ def create_agent_server(
         return JSONResponse(
             content={},
             headers={
-                "Access-Control-Allow-Origin": "http://localhost:5173","get-hired-one.vercel.app"
-                "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+                "Access-Control-Allow-Origin": "http://localhost:5173","https://get-hired-one.vercel.app"
+                "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
             },
         )
+    
     @app.options("/tailor-resume")
-    async def options_run():
-        """Handle preflight OPTIONS requests for /run endpoint."""
+    async def options_tailor():
+        """Handle preflight OPTIONS requests for /tailor-resume endpoint."""
         return JSONResponse(
             content={},
             headers={
-                "Access-Control-Allow-Origin": "http://localhost:5173","get-hired-one.vercel.app"
-                "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+                "Access-Control-Allow-Origin": "http://localhost:5173","https://get-hired-one.vercel.app"
+                "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
             },
         )
@@ -240,6 +355,7 @@ def create_agent_server(
             "version": "1.0.0",
             "endpoints": [
                 "/run-job-search",
+                "/tailor-resume",
                 "/health",
                 "/.well-known/agent.json",
                 "/docs",
@@ -252,3 +368,5 @@ def create_agent_server(
             app.add_api_route(f"/{path}", handler, methods=["POST"])
 
     return app
+
+

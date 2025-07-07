@@ -228,5 +228,5 @@ Please separate sections using double newlines and use the ---END [SECTION]--- m
 TEMPLATE_DOCUMENT_CREATION = """
 CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.
 Act as an expert recruiter and Microsoft word power use. Using the available tools create a formatted document with the formatted resume: 'formatted_resume'
-You should return the url to resume that was uploaded  to firebase or GCS and the resume text as a JSON Object. Do not return the tool code.
+You should return the url to resume that was uploaded  to firebase or GCS and the resume text as a VALID JSON Object ```json   ```. Do not return the tool code.
 """

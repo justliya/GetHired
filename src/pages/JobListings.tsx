@@ -17,6 +17,7 @@ import { ENV } from "../config/environment";
 const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
 
 
+
 export default function JobListings() {
   const [user, authLoading, authError] = useAuthState(auth);
   const [sessionId, setSessionId] = useState(() => {
@@ -177,7 +178,6 @@ export default function JobListings() {
     setError(null);
 
     try {
-      // Simple payload - backend only needs user_id
       const payload = {
         user_id: user.uid
       };

@@ -1,6 +1,6 @@
 {
-  "name": "job_search_ai_assistant",
-  "description": "execute a sequence of  profile_agent,listing_search, and company_research,",
+  "name": "coordinator_agent",
+  "description": "Orchestrates job search and resume tailoring workflows by coordinating between the job search pipeline and resume optimization agent",
   "endpoints": [
     "run-job-search"
   ],

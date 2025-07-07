@@ -41,12 +41,28 @@ async def create_coordinator_agent():
 
 
     coordinator = Agent(
-        name="coordinator_agent",
-        description="jobsearch_pipeline that executes a sequence of profile_agent, listing_search, and company_research, and the resume tailoring agent for job applications.",
-        model="gemini-2.0-flash-001",
-        instruction="",
-        sub_agents=[ jobsearch_pipeline, resume],
-    )
+    name="coordinator_agent",
+    description="Orchestrates job search and resume tailoring workflows by coordinating between the job search pipeline and resume optimization agent",
+    model="gemini-2.0-flash-001",
+    instruction="""You are the master coordinator for a comprehensive job search and application system.
+
+Your role is to:
+1. Route requests to the appropriate sub-agent based on user intent
+2. For job search requests: Direct to the job_search_ai_assistant pipeline which will:
+   - Fetch user preferences from Firebase
+   - Search for matching job listings
+   - Research companies for found positions
+3. For resume tailoring requests: Direct to the resume agent to optimize resumes for specific job descriptions
+
+Key behaviors:
+- When receiving a user ID for job search, invoke the job search pipeline
+- When receiving resume content and job description, invoke the resume agent
+- Pass through all outputs from sub-agents without modification
+- Ensure proper data flow between agents when needed
+
+You coordinate but do not perform the actual work - let your specialized sub-agents handle their domains.""",
+    sub_agents=[jobsearch_pipeline, resume],
+)
     return coordinator, exit_stack
 
 

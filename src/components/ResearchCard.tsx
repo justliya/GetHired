@@ -18,7 +18,7 @@ import {
   Trophy,
 } from "lucide-react";
 
-// Updated interface with jobId
+
 export interface CompanyResearch {
   jobId: string;
   companyOverview: {
@@ -189,9 +189,9 @@ const CollapsibleSection: React.FC<{
 }> = ({ title, icon, children, openDefault = false, className = "" }) => {
   const [open, setOpen] = useState(openDefault);
   return (
-    <div className={`border rounded-md p-3 bg-gray-100 dark:bg-gray-800 ${className}`}>
+    <div className={`border rounded-md p-3 bg-gray-50 dark:bg-gray-700 ${className}`}>
       <button
-        className="font-semibold cursor-pointer flex items-center gap-2 w-full text-left"
+        className="font-semibold cursor-pointer flex items-center gap-2 w-full text-left dark:text-blue-200 text-black "
         onClick={() => setOpen((v) => !v)}
         type="button"
         aria-expanded={open}
@@ -304,8 +304,8 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
           >
             <Bookmark
               className={`w-5 h-5 ${companyResearch.favorite
-                  ? "text-yellow-300 fill-current"
-                  : "text-white/70"
+                ? "text-yellow-300 fill-current"
+                : "text-white/70"
                 }`}
             />
           </button>
@@ -745,3 +745,28 @@ const ResearchCard: React.FC<ResearchCardProps> = ({
 };
 
 export default ResearchCard;
+// Modern-styled Run Job Search section (for reuse)
+// Usage example:
+/*
+<Card className="mt-10 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+  <div className="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-gray-800 pb-3">
+    <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
+      Run Job Search
+    </h3>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
+      <Input
+        value={jobSearchQuery}
+        onChange={(e) => setJobSearchQuery(e.target.value)}
+        className="w-full sm:max-w-md border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+        placeholder="Enter job title or keyword"
+      />
+      <Button
+        onClick={handleRunJobSearch}
+        className="px-6 py-2 text-base font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow"
+      >
+        Run
+      </Button>
+    </div>
+  </div>
+</Card>
+*/
