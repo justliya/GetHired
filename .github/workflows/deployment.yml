@@ -39,13 +39,13 @@ jobs:
       - name: Insert env var after os.environ.copy()
         working-directory: jobsearch_agents
         run: |
-          if grep -q "env = os.environ.copy()" job_coach/agent.py; then
+          if grep -q "env = os.environ.copy()" profile/agent.py; then
             sed -i '/env = os.environ.copy()/a\
           env["SERVICE_ACCOUNT_KEY_PATH"] = env.get("FIREBASE_SERVICE_ACCOUNT_KEY", "")
-            ' job_coach/agent.py
+            ' profile/agent.py
             echo "Environment variable insertion completed"
           else
-            echo "Target line not found in job_coach/agent.py"
+            echo "Target line not found in profile/agent.py"
             exit 1
           fi
       - name: Build and Push Docker Image

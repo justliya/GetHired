@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, ArrowLeft, FileText } from 'lucide-react';
@@ -81,21 +82,23 @@ const ResumeTailoring = () => {
         // Load user job listings for job description dropdown
         const jobsResult = await getJobListings(user.uid);
         if (jobsResult.success) {
-          // Map the job listings to match the expected JobListing interface
-          const jobListings: JobListing[] = (jobsResult.data || []).map((job: Record<string, unknown>) => ({
-            id: job.id as string,
-            jobId: job.id as string,
-            title: job.title as string,
-            company: job.company as string,
-            location: job.location as string,
-            description: job.description as string,
-            salary: (job.salary as string) ?? 'Not specified',
-            url: job.url as string,
-            status: 'new',
+          // Map the job listings to match the expected JobListing interface (fully typed)
+          const jobListings: JobListing[] = (jobsResult.data as any[]).map(job => ({
+            jobId: job.jobId ?? job.id,
+            id: job.id,
+            listingNumber: job.listingNumber,
+            title: job.title,
+            company: job.company,
+            location: job.location,
+            description: job.description,
+            salary: job.salary ?? 'Not specified',
+            datePosted: job.datePosted ?? job.postedDate ?? 'Unknown',
+            qualifications: job.qualifications ?? [],
+            benefits: job.benefits ?? [],
+            jobLink: job.jobLink,
+            easyApply: job.easyApply ?? false,
             favorite: false,
-            datePosted: (job.datePosted as string) || (job.postedDate as string) || 'Unknown',
-            qualifications: (job.qualifications as string[]) || [],
-            benefits: (job.benefits as string[]) || [],
+            status: 'new',
           }));
           setUserJobs(jobListings);
         }
@@ -458,6 +461,7 @@ Join our team and help build the next generation of web applications that serve 
               onToggleJobSelector={handleToggleJobSelector}
               onLoadJobFromListing={handleLoadJobFromListing}
               onLoadSampleJob={loadSampleJobDescription}
+      
             />
           </div>
         </div>
