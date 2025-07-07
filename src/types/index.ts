@@ -1,4 +1,5 @@
 export interface JobListing {
+  jobId: string;
   id: string;
   listingNumber?: number;
   title: string;
@@ -14,8 +15,7 @@ export interface JobListing {
   favorite: boolean;
   status: string;
 }
-export interface companyResearch {
-  jobId:string;
+export interface CompanyResearch {
   companyOverview: {
     name: string;
     id: string;

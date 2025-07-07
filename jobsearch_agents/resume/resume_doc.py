@@ -36,7 +36,7 @@ def initialize_firebase():
         logger.debug("Firebase already initialized")
     except ValueError:
         # No app initialized yet
-        service_account_path = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
+        service_account_path = os.getenv('')
         storage_bucket = os.getenv('FIREBASE_STORAGE_BUCKET')
         if service_account_path and os.path.exists(service_account_path):
             cred = credentials.Certificate(service_account_path)
@@ -818,4 +818,6 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
             "error": str(e),
             "error_type": type(e).__name__,
             "project_id": getattr(client, 'project', 'unknown') if 'client' in locals() else 'unknown'
+
         }
+

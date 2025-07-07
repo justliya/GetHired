@@ -1,11 +1,26 @@
 import { useState } from 'react';
 import { Bookmark, Briefcase, MapPin, CalendarDays, ChevronDown, ChevronUp, ExternalLink, Building2 } from 'lucide-react';
-import type { JobListing } from '../types';
-
+export interface JobListing {
+  jobId: string;
+  id: string;
+  listingNumber?: number;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  datePosted: string;
+  description: string;
+  qualifications: string[];
+  benefits: string[];
+  jobLink?: string;
+  easyApply?: boolean;
+  favorite: boolean;
+  status: string;
+}
 interface JobCardProps {
   job: JobListing;
   onFavoriteToggle: (job: JobListing) => void;
-  onResearch: (job: JobListing) => void;
+  onResearch: (listingNumber: number) => void;
   onTailorResume: (job: JobListing) => void;
   onDelete: (job: JobListing) => void;
 }
@@ -171,11 +186,11 @@ const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) 
             <ExternalLink className="w-4 h-4" />
             Website
           </button>
-          <button
-            onClick={() => {
-              setIsResearchSelected(true);
-              onResearch(job);
-            }}
+         <button
+onClick={() => {
+  setIsResearchSelected(true);
+    if (job.listingNumber != null) onResearch(job.listingNumber);
+  }}
             className={`
               text-sm font-medium flex items-center gap-1 transition-colors
               ${isResearchSelected

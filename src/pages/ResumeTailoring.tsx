@@ -84,6 +84,7 @@ const ResumeTailoring = () => {
           // Map the job listings to match the expected JobListing interface
           const jobListings: JobListing[] = (jobsResult.data || []).map((job: Record<string, unknown>) => ({
             id: job.id as string,
+            jobId: job.id as string,
             title: job.title as string,
             company: job.company as string,
             location: job.location as string,

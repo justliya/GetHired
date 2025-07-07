@@ -255,4 +255,5 @@ NOTE:
 - Replace ACTUAL_USER_ID with the real user_id from the context
 
 Do not return the tool code.
+
 """
