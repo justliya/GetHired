@@ -5,7 +5,7 @@ import type { JobListing } from '../types';
 interface JobCardProps {
   job: JobListing;
   onFavoriteToggle: (job: JobListing) => void;
-  onResearch: (job: JobListing) => void;
+  onResearch: (listingNumber: number) => void;
   onTailorResume: (job: JobListing) => void;
   onDelete: (job: JobListing) => void;
 }
@@ -171,11 +171,11 @@ const JobCard = ({ job, onFavoriteToggle, onResearch, onDelete }: JobCardProps) 
             <ExternalLink className="w-4 h-4" />
             Website
           </button>
-          <button
-            onClick={() => {
-              setIsResearchSelected(true);
-              onResearch(job);
-            }}
+         <button
+onClick={() => {
+  setIsResearchSelected(true);
+    if (job.listingNumber != null) onResearch(job.listingNumber);
+  }}
             className={`
               text-sm font-medium flex items-center gap-1 transition-colors
               ${isResearchSelected

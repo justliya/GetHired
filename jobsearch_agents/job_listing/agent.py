@@ -45,7 +45,7 @@ async def create_agent():
         ],
     )
 
-    # Register cleanup callback
+ 
     async def cleanup():
         if hasattr(tools, "close"):
             await tools.close()

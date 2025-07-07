@@ -11,6 +11,7 @@ Workflow
   5. Do Not CHAT with user
   
 3. Response Output Schema
+```json
 {
   "jobs": [
     {
@@ -29,7 +30,7 @@ Workflow
     // up to 10 entries
   ]
 }
-
+```
 4. Critical Requirements
 
 	•	Strictly JSON: Return exactly one JSON object with no wrapping text.

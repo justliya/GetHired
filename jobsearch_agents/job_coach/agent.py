@@ -13,10 +13,10 @@ env = os.environ.copy()
 
 async def create_agent():
     """Create the job coach agent with MCP tools"""
-    # Create exit stack first
+   
     exit_stack = AsyncExitStack()
 
-    # MCPToolset with proper timeout settings
+
     tools = MCPToolset(
         connection_params=StdioServerParameters(
             command="npx",
