@@ -158,7 +158,7 @@ def create_agent_server(
             role="user",
             parts=[
                 types.Part(
-                    text=f"Run a complete job search for user ID: {request.user_id}"
+                    parts=[types.Part(text=json.dumps({"user_id": request.user_id}))]
                 )
             ],
         )
