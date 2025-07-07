@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
+import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
@@ -185,26 +186,15 @@ export default function JobListings() {
       console.log('Sending job search request to:', `${API_BASE_URL}/run-job-search`);
       console.log('Payload:', payload);
 
-      // Send POST request using fetch
-      const response = await fetch(`${API_BASE_URL}/run-job-search`, {
-        method: 'POST',
+      // Send POST request using axios
+      const response = await axios.post(`${API_BASE_URL}/run-job-search`, payload, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        }
       });
 
-      console.log('Response received. Status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Server error: ${response.status} - ${errorText}`);
-      }
-
-      // Parse JSON response
-      const responseData = await response.json();
+      const responseData = response.data;
       console.log('Parsed response data:', responseData);
 
       if (responseData.error) {
@@ -257,7 +247,14 @@ export default function JobListings() {
     } catch (error) {
       console.error('Job search error:', error);
 
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      // Axios network error handling
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'isAxiosError' in error &&
+        (error as any).isAxiosError &&
+        !(error as any).response
+      ) {
         setError('Cannot connect to server. Make sure the server is running at ' + API_BASE_URL);
       } else if (error instanceof Error) {
         setError(error.message);
