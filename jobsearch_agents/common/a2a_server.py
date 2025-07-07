@@ -71,6 +71,7 @@ def create_agent_server(
         ],
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
+        allow_credentials=True,
     )
 
     # Create .well-known directory if it doesn't exist
@@ -208,6 +209,7 @@ def create_agent_server(
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Credentials": "true",
+      
             }
         )
 
