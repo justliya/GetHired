@@ -62,7 +62,7 @@ def create_agent_server(
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[ "https://get-hired-one.vercel.app"],
+        allow_origins=[ "*"],
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         allow_credentials=True,
@@ -199,7 +199,7 @@ def create_agent_server(
                 "company_research": company_research_parsed,
             },
             headers={
-                "Access-Control-Allow-Origin": "https://get-hired-one.vercel.app",
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Credentials": "true",
@@ -324,7 +324,7 @@ def create_agent_server(
         return JSONResponse(
             content={},
             headers={
-                "Access-Control-Allow-Origin": "https://get-hired-one.vercel.app",
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Credentials": "true",
@@ -337,7 +337,7 @@ def create_agent_server(
         return JSONResponse(
             content={},
             headers={
-                "Access-Control-Allow-Origin": "https://get-hired-one.vercel.app",
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Credentials": "true",
             },

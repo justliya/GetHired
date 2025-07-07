@@ -17,7 +17,7 @@ interface EnvironmentConfig {
 }
 
 const getEnvironmentConfig = (): EnvironmentConfig => {
-  const isDevelopment = import.meta.env.MODE === 'development';
+  const isDevelopment = import.meta.env.MODE === 'development'; 
   const isProduction = import.meta.env.MODE === 'production';
 
   return {
