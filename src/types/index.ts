@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export interface Profile {
   name: string;
   email: string;
@@ -159,6 +161,13 @@ export interface SearchParameters {
   excludeKeywords?: string[];
   scheduleSettings?: ScheduleSettings;
 }
+
+export interface JobSearch {
+  preferences: JobPreferences;
+  initiatedAt: string;
+  resultsCount: number;
+  status?: 'queued' | 'running' | 'completed' | 'failed';
+}
 export interface JobListing {
   jobId: string;
   id: string;
@@ -252,17 +261,7 @@ export interface CompanyResearch {
   };
   favorite?: boolean;
 }
-export interface ResumeTailoring {
-  id: string;
-  jobId: string;
-  suggestedChanges: {
-    section: string;
-    original: string;
-    suggested: string;
-    reason: string;
-  }[];
-  coverLetter: string | null;
-}
+
 
 export interface UserPreferences {
   jobTitles: string[];
@@ -308,3 +307,42 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
 }
+
+// Main user data interface
+export interface UserData {
+  profile: Profile;
+  jobPreferences: JobPreferences;
+  applications: Application[];
+  resumes: Resume[];
+  jobListings: JobListing[];
+  jobSearches: JobSearch[];
+  tailoredResumes?: TailoredResume[];  // Add this for tracking tailored resumes
+}
+
+
+// API Response Types
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+// Firebase Service Response Types
+export interface FirebaseServiceResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+/*export interface ResumeTailoring {
+  id: string;
+  jobId: string;
+  suggestedChanges: {
+    section: string;
+    original: string;
+    suggested: string;
+    reason: string;
+  }[];
+  coverLetter: string | null;
+}*/

@@ -13,8 +13,8 @@ import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import { auth, onAuthStateChanged } from './firebase';
 import { updateUserPreferences, getUserPreferences } from './services/firebaseService';
-import UserPreferencesModal from "./components/ui/UserPreferencesModal";
-import SuccessModal from "./components/ui/SuccessModal";
+import UserPreferencesModal from "./components/onboarding_modal/UserPreferencesModal";
+import SuccessModal from "./components/onboarding_modal/SuccessModal";
 import {
   shouldShowPreferencesModal,
   markPreferencesModalSeen,

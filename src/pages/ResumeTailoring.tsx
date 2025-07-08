@@ -5,7 +5,14 @@ import { Loader2, ArrowLeft, FileText } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
-import { getUserResumes, getResumeUrlForContext, uploadResumeWithFallback, getJobListings, getUserData, saveTailoredResume } from '../services/firebaseService';
+import { 
+  getUserResumes, 
+  getResumeUrlForContext, 
+  uploadResume, 
+  getJobListings, 
+  getUserData, 
+  saveTailoredResume 
+} from '../services/firebaseService';
 import { useResumeTailoring } from '../hooks/useResumeTailoring';
 import {
   ResumeSelector,
@@ -15,7 +22,7 @@ import {
   DownloadBanner,
   UnifiedDocumentViewer
 } from '../components/resume';
-import type { Resume } from '../models/UserData';
+import type { Resume, ResumeTailoringContext } from '../types';
 import type { JobListing } from '../types';
 
 interface Job {
@@ -75,12 +82,10 @@ const ResumeTailoring = () => {
             setSelectedResumeId(defaultResume.id);
             setSelectedResumeUrl(getResumeUrlForContext(defaultResume));
             setResumeInputMethod('saved');
-            setResumeText(`Upload resume content will be processed automatically.`);
+            setResumeText(`Resume content will be processed automatically.`);
           }
         }
-
-        // Load user job listings for job description dropdown
-        const jobsResult = await getJobListings(user.uid);
+    const jobsResult = await getJobListings(user.uid);
         if (jobsResult.success) {
           // Map the job listings to match the expected JobListing interface (fully typed)
           const jobListings: JobListing[] = (jobsResult.data as any[]).map(job => ({
@@ -102,6 +107,7 @@ const ResumeTailoring = () => {
           }));
           setUserJobs(jobListings);
         }
+
 
         // If we have a specific job ID, load that job's data
         if (jobId && jobId !== 'new') {
@@ -141,10 +147,10 @@ const ResumeTailoring = () => {
 
     try {
       setIsUploading(true);
-      const result = await uploadResumeWithFallback(user.uid, file, {
+      
+      const result = await uploadResume(user.uid, file, {
         title: file.name,
         isOriginal: true,
-        uploadSource: 'manual',
       });
 
       if (result.success && result.data) {
@@ -153,11 +159,13 @@ const ResumeTailoring = () => {
         setSelectedResumeId(newResume.id);
         setSelectedResumeUrl(getResumeUrlForContext(newResume));
         setResumeInputMethod('upload');
-
-        setResumeText(`The resume content will be processed automatically.`);
+        setResumeText(`Resume uploaded successfully. The content will be processed automatically.`);
+      } else {
+        alert(result.error || 'Failed to upload resume');
       }
     } catch (err) {
       console.error('Error uploading resume:', err);
+      alert('Failed to upload resume. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -169,8 +177,7 @@ const ResumeTailoring = () => {
 
     setSelectedResumeUrl(getResumeUrlForContext(resume));
     setResumeInputMethod('saved');
-
-    setResumeText(`The resume content will be processed automatically. You can also paste additional text if needed.`);
+    setResumeText(`Resume content will be processed automatically.`);
   };
 
   const loadSampleResume = () => {
@@ -272,25 +279,30 @@ Join our team and help build the next generation of web applications that serve 
     setShowJobSelector(false);
   };
 
+  const handleStartAnalysis = () => {
+    const context: ResumeTailoringContext = {
+      user_id: user?.uid || 'anonymous',
+      firebase_uid: user?.uid,
+            is_anonymous: user?.isAnonymous || false,
+      task: 'resume_tailoring',
+      user_name: userName || user?.displayName || '',
+      resume_storage_url: selectedResumeUrl || '',
+      job_description: jobDescription,
+      job_title: job?.title || '',
+      job_company: job?.company || '',
+      require_authenticated_urls: true,
+      user_email: user?.email || '',
+      timestamp: new Date().toISOString(),
+      user_agent: navigator.userAgent
+    };
 
-const handleStartAnalysis = () => {
-  const context = {
-    user_id: user?.uid || 'anonymous',
-    firebase_uid: user?.uid,
-    is_anonymous: user?.isAnonymous || false,
-    task: 'resume_tailoring',
-    user_name: userName || user?.displayName || '',
-    resume_storage_url: selectedResumeUrl || '',
-    job_description: jobDescription,
-    job_title: job?.title || '',
-    job_company: job?.company || '',
-    require_authenticated_urls: true,
-    user_email: user?.email || ''
+    console.log('🚀 Starting analysis with context:', {
+      ...context,
+      resume_url_provided: !!selectedResumeUrl
+    });
+
+    startAnalysis(resumeText, selectedResumeUrl, jobDescription, context, job, userName);
   };
-
-  startAnalysis(resumeText, selectedResumeUrl, jobDescription, context, job, userName);
-};
-
 
   // Handlers for ResumeSelector component
   const handleResumeSelect = (resumeId: string) => {
@@ -317,6 +329,21 @@ const handleStartAnalysis = () => {
     setShowJobSelector(!showJobSelector);
   };
 
+  // Get the best available download URL
+  const getDownloadUrl = (): string => {
+    if (!tailoringData) return '';
+    // Priority: authenticated/signed URL > public URL > any other URL
+    return (
+      tailoringData.authenticatedUrl ||
+      tailoringData.signedUrl ||
+      tailoringData.publicUrl ||
+      tailoringData.tailoredResumeUrl ||
+      tailoringData.firebaseUrl ||
+      tailoringData.gcsUrl ||
+      ''
+    ) as string;
+  };
+
   // Handler for saving tailored resume
   const handleSaveResume = async () => {
     if (!user?.uid || !tailoringData) {
@@ -332,11 +359,16 @@ const handleStartAnalysis = () => {
       
       const result = await saveTailoredResume(user.uid, {
         resumeText: tailoringData.tailoredResumeText || '',
-        documentUrl: tailoringData.tailoredResumeUrl,
-        authenticatedUrl: tailoringData.authenticatedUrl,
+        documentUrl: (tailoringData.publicUrl || tailoringData.tailoredResumeUrl) as string | undefined,
+        authenticatedUrl: tailoringData.authenticatedUrl as string | undefined,
+        signedUrl: tailoringData.signedUrl as string | undefined,
+        publicUrl: tailoringData.publicUrl as string | undefined,
+        firebaseUrl: tailoringData.firebaseUrl as string | undefined,
+        gcsUrl: tailoringData.gcsUrl as string | undefined,
+        filename: tailoringData.filename as string | undefined,
         jobTitle: job?.title,
         jobCompany: job?.company,
-        originalResumeId: originalResumeId
+        originalResumeId: originalResumeId,
       });
 
       if (result.success) {
@@ -347,7 +379,6 @@ const handleStartAnalysis = () => {
           setUserResumes(prev => [...prev, result.data!]);
         }
         
-        // Show success feedback (you could add a toast notification here)
         alert('Resume saved successfully! You can find it in your saved resumes.');
       } else {
         console.error('❌ Failed to save resume:', result.error);
@@ -464,7 +495,6 @@ const handleStartAnalysis = () => {
               onToggleJobSelector={handleToggleJobSelector}
               onLoadJobFromListing={handleLoadJobFromListing}
               onLoadSampleJob={loadSampleJobDescription}
-      
             />
           </div>
         </div>
@@ -494,26 +524,28 @@ const handleStartAnalysis = () => {
       {tailoringData && (
         <div>
           {/* Download Banner */}
-          {(tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl) && (
-            <DownloadBanner resumeUrl={(tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl)!} />
+          {getDownloadUrl() && (
+            <DownloadBanner 
+              resumeUrl={getDownloadUrl()} 
+            />
           )}
 
           {/* Resume Changes Tab */}
           {activeTab === 'resume' && (
             <div className="space-y-6">
               {/* Document Viewer */}
-              {(tailoringData.tailoredResumeText || tailoringData.tailoredResumeUrl) && (
+              {(tailoringData.tailoredResumeText || getDownloadUrl()) && (
                 <UnifiedDocumentViewer
                   resumeText={tailoringData.tailoredResumeText}
-                  documentUrl={tailoringData.tailoredResumeUrl}
-                  authenticatedUrl={tailoringData.authenticatedUrl}
+                  authenticatedUrl={getDownloadUrl()}
                   job={job}
                   onCopyText={copySuggestion}
                   onDownload={() => {
-                    // Prefer authenticated URL for downloads
-                    const downloadUrl = tailoringData.authenticatedUrl || tailoringData.tailoredResumeUrl;
+                    const downloadUrl = getDownloadUrl();
                     if (downloadUrl) {
                       window.open(downloadUrl, '_blank');
+                    } else {
+                      alert('No download URL available. Please try again.');
                     }
                   }}
                   onSave={handleSaveResume}
@@ -548,6 +580,15 @@ const handleStartAnalysis = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+            {/* Error State */}
+      {!isAnalyzing && !tailoringData && (resumeText && jobDescription) && (
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
+          <p className="text-gray-600 dark:text-gray-400">
+            Click "Tailor My Resume" to start the analysis and get personalized recommendations.
+          </p>
         </div>
       )}
     </div>
