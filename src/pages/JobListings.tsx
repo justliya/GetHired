@@ -12,10 +12,10 @@ import { auth, db } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
 import type { JobListing } from '../types';
-import { ENV } from "../config/environment";
+//import { ENV } from "../config/environment";
 
 
-const API_BASE_URL = ENV.GETHIRED_AGENTS_API_URL;
+const API_BASE_URL = "http://0.0.0.0:8080";
 
 
 

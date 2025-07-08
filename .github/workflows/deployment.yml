@@ -41,7 +41,7 @@ jobs:
         run: |
           if grep -q "env = os.environ.copy()" profile/agent.py; then
             sed -i '/env = os.environ.copy()/a\
-          env["SERVICE_ACCOUNT_KEY_PATH"] = env.get("FIREBASE_SERVICE_ACCOUNT_KEY", "")
+          env["SERVICE_ACCOUNT_KEY_PATH"] = env.get("SERVICE_ACCOUNT_KEY_PATH", "")
             ' profile/agent.py
             echo "Environment variable insertion completed"
           else
@@ -103,8 +103,8 @@ jobs:
             --allow-unauthenticated \
             --memory=2Gi \
             --cpu=2.0 \
-            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,MCP_SERVER_URL=${{ secrets.MCP_SERVER_URL }},GCS_RESUME_BUCKET=gethired-resumes,GOOGLE_APPLICATION_CREDENTIALS=/secrets/firebase-service-account-key,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT" \
-            --set-env-vars="FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.SA_PATH }},MODE=staging,"
+            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=True,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,MCP_SERVER_URL=${{ secrets.MCP_SERVER_URL }},GCS_RESUME_BUCKET=gethired-resumes,GOOGLE_APPLICATION_CREDENTIALS=/secrets/firebase-service-account-key,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT" \
+            --set-env-vars="SERVICE_ACCOUNT_KEY_PATH=${{ secrets.SA_PATH }},MODE=staging,"
 
   deploy-production:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -142,5 +142,5 @@ jobs:
             --cpu=4.0 \
             --min-instances=1 \
             --max-instances=10 \
-            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,DISABLE_WEB_DRIVER=0,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,MCP_SERVER_URL=${{ secrets.MCP_SERVER_URL }},GCS_RESUME_BUCKET=gethired-resumes,GOOGLE_APPLICATION_CREDENTIALS=/secrets/firebase-service-account-key,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT" \
-            --set-env-vars="FIREBASE_SERVICE_ACCOUNT_KEY=${{ secrets.SA_PATH }},MODE=production"
+            --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=True,GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,STAGING_BUCKET=$STAGING_BUCKET,GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET,MCP_SERVER_URL=${{ secrets.MCP_SERVER_URL }},GCS_RESUME_BUCKET=gethired-resumes,GOOGLE_APPLICATION_CREDENTIALS=/secrets/firebase-service-account-key,GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT" \
+            --set-env-vars="SERVICE_ACCOUNT_KEY_PATH=${{ secrets.SA_PATH }}, MODE=production"
