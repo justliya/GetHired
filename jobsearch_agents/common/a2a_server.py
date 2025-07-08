@@ -264,7 +264,7 @@ def create_agent_server(
                         "session_id": session_id,
                     },
                     headers={
-                        "Access-Control-Allow-Origin": "http://localhost:5173",
+                        "Access-Control-Allow-Origin": "*",
                         "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                         "Access-Control-Allow-Headers": "*",
                         "Access-Control-Allow-Credentials": "true",
@@ -280,7 +280,7 @@ def create_agent_server(
                     },
                     status_code=500,
                     headers={
-                        "Access-Control-Allow-Origin": "http://localhost:5173",
+                        "Access-Control-Allow-Origin": "*",
                         "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                         "Access-Control-Allow-Headers": "*",
                         "Access-Control-Allow-Credentials": "true",
@@ -297,7 +297,7 @@ def create_agent_server(
                 },
                 status_code=500,
                 headers={
-                    "Access-Control-Allow-Origin": "http://localhost:5173",
+                    "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                     "Access-Control-Allow-Headers": "*",
                     "Access-Control-Allow-Credentials": "true",
