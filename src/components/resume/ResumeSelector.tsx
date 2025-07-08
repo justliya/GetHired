@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Upload, FileText, Loader2 } from 'lucide-react';
-import type { Resume } from '../../models/UserData';
+import type { Resume } from '../../types';
 
 interface ResumeSelectorProps {
   userResumes: (Resume & { id: string })[];

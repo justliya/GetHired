@@ -1,8 +1,8 @@
-import  { type ReactNode, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Menu, X, Search, Briefcase, Building2, FileText, 
-  Settings, Moon, Sun, 
+import {
+  Menu, X, Search, Briefcase, Building2, FileText,
+  Settings, Moon, Sun,
   User
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
@@ -17,7 +17,7 @@ const Layout = ({ children }: LayoutProps) => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const navigationItems = [
     { name: 'Dashboard', path: '/', icon: <Search className="w-5 h-5" /> },
     { name: 'Job Search', path: '/jobs', icon: <Briefcase className="w-5 h-5" /> },
@@ -33,7 +33,7 @@ const Layout = ({ children }: LayoutProps) => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       {/* Mobile Header */}
       <header className="lg:hidden flex items-center justify-between p-4 bg-white dark:bg-gray-800 shadow-sm">
-        <button 
+        <button
           onClick={toggleSidebar}
           className="p-2 rounded-md text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-white focus:outline-none"
         >
@@ -81,11 +81,10 @@ const Layout = ({ children }: LayoutProps) => {
                         navigate(item.path);
                         setSidebarOpen(false);
                       }}
-                      className={`flex items-center w-full p-3 rounded-md transition-colors duration-200 ${
-                        location.pathname === item.path
+                      className={`flex items-center w-full p-3 rounded-md transition-colors duration-200 ${location.pathname === item.path
                           ? 'bg-blue-50 text-blue-600 dark:bg-gray-700 dark:text-blue-400'
                           : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                      }`}
+                        }`}
                     >
                       {item.icon}
                       <span className="ml-3">{item.name}</span>
@@ -114,11 +113,10 @@ const Layout = ({ children }: LayoutProps) => {
                 <li key={item.path}>
                   <button
                     onClick={() => navigate(item.path)}
-                    className={`flex items-center w-full p-3 rounded-md transition-colors duration-200 ${
-                      location.pathname === item.path
+                    className={`flex items-center w-full p-3 rounded-md transition-colors duration-200 ${location.pathname === item.path
                         ? 'bg-blue-50 text-blue-600 dark:bg-gray-700 dark:text-blue-400'
                         : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                    }`}
+                      }`}
                   >
                     {item.icon}
                     <span className="ml-3">{item.name}</span>

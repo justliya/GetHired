@@ -1,4 +1,4 @@
-import  { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   MapPin,
@@ -16,7 +16,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
-// Editable subset of AppUser
+
 interface ProfileData {
   name: string;
   title: string;
@@ -144,13 +144,13 @@ export default function Profile() {
             {profile.skills.map((skill, idx) => (
               <div key={idx} className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
                 {skill}
-                {isEditing && <button onClick={() => onChange('skills', profile.skills.filter((_, j) => j !== idx))} className="ml-2 text-red-600"><Trash2 className="w-4 h-4"/></button>}
+                {isEditing && <button onClick={() => onChange('skills', profile.skills.filter((_, j) => j !== idx))} className="ml-2 text-red-600"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>
           {isEditing && (
             <form onSubmit={e => { e.preventDefault(); const v = (e.currentTarget.elements.namedItem('newSkill') as HTMLInputElement).value.trim(); if (v) onChange('skills', [...profile.skills, v]); e.currentTarget.reset(); }} className="mt-4 flex items-center space-x-2">
-              <input name="newSkill" type="text" placeholder="New skill" className="p-2 border border-gray-300 dark:border-gray-600 rounded-md flex-1"/>
+              <input name="newSkill" type="text" placeholder="New skill" className="p-2 border border-gray-300 dark:border-gray-600 rounded-md flex-1" />
               <button type="submit" className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md">Add</button>
             </form>
           )}
@@ -168,7 +168,7 @@ export default function Profile() {
                     <p className="text-gray-600 dark:text-gray-400">{exp.company}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-500">{exp.startDate} - {exp.endDate || 'Present'}</p>
                   </div>
-                  {isEditing && <button onClick={() => onChange('experience', profile.experience.filter((_, j) => j !== idx))} className="text-red-500 hover:text-red-600"><Trash2 className="w-4 h-4"/></button>}
+                  {isEditing && <button onClick={() => onChange('experience', profile.experience.filter((_, j) => j !== idx))} className="text-red-500 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
                 </div>
                 <p className="mt-2 text-gray-600 dark:text-gray-400">{exp.description}</p>
               </div>
@@ -199,7 +199,7 @@ export default function Profile() {
                   <p className="text-gray-600 dark:text-gray-400">{edu.degree} in {edu.field}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-500">Graduated {edu.graduationYear}</p>
                 </div>
-                {isEditing && <button onClick={() => onChange('education', profile.education.filter((_, j) => j !== idx))} className="text-red-500 hover:text-red-600"><Trash2 className="w-4 h-4"/></button>}
+                {isEditing && <button onClick={() => onChange('education', profile.education.filter((_, j) => j !== idx))} className="text-red-500 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>
@@ -223,7 +223,7 @@ export default function Profile() {
                 <a href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:underline">
                   <LinkIcon className="w-4 h-4 mr-2" />{link.type.charAt(0).toUpperCase() + link.type.slice(1)}
                 </a>
-                {isEditing && <button onClick={() => onChange('links', profile.links.filter((_, j) => j !== idx))} className="text-red-500 hover:text-red-600"><Trash2 className="w-4 h-4"/></button>}
+                {isEditing && <button onClick={() => onChange('links', profile.links.filter((_, j) => j !== idx))} className="text-red-500 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>

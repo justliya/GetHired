@@ -17,7 +17,7 @@ import { auth } from "../firebase";
 const Settings = () => {
 
   const [activeTab, setActiveTab] = useState('resume');
-  // Use the already initialized auth instance
+
   const handleLogout = async () => {
     await signOut(auth);
   };

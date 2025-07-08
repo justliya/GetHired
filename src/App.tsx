@@ -5,7 +5,7 @@ import { ThemeProvider } from './context/ThemeProvider';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import JobListings from './pages/JobListings';
-import PageNotFound from "./pages/NotFound"; 
+import PageNotFound from "./pages/NotFound";
 import CompanyResearch from './pages/CompanyResearch';
 import ResumeTailoring from './pages/ResumeTailoring';
 import Settings from './pages/Settings';
@@ -15,10 +15,10 @@ import { auth, onAuthStateChanged } from './firebase';
 import { updateUserPreferences, getUserPreferences } from './services/firebaseService';
 import UserPreferencesModal from "./components/ui/UserPreferencesModal";
 import SuccessModal from "./components/ui/SuccessModal";
-import { 
-  shouldShowPreferencesModal, 
-  markPreferencesModalSeen, 
-  handlePreferencesSubmissionSuccess 
+import {
+  shouldShowPreferencesModal,
+  markPreferencesModalSeen,
+  handlePreferencesSubmissionSuccess
 } from './utils/onboardingUtils';
 import type { ScheduledSearch } from './services/scheduledSearchService';
 
@@ -35,19 +35,19 @@ function App() {
         try {
           // Check if user has preferences set
           const prefsResult = await getUserPreferences(user.uid);
-          
+
           // Determine if this is a new user by checking if they have customized preferences
-          const hasCustomPreferences = prefsResult.success && 
-            prefsResult.data && 
-            (prefsResult.data.titles?.length > 0 || 
-             prefsResult.data.locations?.length > 0 ||
-             prefsResult.data.skills?.length > 0);
-          
+          const hasCustomPreferences = prefsResult.success &&
+            prefsResult.data &&
+            (prefsResult.data.titles?.length > 0 ||
+              prefsResult.data.locations?.length > 0 ||
+              prefsResult.data.skills?.length > 0);
+
           setCurrentPage('dashboard');
-          
+
           // Use utility function to determine if we should show the modal
           const shouldShow = shouldShowPreferencesModal(user.uid, hasCustomPreferences || false);
-          
+
           if (shouldShow) {
             // Mark that they've seen the modal
             markPreferencesModalSeen(user.uid);
@@ -100,9 +100,9 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<PageNotFound />} />
           </Routes>
-          
+
           {showUserPrefs && (
-            <UserPreferencesModal 
+            <UserPreferencesModal
               show={showUserPrefs}
               existingSchedule={editingSchedule ? {
                 preferences: editingSchedule.preferences,
@@ -119,14 +119,14 @@ function App() {
               onSubmit={async (formData) => {
                 // Prevent double submissions
                 if (isSubmittingPrefs) return;
-                
+
                 setIsSubmittingPrefs(true);
                 try {
                   const userId = auth.currentUser?.uid;
                   if (!userId) {
                     throw new Error('No authenticated user');
                   }
-                  
+
                   // Map the form data to match your JobPreferences structure
                   const preferences = {
                     titles: formData.preferences.roles || [],
@@ -150,33 +150,33 @@ function App() {
                     includeKeywords: formData.preferences.includeKeywords || [],
                     excludeKeywords: formData.preferences.excludeKeywords || []
                   };
-                  
+
                   const result = await updateUserPreferences(userId, preferences);
-                  
+
                   if (!result.success) {
                     throw new Error(result.error || 'Failed to update preferences');
                   }
-                  
+
                   // Handle successful submission with utility function
                   handlePreferencesSubmissionSuccess(userId);
-                  
+
                   // Close modal immediately for better UX
                   setShowUserPrefs(false);
                   setEditingSchedule(null);
-                  
+
                   // Show success modal after a brief delay
                   setTimeout(() => {
                     setShowSuccessModal(true);
                   }, 150);
-                  
+
                   // Handle background operations (scheduling, job search) asynchronously
                   setTimeout(async () => {
                     try {
                       // Only trigger background job search if user has meaningful criteria
-                      const hasSearchCriteria = preferences.titles.length > 0 || 
-                                               preferences.locations.length > 0 ||
-                                               preferences.skills.length > 0;
-                      
+                      const hasSearchCriteria = preferences.titles.length > 0 ||
+                        preferences.locations.length > 0 ||
+                        preferences.skills.length > 0;
+
                       if (hasSearchCriteria && preferences.searchSchedule?.enabled) {
                         // Background job search - don't await this
                         fetch(`${import.meta.env.VITE_GETHIRED_AGENTS_API_URL}/run`, {
@@ -200,7 +200,7 @@ function App() {
                       console.warn('Background operations failed:', error);
                     }
                   }, 1000);
-                  
+
                 } catch (error) {
                   console.error('Failed to save preferences:', error);
                   alert('Failed to save preferences. Please try again.');
@@ -210,7 +210,7 @@ function App() {
               }}
             />
           )}
-          
+
           {/* Success Modal */}
           <SuccessModal
             show={showSuccessModal}

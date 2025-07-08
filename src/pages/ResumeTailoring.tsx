@@ -272,22 +272,25 @@ Join our team and help build the next generation of web applications that serve 
     setShowJobSelector(false);
   };
 
-  // Handler for the Tailor Resume button  
-  const handleStartAnalysis = () => {
-    const context = {
-      user_id: user?.uid || 'anonymous',
-      firebase_uid: user?.uid,
-      is_anonymous: user?.isAnonymous || false,
-      task: 'resume_tailoring',
-      user_name: userName || user?.displayName || '',
-      resume_storage_url: selectedResumeUrl || '',
-      job_description: jobDescription,
-      job_title: job?.title || '',
-      job_company: job?.company || ''
-    };
 
-    startAnalysis(resumeText, selectedResumeUrl, jobDescription, context, job, userName);
+const handleStartAnalysis = () => {
+  const context = {
+    user_id: user?.uid || 'anonymous',
+    firebase_uid: user?.uid,
+    is_anonymous: user?.isAnonymous || false,
+    task: 'resume_tailoring',
+    user_name: userName || user?.displayName || '',
+    resume_storage_url: selectedResumeUrl || '',
+    job_description: jobDescription,
+    job_title: job?.title || '',
+    job_company: job?.company || '',
+    require_authenticated_urls: true,
+    user_email: user?.email || ''
   };
+
+  startAnalysis(resumeText, selectedResumeUrl, jobDescription, context, job, userName);
+};
+
 
   // Handlers for ResumeSelector component
   const handleResumeSelect = (resumeId: string) => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Basic interfaces
 export interface Profile {
   name: string;
@@ -91,6 +92,70 @@ export interface Resume {
   };
 }
 
+// Resume Tailoring Types
+export interface ResumeSuggestion {
+  section: string;
+  original: string;
+  suggested: string;
+  reason: string;
+}
+
+export interface TailoredResumeUrls {
+  publicUrl?: string;
+  authenticatedUrl?: string;
+  signedUrl?: string;
+  firebaseUrl?: string;
+  gcsUrl?: string;
+}
+
+export interface ResumeTailoringContext {
+  user_id: string;
+  firebase_uid?: string;
+  is_anonymous?: boolean;
+  task: string;
+  user_name: string;
+  resume_storage_url?: string;
+  job_description: string;
+  job_title?: string;
+  job_company?: string;
+  require_authenticated_urls?: boolean;
+  user_email?: string;
+  timestamp?: string;
+  user_agent?: string;
+}
+
+export interface ResumeTailoringResponse {
+  message: string;
+  status: string;
+  data?: {
+    resume_text?: string;
+    final_resume?: string;
+    tailored_resume_text?: string;
+    public_url?: string;
+    document_url?: string;
+    authenticated_url?: string;
+    signed_url?: string;
+    firebase_url?: string;
+    gcs_url?: string;
+    filename?: string;
+    status?: string;
+    suggested_changes?: ResumeSuggestion[];
+    cover_letter?: string;
+  };
+  session_id?: string;
+}
+
+export interface TailoredResume extends Resume {
+  tailoringData?: {
+    suggestedChanges?: ResumeSuggestion[];
+    coverLetter?: string;
+    urls?: TailoredResumeUrls;
+    analysisTimestamp?: string;
+    confidenceScore?: number;
+  };
+}
+
+// Job Listing Types
 export interface JobListing {
   title: string;
   company: string;
@@ -100,6 +165,10 @@ export interface JobListing {
   url: string;
   salary?: string;
   employmentType?: string;
+  // Add fields for resume tailoring
+  hasTailoredResume?: boolean;
+  tailoredResumeId?: string;
+  lastTailoredDate?: string;
 }
 
 export interface SearchParameters {
@@ -122,8 +191,24 @@ export interface JobSearch {
 export interface UserData {
   profile: Profile;
   jobPreferences: JobPreferences;
-  applications: Application[]
-  resumes: Resume[]
-  jobListings: JobListing[]
-  jobSearches: JobSearch[]
+  applications: Application[];
+  resumes: Resume[];
+  jobListings: JobListing[];
+  jobSearches: JobSearch[];
+  tailoredResumes?: TailoredResume[];  // Add this for tracking tailored resumes
+}
+
+// API Response Types
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+// Firebase Service Response Types
+export interface FirebaseServiceResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
 }

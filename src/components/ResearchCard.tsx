@@ -18,80 +18,8 @@ import {
   Trophy,
 } from "lucide-react";
 
+import type { CompanyResearch } from '../types'
 
-export interface CompanyResearch {
-  jobId: string;
-  companyOverview: {
-    name: string;
-    id: string;
-    industry: string;
-    size: string;
-    founded: number;
-    headquarters: string;
-    website: string;
-    stockSymbol: string | null;
-    logoUrl: string;
-  };
-  ratings: {
-    overall: number;
-    reviewCount: number;
-    ceo: {
-      rating: number;
-      name: string;
-    };
-    recommendToFriend: number;
-    detailedBreakdown: {
-      workLifeBalance: number;
-      cultureAndValues: number;
-      compensationAndBenefits: number;
-      careerOpportunities: number;
-      seniorManagement: number;
-      businessOutlook: string;
-    };
-  };
-  salaryEstimates: {
-    title: string;
-    baseRange: { min: number; max: number; median: number };
-    additionalPay: { min: number; max: number };
-    totalCompensation: { min: number; max: number };
-    confidenceLevel: string;
-    dataPoints: number;
-  };
-  reviewsSummary: {
-    link: string;
-    pros: string[];
-    cons: string[];
-    recentInsight: {
-      title: string;
-      location: string;
-      duration: string;
-      snippet: string;
-    };
-  };
-  interviewIntelligence: {
-    difficultyLevel: string;
-    process: string;
-    timeline: string;
-    successRate: string;
-    commonQuestions: string[];
-    tips: string[];
-  };
-  competitors: {
-    name: string;
-    id: string;
-  }[];
-  officeLocations: string[];
-  awards: {
-    title: string;
-    year: number;
-  }[];
-  strategicAssessment: {
-    strengths: string[];
-    concerns: string[];
-    recommendation: string;
-  };
-  favorite?: boolean;
-}
 
 interface ResearchCardProps {
   companyResearch: CompanyResearch;
