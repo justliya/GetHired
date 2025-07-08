@@ -82,6 +82,9 @@ export const uploadResume = async (
     const storageRef = ref(storage, uploadPath);
     const uploadResult = await uploadBytes(storageRef, file);
     const downloadUrl = await getDownloadURL(uploadResult.ref);
+    const bucketName = 'gethired-6c623.appspot.com';
+    const encodedPath = encodeURIComponent(uploadPath);
+    const gcsUrl = `https://storage.googleapis.com/${bucketName}/${encodedPath}`;
 
     // Create resume metadata
     const meta: Resume['metadata'] = {
@@ -99,10 +102,14 @@ export const uploadResume = async (
 
     const resumeData: Resume = {
       fileUrl: downloadUrl,
-      publicUrl: downloadUrl, // Same URL for simplicity
+      publicUrl: gcsUrl || downloadUrl,
       createdAt: new Date().toISOString(),
       type: meta.isOriginal ? 'original' : 'tailored',
-      metadata: meta
+      metadata: {
+        ...meta,
+        storagePath: uploadPath,
+        documentUrl: downloadUrl
+      }
     };
 
     // Save to Firestore
@@ -170,14 +177,9 @@ export const saveTailoredResume = async (
     }
 
     // Use the best available URL (prefer signed/authenticated URLs for downloads)
-    const publicUrl = resumeData.publicUrl || 
-                     resumeData.documentUrl || 
-                     resumeData.gcsUrl || 
-                     resumeData.firebaseUrl || 
-                     '';
+    const publicUrl = resumeData.publicUrl ;
                      
-    const downloadUrl = resumeData.authenticatedUrl || 
-                       resumeData.signedUrl || 
+    const downloadUrl = resumeData.signedUrl || 
                        publicUrl;
 
     // Create resume metadata

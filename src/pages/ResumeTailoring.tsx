@@ -5,20 +5,20 @@ import { Loader2, ArrowLeft, FileText } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
-import { 
-  getUserResumes, 
-  getResumeUrlForContext, 
-  uploadResume, 
-  getJobListings, 
-  getUserData, 
-  saveTailoredResume 
+import {
+  getUserResumes,
+  getResumeUrlForContext,
+  uploadResume,
+  getJobListings,
+  getUserData,
+  saveTailoredResume
 } from '../services/firebaseService';
 import { useResumeTailoring } from '../hooks/useResumeTailoring';
 import {
   ResumeSelector,
   JobDescriptionInput,
   ResumeTextInput,
-  SuggestedChanges,
+  /*SuggestedChanges,*/
   DownloadBanner,
   UnifiedDocumentViewer
 } from '../components/resume';
@@ -85,7 +85,7 @@ const ResumeTailoring = () => {
             setResumeText(`Resume content will be processed automatically.`);
           }
         }
-    const jobsResult = await getJobListings(user.uid);
+        const jobsResult = await getJobListings(user.uid);
         if (jobsResult.success) {
           // Map the job listings to match the expected JobListing interface (fully typed)
           const jobListings: JobListing[] = (jobsResult.data as any[]).map(job => ({
@@ -107,7 +107,6 @@ const ResumeTailoring = () => {
           }));
           setUserJobs(jobListings);
         }
-
 
         // If we have a specific job ID, load that job's data
         if (jobId && jobId !== 'new') {
@@ -147,7 +146,7 @@ const ResumeTailoring = () => {
 
     try {
       setIsUploading(true);
-      
+
       const result = await uploadResume(user.uid, file, {
         title: file.name,
         isOriginal: true,
@@ -283,7 +282,7 @@ Join our team and help build the next generation of web applications that serve 
     const context: ResumeTailoringContext = {
       user_id: user?.uid || 'anonymous',
       firebase_uid: user?.uid,
-            is_anonymous: user?.isAnonymous || false,
+      is_anonymous: user?.isAnonymous || false,
       task: 'resume_tailoring',
       user_name: userName || user?.displayName || '',
       resume_storage_url: selectedResumeUrl || '',
@@ -301,10 +300,10 @@ Join our team and help build the next generation of web applications that serve 
       resume_url_provided: !!selectedResumeUrl
     });
 
-    startAnalysis(resumeText, selectedResumeUrl, jobDescription, context, job, userName);
+    startAnalysis(resumeText, selectedResumeUrl, jobDescription, context);
   };
 
-  // Handlers for ResumeSelector component
+    // Handlers for ResumeSelector component
   const handleResumeSelect = (resumeId: string) => {
     setSelectedResumeId(resumeId);
     if (resumeId) {
@@ -332,16 +331,8 @@ Join our team and help build the next generation of web applications that serve 
   // Get the best available download URL
   const getDownloadUrl = (): string => {
     if (!tailoringData) return '';
-    // Priority: authenticated/signed URL > public URL > any other URL
-    return (
-      tailoringData.authenticatedUrl ||
-      tailoringData.signedUrl ||
-      tailoringData.publicUrl ||
-      tailoringData.tailoredResumeUrl ||
-      tailoringData.firebaseUrl ||
-      tailoringData.gcsUrl ||
-      ''
-    ) as string;
+    // Priority: authenticated/signed URL > public URL
+    return tailoringData.signedUrl || tailoringData.publicUrl || '';
   };
 
   // Handler for saving tailored resume
@@ -353,32 +344,26 @@ Join our team and help build the next generation of web applications that serve 
 
     try {
       console.log('💾 Saving tailored resume...');
-      
+
       // Find the original resume ID if possible
       const originalResumeId = selectedResumeId || userResumes.find(r => r.metadata?.isOriginal)?.id;
-      
+
       const result = await saveTailoredResume(user.uid, {
         resumeText: tailoringData.tailoredResumeText || '',
-        documentUrl: (tailoringData.publicUrl || tailoringData.tailoredResumeUrl) as string | undefined,
-        authenticatedUrl: tailoringData.authenticatedUrl as string | undefined,
-        signedUrl: tailoringData.signedUrl as string | undefined,
-        publicUrl: tailoringData.publicUrl as string | undefined,
-        firebaseUrl: tailoringData.firebaseUrl as string | undefined,
-        gcsUrl: tailoringData.gcsUrl as string | undefined,
-        filename: tailoringData.filename as string | undefined,
+        documentUrl: tailoringData.publicUrl,  // Save the public URL
         jobTitle: job?.title,
         jobCompany: job?.company,
-        originalResumeId: originalResumeId,
+        originalResumeId: originalResumeId
       });
 
       if (result.success) {
         console.log('✅ Resume saved successfully:', result.data);
-        
+
         // Update the local resumes list to include the new saved resume
         if (result.data) {
           setUserResumes(prev => [...prev, result.data!]);
         }
-        
+
         alert('Resume saved successfully! You can find it in your saved resumes.');
       } else {
         console.error('❌ Failed to save resume:', result.error);
@@ -525,8 +510,8 @@ Join our team and help build the next generation of web applications that serve 
         <div>
           {/* Download Banner */}
           {getDownloadUrl() && (
-            <DownloadBanner 
-              resumeUrl={getDownloadUrl()} 
+            <DownloadBanner
+              resumeUrl={getDownloadUrl()}
             />
           )}
 
@@ -537,28 +522,29 @@ Join our team and help build the next generation of web applications that serve 
               {(tailoringData.tailoredResumeText || getDownloadUrl()) && (
                 <UnifiedDocumentViewer
                   resumeText={tailoringData.tailoredResumeText}
-                  authenticatedUrl={getDownloadUrl()}
+                  documentUrl={tailoringData.publicUrl}
+                  authenticatedUrl={tailoringData.signedUrl}
                   job={job}
-                  onCopyText={copySuggestion}
+                  onCopyText={(text) => copySuggestion(text)}
                   onDownload={() => {
+                    // Use signed URL for download if available
                     const downloadUrl = getDownloadUrl();
                     if (downloadUrl) {
                       window.open(downloadUrl, '_blank');
-                    } else {
-                      alert('No download URL available. Please try again.');
                     }
                   }}
                   onSave={handleSaveResume}
                 />
               )}
 
-              {/* Suggested Changes */}
+              {/* Suggested Changes - Commented out for now
               {tailoringData.suggestedChanges && tailoringData.suggestedChanges.length > 0 && (
                 <SuggestedChanges
                   changes={tailoringData.suggestedChanges}
                   onCopyText={copySuggestion}
                 />
               )}
+              */}
             </div>
           )}
 
@@ -583,7 +569,7 @@ Join our team and help build the next generation of web applications that serve 
         </div>
       )}
 
-            {/* Error State */}
+      {/* Error State */}
       {!isAnalyzing && !tailoringData && (resumeText && jobDescription) && (
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-8 text-center">
           <p className="text-gray-600 dark:text-gray-400">

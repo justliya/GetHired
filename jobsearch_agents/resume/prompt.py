@@ -266,16 +266,15 @@ CRITICAL: Look for the user_id in the context object provided. It will be under 
 You should return the URLs to the resume that was uploaded to Google Cloud Storage and the resume text as a JSON Object with the following structure:
 {
   "public_url": "https://storage.googleapis.com/gethired-resumes/resumes/ACTUAL_USER_ID/filename.docx",
-  "authenticated_url": "SIGNED_URL_HERE",
   "signed_url": "SIGNED_URL_HERE", 
-  "resume_text": "formatted resume text here",
+  "resume_text": {formatted_resume},
   "filename": "resume_filename.docx",
   "status": "success"
 }
 
 NOTE: 
 - The public_url should be the direct Google Cloud Storage URL
-- The authenticated_url and signed_url should be the same signed URL with 7-day expiration
+- The signed_url should be the same signed URL with 7-day expiration
 - Use the actual user_id in the URL path
 - The signed URL will be a long URL with authentication parameters
 - Replace ACTUAL_USER_ID with the real user_id from the context

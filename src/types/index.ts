@@ -73,6 +73,7 @@ export interface Resume {
   publicUrl?: string;  // Public URL for agent processing (without authentication)
   createdAt: string;
   type: ResumeType;
+  
   metadata: {
     title?: string;
     description?: string;
@@ -87,6 +88,9 @@ export interface Resume {
     originalResumeId?: string;   // Reference to the original resume this was based on
     customizations?: string[];   // List of customizations made to original
     [key: string]: unknown;
+    storagePath?: string;    // ✅ Add this
+    documentUrl?: string; 
+  
   };
 }
 

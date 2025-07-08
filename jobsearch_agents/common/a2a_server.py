@@ -221,88 +221,81 @@ def create_agent_server(
         """
         print(f"\n>>> Tailoring Resume - Session: {request.session_id}")
 
-        # Extract user_id from context
-        user_id = request.context.get("user_id", "anonymous")
-        session_id = request.session_id or f"{user_id}_resume_{uuid.uuid4().hex[:8]}"
+        user_id = request.context.get("user_id", "unknown_user")
+        session_id = f"{user_id}_job_search_{uuid.uuid4().hex[:8]}"
+        agent_instance = task_manager.agent
+        runner = task_manager.runner
+
+        # Create session first
+        try:
+            session = await task_manager.session_service.get_session(
+                app_name=runner.app_name, user_id=user_id, session_id=session_id
+            )
+
+            if not session:
+                session = await task_manager.session_service.create_session(
+                    app_name=runner.app_name,
+                    user_id=user_id,
+                    session_id=session_id,
+                    state={},
+                )
+                print(f"Created new session: {session_id}")
+            else:
+                print(f"Using existing session: {session_id}")
+        except Exception as inner_e:
+            print(f"Session error: {inner_e}. Creating new session.")
+            session = await task_manager.session_service.create_session(
+                app_name=runner.app_name,
+                user_id=user_id,
+                session_id=session_id,
+                state={},
+            )
 
         # Create proper Content object with the message
         user_content = types.Content(role="user", parts=[types.Part(text=request.message)])
 
-        try:
-            # Process the resume tailoring request
-            response = await task_manager.process_task(
-                message=request.message, context=request.context, session_id=session_id
-            )
+            # Run the agent
+        async for event in runner.run_async(
+            user_id=user_id, session_id=session_id, new_message=user_content
+        ):
+            pass
 
-            # Extract the tailored resume from response
-            if response.get("status") == "success":
-                data = response.get("data", {})
+        # Get session state after completion
+        current_session = await task_manager.session_service.get_session(
+            app_name=runner.app_name, user_id=user_id, session_id=session_id
+        )
 
-                # Check for formatted_resume or final_resume in the data
-                formatted_resume = None
-                document_url = None
+        # Extract outputs from session state
+        resume_format = current_session.state.get("formatted_resume")
+        document = current_session.state.get("doc")
 
-                # Look for the resume in various possible locations in the response
-                if "formatted_resume" in data:
-                    formatted_resume = data["formatted_resume"]
-                elif "final_resume" in data:
-                    formatted_resume = data["final_resume"]
-                elif "resume_text" in data:
-                    formatted_resume = data["resume_text"]
+        # Parse the outputs
+        resume_format_parsed = unwrap_json_string(resume_format)
+        document_parsed = unwrap_json_string( document)
 
-                if "document_url" in data:
-                    document_url = data["document_url"]
-                elif "download_url" in data:
-                    document_url = data["download_url"]
-
-                return JSONResponse(
-                    content={
-                        "status": "success",
-                        "message": "Resume tailored successfully",
-                        "tailored_resume": formatted_resume,
-                        "document_url": document_url,
-                        "session_id": session_id,
-                    },
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
-                        "Access-Control-Allow-Headers": "*",
-                        "Access-Control-Allow-Credentials": "true",
-                    },
-                )
-            else:
-                return JSONResponse(
-                    content={
-                        "status": "error",
-                        "message": response.get("message", "Failed to tailor resume"),
-                        "error": response.get("data", {}).get("error_type", "Unknown error"),
-                        "session_id": session_id,
-                    },
-                    status_code=500,
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
-                        "Access-Control-Allow-Headers": "*",
-                        "Access-Control-Allow-Credentials": "true",
-                    },
-                )
-
-        except Exception as e:
-            print(f"Error in resume tailoring: {e}")
-            return JSONResponse(
-                content={
-                    "status": "error",
-                    "message": f"Failed to tailor resume: {str(e)}",
-                    "session_id": session_id,
+        print(
+            json.dumps(
+                {
+                    "job_listings": resume_format_parsed,
+                    "company_research":document_parsed,
                 },
-                status_code=500,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
-                    "Access-Control-Allow-Headers": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                },
+                indent=2,
             )
+        )
+
+        # Return the parsed results directly
+        return JSONResponse(
+            content={
+                "resume_text": resume_format_parsed,
+                "content": document_parsed,
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true",
+            },
+        )
 
     # Metadata endpoint
     @app.get("/.well-known/agent.json")
