@@ -1,4 +1,4 @@
-import type { SearchSchedule } from '../models/UserData';
+import type { SearchSchedule } from '../types';
 
 export const formatTime = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number);

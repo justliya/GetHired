@@ -1,7 +1,6 @@
 // Test script for Firebase permissions - scheduledSearchService.ts
 // Run this in your browser console to test the service
-
-import { 
+/*import { 
   isUserAuthenticated, 
   getCurrentUserIdSafe, 
   getUserScheduledSearches,
@@ -95,4 +94,4 @@ async function testCreateScheduledSearch() {
 // Run the tests
 testGetScheduledSearches();
 // Uncomment the line below to test creation (will create a real record!)
-// testCreateScheduledSearch();
+// testCreateScheduledSearch();*/

@@ -63,7 +63,8 @@ doc_creator_agent =  Agent(
     instruction = prompt.TEMPLATE_DOCUMENT_CREATION,
     tools=[
         create_formatted_resume
-    ]
+    ],
+     output_key='doc'
     )
 async def create_agent():
     exit_stack = AsyncExitStack()

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react'; 
+import { AlertTriangle } from 'lucide-react';
 
 const PageNotFound = () => {
   const navigate = useNavigate();

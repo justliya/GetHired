@@ -9,7 +9,7 @@ import type {
     Resume,
     SearchFrequency,
     NotificationType 
-} from '../../models/UserData';
+} from '../../types';
 import ScheduleConfig from './ScheduleConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';

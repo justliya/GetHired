@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   Timestamp 
 } from 'firebase/firestore';
-import type { JobPreferences, SearchSchedule } from '../models/UserData';
+import type { JobPreferences, SearchSchedule } from '../types';
 
 const COLLECTION_NAME = 'scheduledSearches';
 

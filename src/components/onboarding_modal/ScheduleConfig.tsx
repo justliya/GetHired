@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ButtonGroup from './ButtonGroup';
-import type { SearchFrequency, NotificationType, SearchSchedule } from '../../models/UserData';
+import type { SearchFrequency, NotificationType, SearchSchedule } from '../../types';
 
 interface ScheduleConfigProps {
   schedule: SearchSchedule;

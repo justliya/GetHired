@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import JobCard from '../components/JobCard';
-import ScheduleStatusDisplay from '../components/ui/ScheduleStatusDisplay';
+import ScheduleStatusDisplay from '../components/onboarding_modal/ScheduleStatusDisplay';
 import type { JobListing } from '../types';
 import type { ScheduledSearch } from '../services/scheduledSearchService';
 

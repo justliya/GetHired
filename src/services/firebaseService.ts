@@ -12,37 +12,24 @@ import {
 import { 
   ref, 
   uploadBytes, 
-  getDownloadURL, 
-  getBlob,
-  getStorage 
+  getDownloadURL,
+  getBlob
 } from 'firebase/storage';
 import type { 
   JobPreferences, 
   Resume,
-  ResumeUploadSource, 
   Application, 
   JobListing, 
   JobSearch,
   Profile, 
   UserData 
-} from '../models/UserData';
-
-interface UploadResult {
-  success: boolean;
-  fileUrl?: string;
-  downloadUrl?: string;
-  uploadMethod?: 'gcs' | 'firebase' | 'dataurl' | 'failed';
-  error?: string;
-}
+} from '../types';
 
 interface ServiceResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
 }
-
-const GCS_USER_UPLOADS_BUCKET = 'gethired-resume-uploads';
-const GCS_AI_GENERATED_BUCKET = 'gethired-resumes';
 
 const defaultJobPreferences: JobPreferences = {
   titles: [],
@@ -79,137 +66,6 @@ const generateSafeFileName = (fileName: string, userId: string): string => {
   return `resumes/${userId}/${timestamp}_${safeFileName}`;
 };
 
-const convertToDirectGCSUrl = (firebaseUrl: string): string => {
-  try {
-    if (firebaseUrl.includes('storage.googleapis.com') && !firebaseUrl.includes('firebasestorage.googleapis.com')) {
-      return firebaseUrl;
-    }
-    
-    if (firebaseUrl.includes('firebasestorage.googleapis.com')) {
-      const urlObj = new URL(firebaseUrl);
-      const pathMatch = urlObj.pathname.match(/\/v0\/b\/(.+?)\/o\/(.+)/);
-      if (pathMatch) {
-        const [, bucket, encodedPath] = pathMatch;
-        const decodedPath = decodeURIComponent(encodedPath);
-        return `https://storage.googleapis.com/${bucket}/${decodedPath}`;
-      }
-    }
-
-    return firebaseUrl;
-  } catch (error) {
-    console.error('Failed to convert URL:', error);
-    return firebaseUrl;
-  }
-};
-
-const uploadToGCSBucket = async (file: File, userId: string, bucketName: string = GCS_USER_UPLOADS_BUCKET): Promise<UploadResult> => {
-  try {
-    const uploadPath = generateSafeFileName(file.name, userId);
-    const gcsStorage = getStorage(undefined, `gs://${bucketName}`);
-    const storageRef = ref(gcsStorage, uploadPath);
-    
-    const uploadResult = await uploadBytes(storageRef, file, {
-      contentType: file.type,
-      cacheControl: 'public, max-age=31536000',
-      customMetadata: {
-        'publicAccess': 'true',
-        'uploadedBy': userId,
-        'uploadTimestamp': Date.now().toString()
-      }
-    });
-    
-    const downloadUrl = await getDownloadURL(uploadResult.ref);
-    const publicUrl = `https://storage.googleapis.com/${bucketName}/${uploadPath}`;
-    
-    return {
-      success: true,
-      fileUrl: downloadUrl,
-      downloadUrl: publicUrl,
-      uploadMethod: 'gcs'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'GCS upload failed',
-      uploadMethod: 'failed'
-    };
-  }
-};
-
-const uploadToFirebaseStorage = async (file: File, userId: string): Promise<UploadResult> => {
-  try {
-    const uploadPath = generateSafeFileName(file.name, userId);
-    const storageRef = ref(storage, uploadPath);
-    const uploadResult = await uploadBytes(storageRef, file);
-    const downloadUrl = await getDownloadURL(uploadResult.ref);
-    
-    return {
-      success: true,
-      fileUrl: downloadUrl,
-      downloadUrl: downloadUrl,
-      uploadMethod: 'firebase'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Firebase upload failed',
-      uploadMethod: 'failed'
-    };
-  }
-};
-
-const createDataUrlFallback = async (file: File): Promise<UploadResult> => {
-  try {
-    const reader = new FileReader();
-    const dataUrlPromise = new Promise<string>((resolve, reject) => {
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    
-    const dataUrl = await dataUrlPromise;
-    
-    return {
-      success: true,
-      fileUrl: dataUrl,
-      downloadUrl: dataUrl,
-      uploadMethod: 'dataurl'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Data URL creation failed',
-      uploadMethod: 'failed'
-    };
-  }
-};
-
-const uploadFileWithFallback = async (file: File, userId: string, bucketName: string = GCS_USER_UPLOADS_BUCKET): Promise<UploadResult> => {
-  // GCS-first strategy
-  const gcsResult = await uploadToGCSBucket(file, userId, bucketName);
-  if (gcsResult.success) {
-    return gcsResult;
-  }
-  
-  // Firebase fallback
-  const firebaseResult = await uploadToFirebaseStorage(file, userId);
-  if (firebaseResult.success) {
-    return firebaseResult;
-  }
-  
-  // Data URL fallback
-  const dataUrlResult = await createDataUrlFallback(file);
-  if (dataUrlResult.success) {
-    return dataUrlResult;
-  }
-  
-  return {
-    success: false,
-    error: `All upload strategies failed. GCS: ${gcsResult.error}, Firebase: ${firebaseResult.error}, DataURL: ${dataUrlResult.error}`,
-    uploadMethod: 'failed'
-  };
-};
-
 export const uploadResume = async (
   userId: string, 
   file: File, 
@@ -221,21 +77,19 @@ export const uploadResume = async (
       throw new Error('Unauthorized access to user data');
     }
 
-    // Use user uploads bucket for manually uploaded resumes
-    const uploadResult = await uploadFileWithFallback(file, userId, GCS_USER_UPLOADS_BUCKET);
-    
-    if (!uploadResult.success) {
-      return {
-        success: false,
-        error: uploadResult.error || 'Upload failed'
-      };
-    }
+    // Upload to Firebase Storage
+    const uploadPath = generateSafeFileName(file.name, userId);
+    const storageRef = ref(storage, uploadPath);
+    const uploadResult = await uploadBytes(storageRef, file);
+    const downloadUrl = await getDownloadURL(uploadResult.ref);
+    const bucketName = 'gethired-6c623.appspot.com';
+    const encodedPath = encodeURIComponent(uploadPath);
+    const gcsUrl = `https://storage.googleapis.com/${bucketName}/${encodedPath}`;
 
+    // Create resume metadata
     const meta: Resume['metadata'] = {
       title: metadata?.title || file.name,
-      uploadSource: (uploadResult.uploadMethod === 'firebase' ? 'firebase' : 
-                    uploadResult.uploadMethod === 'gcs' ? 'public' : 
-                    uploadResult.uploadMethod === 'dataurl' ? 'base64' : 'manual') as ResumeUploadSource,
+      uploadSource: 'manual',
       isOriginal: metadata?.isOriginal ?? true,
       keywords: metadata?.keywords || [],
       ...(metadata?.description && { description: metadata.description }),
@@ -247,43 +101,29 @@ export const uploadResume = async (
     };
 
     const resumeData: Resume = {
-      fileUrl: uploadResult.fileUrl!,
-      publicUrl: uploadResult.downloadUrl || uploadResult.fileUrl!,
+      fileUrl: downloadUrl,
+      publicUrl: gcsUrl || downloadUrl,
       createdAt: new Date().toISOString(),
       type: meta.isOriginal ? 'original' : 'tailored',
-      metadata: meta
+      metadata: {
+        ...meta,
+        storagePath: uploadPath,
+        documentUrl: downloadUrl
+      }
     };
 
-    try {
-      const resumesRef = collection(db, 'users', userId, 'resumes');
-      const docRef = await addDoc(resumesRef, resumeData);
+    // Save to Firestore
+    const resumesRef = collection(db, 'users', userId, 'resumes');
+    const docRef = await addDoc(resumesRef, resumeData);
 
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserData;
-        const updatedResumes = [...(userData.resumes || []), { ...resumeData, id: docRef.id }];
-        
-        await setDoc(userRef, { 
-          resumes: updatedResumes 
-        }, { merge: true });
-      }
-      
-      return { 
-        success: true, 
-        data: { id: docRef.id, ...resumeData } 
-      };
-    } catch {
-      return { 
-        success: true, 
-        data: { id: `temp_${Date.now()}`, ...resumeData } 
-      };
-    }
+    return { 
+      success: true, 
+      data: { id: docRef.id, ...resumeData } 
+    };
   } catch (error) {
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : 'Failed to upload resume' 
     };
   }
 };
@@ -307,7 +147,7 @@ export const getUserResumes = async (userId: string): Promise<ServiceResponse<(R
   } catch (error) {
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Failed to get resumes',
       data: [] 
     };
   }
@@ -319,9 +159,15 @@ export const saveTailoredResume = async (
     resumeText: string;
     documentUrl?: string;
     authenticatedUrl?: string;
+    signedUrl?: string;
+    publicUrl?: string;
+    firebaseUrl?: string;
+    gcsUrl?: string;
+    filename?: string;
     jobTitle?: string;
     jobCompany?: string;
     originalResumeId?: string;
+    status?: string;
   }
 ): Promise<ServiceResponse<Resume & { id: string }>> => {
   try {
@@ -330,26 +176,30 @@ export const saveTailoredResume = async (
       throw new Error('Unauthorized access to user data');
     }
 
+    // Use the best available URL (prefer signed/authenticated URLs for downloads)
+    const publicUrl = resumeData.publicUrl ;
+                     
+    const downloadUrl = resumeData.signedUrl || 
+                       publicUrl;
+
     // Create resume metadata
     const metadata: Resume['metadata'] = {
       title: resumeData.jobTitle && resumeData.jobCompany 
         ? `Resume for ${resumeData.jobTitle} at ${resumeData.jobCompany}`
-        : 'Tailored Resume',
-      uploadSource: 'manual',
+        : resumeData.filename || 'Tailored Resume',
+      uploadSource: 'ai_generated',
       isOriginal: false,
       keywords: [resumeData.jobTitle, resumeData.jobCompany].filter(Boolean) as string[],
-      relatedJobId: undefined, // Could be added if we have job ID
       relatedCompany: resumeData.jobCompany,
       relatedRole: resumeData.jobTitle,
       originalResumeId: resumeData.originalResumeId,
-      customizations: ['AI-tailored resume content']
+      customizations: ['AI-tailored resume']
     };
 
     // Create the resume document
-    // For AI-generated resumes, prefer the documentUrl from AI generated bucket
     const newResume: Resume = {
-      fileUrl: resumeData.documentUrl || `data:text/plain;charset=utf-8,${encodeURIComponent(resumeData.resumeText)}`,
-      publicUrl: resumeData.documentUrl || resumeData.authenticatedUrl,
+      fileUrl: downloadUrl || publicUrl || `data:text/plain;charset=utf-8,${encodeURIComponent(resumeData.resumeText)}`,
+      publicUrl: publicUrl,
       createdAt: new Date().toISOString(),
       type: 'tailored',
       metadata
@@ -358,23 +208,6 @@ export const saveTailoredResume = async (
     // Save to Firestore
     const resumesRef = collection(db, 'users', userId, 'resumes');
     const docRef = await addDoc(resumesRef, newResume);
-
-    // Update user document with new resume
-    try {
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserData;
-        const updatedResumes = [...(userData.resumes || []), { ...newResume, id: docRef.id }];
-        
-        await setDoc(userRef, { 
-          resumes: updatedResumes 
-        }, { merge: true });
-      }
-    } catch (updateError) {
-      console.warn('Failed to update user document, but resume was saved:', updateError);
-    }
 
     return {
       success: true,
@@ -385,90 +218,6 @@ export const saveTailoredResume = async (
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save tailored resume'
-    };
-  }
-};
-
-export const saveAIGeneratedResume = async (
-  userId: string,
-  resumeFile: File,
-  metadata: {
-    jobTitle?: string;
-    jobCompany?: string;
-    originalResumeId?: string;
-    description?: string;
-  }
-): Promise<ServiceResponse<Resume & { id: string }>> => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
-      throw new Error('Unauthorized access to user data');
-    }
-
-    // Use AI-generated bucket for AI-created resumes
-    const uploadResult = await uploadFileWithFallback(resumeFile, userId, GCS_AI_GENERATED_BUCKET);
-    
-    if (!uploadResult.success) {
-      return {
-        success: false,
-        error: uploadResult.error || 'Upload failed'
-      };
-    }
-
-    // Create resume metadata for AI-generated resume
-    const resumeMetadata: Resume['metadata'] = {
-      title: metadata.jobTitle && metadata.jobCompany 
-        ? `AI Resume for ${metadata.jobTitle} at ${metadata.jobCompany}`
-        : 'AI Generated Resume',
-      uploadSource: 'ai_generated' as ResumeUploadSource,
-      isOriginal: false,
-      keywords: [metadata.jobTitle, metadata.jobCompany].filter(Boolean) as string[],
-      description: metadata.description,
-      relatedJobId: undefined,
-      relatedCompany: metadata.jobCompany,
-      relatedRole: metadata.jobTitle,
-      originalResumeId: metadata.originalResumeId,
-      customizations: ['AI-generated resume document']
-    };
-
-    const resumeData: Resume = {
-      fileUrl: uploadResult.fileUrl!,
-      publicUrl: uploadResult.downloadUrl || uploadResult.fileUrl!,
-      createdAt: new Date().toISOString(),
-      type: 'tailored',
-      metadata: resumeMetadata
-    };
-
-    try {
-      const resumesRef = collection(db, 'users', userId, 'resumes');
-      const docRef = await addDoc(resumesRef, resumeData);
-
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserData;
-        const updatedResumes = [...(userData.resumes || []), { ...resumeData, id: docRef.id }];
-        
-        await setDoc(userRef, { 
-          resumes: updatedResumes 
-        }, { merge: true });
-      }
-      
-      return { 
-        success: true, 
-        data: { id: docRef.id, ...resumeData } 
-      };
-    } catch {
-      return { 
-        success: true, 
-        data: { id: `temp_${Date.now()}`, ...resumeData } 
-      };
-    }
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to save AI-generated resume' 
     };
   }
 };
@@ -485,40 +234,10 @@ export const updateUserPreferences = async (
     
     const userRef = doc(db, 'users', userId);
     
-    const userDoc = await getDoc(userRef);
-    if (!userDoc.exists()) {
-      throw new Error('User document not found');
-    }
-    
     await setDoc(userRef, {
       jobPreferences: preferences
     }, { merge: true });
 
-    if (preferences.searchSchedule?.enabled) {
-      try {
-        const { createScheduledSearch, getUserScheduledSearches, updateScheduledSearch } = await import('./scheduledSearchService');
-        
-        const existingSearches = await getUserScheduledSearches(userId);
-        
-        if (existingSearches.success && existingSearches.data && existingSearches.data.length > 0) {
-          const existing = existingSearches.data[0];
-          await updateScheduledSearch({
-            scheduleId: existing.id!,
-            preferences,
-            schedule: preferences.searchSchedule
-          });
-        } else {
-          await createScheduledSearch({
-            userId,
-            preferences,
-            schedule: preferences.searchSchedule
-          });
-        }
-      } catch (scheduleError) {
-        console.error('Failed to update scheduled search:', scheduleError);
-      }
-    }
-    
     return { success: true, data: preferences };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -644,6 +363,8 @@ export const updateUserProfile = async (
   }
 };
 
+
+
 export const addApplication = async (
   userId: string, 
   application: Application
@@ -732,7 +453,7 @@ export const addJobListing = async (
     const jobListingsRef = collection(db, 'users', userId, 'jobListings');
     const docRef = await addDoc(jobListingsRef, jobListing);
     
-    return { success: true, data: { id: docRef.id, ...jobListing } };
+    return { success: true, data: { ...jobListing, id: docRef.id } };
   } catch (error) {
     return { 
       success: false, 
@@ -752,7 +473,7 @@ export const getJobListings = async (userId: string): Promise<ServiceResponse<(J
     const snapshot = await getDocs(jobListingsRef);
     const jobListings = snapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data() as JobListing
+      ...(doc.data() as Omit<JobListing, 'id'>),
     }));
     
     return { success: true, data: jobListings };
@@ -814,16 +535,6 @@ export const getJobSearches = async (userId: string): Promise<ServiceResponse<(J
   }
 };
 
-export const getPublicUrlFromDownloadUrl = (downloadUrl: string): string => {
-  return convertToDirectGCSUrl(downloadUrl);
-};
-
-export const getBestDownloadUrl = (originalUrl: string): string => {
-  if (originalUrl.includes('firebasestorage.googleapis.com') && originalUrl.includes('token=')) {
-    return originalUrl;
-  }
-  return convertToDirectGCSUrl(originalUrl);
-};
 
 export const getResumeContent = async (resumeUrl: string): Promise<{
   success: boolean;
@@ -873,8 +584,12 @@ export const getResumeContent = async (resumeUrl: string): Promise<{
   }
 };
 
+
+// Simple helper to get the resume URL for the agent
 export const getResumeUrlForContext = (resume: Resume): string => {
-  return resume.fileUrl;
+  // Return the public URL which should work for the agent
+  return resume.publicUrl || resume.fileUrl;
 };
 
+// Alias for compatibility
 export const uploadResumeWithFallback = uploadResume;

@@ -2,7 +2,7 @@
  * Utility functions for managing user onboarding state
  */
 
-import type { JobPreferences } from '../models/UserData';
+import type { JobPreferences } from '../types';
 
 const ONBOARDING_KEYS = {
   SEEN_PREFERENCES_MODAL: 'hasSeenPrefsModal',

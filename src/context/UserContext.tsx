@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import { auth, db, onAuthStateChanged } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User as FirebaseUser, IdTokenResult } from 'firebase/auth';
-import type { JobPreferences } from '../models/UserData';
+import type { JobPreferences } from '../types'
 
 // --- Profile-related types ---
 export interface ExperienceEntry {

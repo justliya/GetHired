@@ -11,7 +11,7 @@ import ResearchCard from "../components/ResearchCard";
 interface EnhancedCompanyResearch extends CompanyResearch {
   associatedJob?: JobListing;
   sessionId?: string;
-  jobId?: string;
+  JobId?: string;
 }
 
 const CompanyResearchPage = () => {
