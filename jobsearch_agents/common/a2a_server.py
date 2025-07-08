@@ -3,22 +3,25 @@ Standardized Agent to Agent (A2A) server implementation for Job Search AI Assist
 This module provides a FastAPI server implementation following Google ADK standards.
 """
 
-import os
-import json
 import inspect
+import json
+import os
 import re
 import uuid
-from typing import Dict, Any, Callable, Optional
-from fastapi import FastAPI, Body
-from fastapi.responses import JSONResponse
+from typing import Any, Callable, Dict, Optional
+
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
 from google.genai import types
 
 
 # Job Search specific models
 class JobSearchRequest(BaseModel):
     """Request model for job search - only requires user_id."""
+
     user_id: str = Field(
         ..., description="Firebase user ID for personalized job search"
     )
@@ -26,6 +29,7 @@ class JobSearchRequest(BaseModel):
 
 class ResumeTailorRequest(BaseModel):
     """Request model for resume tailoring."""
+
     message: str = Field(
         ..., description="Message containing resume URL/text and job description"
     )
@@ -62,7 +66,7 @@ def create_agent_server(
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[ "*"],
+        allow_origins=["*"],
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         allow_credentials=True,
@@ -87,7 +91,12 @@ def create_agent_server(
             "description": description,
             "endpoints": endpoint_names,
             "version": "1.0.0",
-            "capabilities": ["job_search", "profile_analysis", "company_research", "resume_tailoring"],
+            "capabilities": [
+                "job_search",
+                "profile_analysis",
+                "company_research",
+                "resume_tailoring",
+            ],
             "sub_agents": [
                 "profile_agent",
                 "listing_search_agent",
@@ -122,7 +131,6 @@ def create_agent_server(
         2. Searches for matching jobs
         3. Performs company research on found jobs
         """
-
         print(f"\n>>> Running Job Search for User: {request.user_id}")
         session_id = f"{request.user_id}_job_search_{uuid.uuid4().hex[:8]}"
         agent_instance = task_manager.agent
@@ -153,13 +161,11 @@ def create_agent_server(
                 state={},
             )
 
-        # Create proper Content object
+        # Create proper Content object - Fixed the Part construction
         user_content = types.Content(
             role="user",
             parts=[
-                types.Part(
-                    parts=[types.Part(text=json.dumps({"user_id": request.user_id}))]
-                )
+                types.Part(text=json.dumps({"user_id": request.user_id}))
             ],
         )
 
@@ -203,8 +209,7 @@ def create_agent_server(
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                 "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Credentials": "true",
-      
-            }
+            },
         )
 
     # Resume tailoring endpoint
@@ -215,33 +220,28 @@ def create_agent_server(
         Accepts either a resume URL or text content along with a job description.
         """
         print(f"\n>>> Tailoring Resume - Session: {request.session_id}")
-        
+
         # Extract user_id from context
         user_id = request.context.get("user_id", "anonymous")
         session_id = request.session_id or f"{user_id}_resume_{uuid.uuid4().hex[:8]}"
-        
+
         # Create proper Content object with the message
-        user_content = types.Content(
-            role="user",
-            parts=[types.Part(text=request.message)]
-        )
-        
+        user_content = types.Content(role="user", parts=[types.Part(text=request.message)])
+
         try:
             # Process the resume tailoring request
             response = await task_manager.process_task(
-                message=request.message,
-                context=request.context,
-                session_id=session_id
+                message=request.message, context=request.context, session_id=session_id
             )
-            
+
             # Extract the tailored resume from response
             if response.get("status") == "success":
                 data = response.get("data", {})
-                
+
                 # Check for formatted_resume or final_resume in the data
                 formatted_resume = None
                 document_url = None
-                
+
                 # Look for the resume in various possible locations in the response
                 if "formatted_resume" in data:
                     formatted_resume = data["formatted_resume"]
@@ -249,26 +249,26 @@ def create_agent_server(
                     formatted_resume = data["final_resume"]
                 elif "resume_text" in data:
                     formatted_resume = data["resume_text"]
-                
+
                 if "document_url" in data:
                     document_url = data["document_url"]
                 elif "download_url" in data:
                     document_url = data["download_url"]
-                
+
                 return JSONResponse(
                     content={
                         "status": "success",
                         "message": "Resume tailored successfully",
                         "tailored_resume": formatted_resume,
                         "document_url": document_url,
-                        "session_id": session_id
+                        "session_id": session_id,
                     },
                     headers={
                         "Access-Control-Allow-Origin": "http://localhost:5173",
                         "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                         "Access-Control-Allow-Headers": "*",
                         "Access-Control-Allow-Credentials": "true",
-                    }
+                    },
                 )
             else:
                 return JSONResponse(
@@ -276,7 +276,7 @@ def create_agent_server(
                         "status": "error",
                         "message": response.get("message", "Failed to tailor resume"),
                         "error": response.get("data", {}).get("error_type", "Unknown error"),
-                        "session_id": session_id
+                        "session_id": session_id,
                     },
                     status_code=500,
                     headers={
@@ -284,16 +284,16 @@ def create_agent_server(
                         "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                         "Access-Control-Allow-Headers": "*",
                         "Access-Control-Allow-Credentials": "true",
-                    }
+                    },
                 )
-                
+
         except Exception as e:
             print(f"Error in resume tailoring: {e}")
             return JSONResponse(
                 content={
                     "status": "error",
                     "message": f"Failed to tailor resume: {str(e)}",
-                    "session_id": session_id
+                    "session_id": session_id,
                 },
                 status_code=500,
                 headers={
@@ -301,7 +301,7 @@ def create_agent_server(
                     "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
                     "Access-Control-Allow-Headers": "*",
                     "Access-Control-Allow-Credentials": "true",
-                }
+                },
             )
 
     # Metadata endpoint
@@ -330,7 +330,7 @@ def create_agent_server(
                 "Access-Control-Allow-Credentials": "true",
             },
         )
-    
+
     @app.options("/tailor-resume")
     async def options_tailor():
         """Handle preflight OPTIONS requests for /tailor-resume endpoint."""
@@ -339,6 +339,7 @@ def create_agent_server(
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, PUT, OPTIONS, GET",
+                "Access-Control-Allow-Headers": "*",
                 "Access-Control-Allow-Credentials": "true",
             },
         )
@@ -365,5 +366,3 @@ def create_agent_server(
             app.add_api_route(f"/{path}", handler, methods=["POST"])
 
     return app
-
-
