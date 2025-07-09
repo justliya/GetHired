@@ -161,7 +161,6 @@ def create_agent_server(
                 state={},
             )
 
-        # Create proper Content object - Fixed the Part construction
         user_content = types.Content(
             role="user",
             parts=[
@@ -251,10 +250,10 @@ def create_agent_server(
                 state={},
             )
 
-        # Create proper Content object with the message
+        # Content object with the message
         user_content = types.Content(role="user", parts=[types.Part(text=request.message)])
 
-            # Run the agent
+       
         async for event in runner.run_async(
             user_id=user_id, session_id=session_id, new_message=user_content
         ):
@@ -275,7 +274,7 @@ def create_agent_server(
         print(
             json.dumps(
                 {
-                    "resume_text":  resume_format,
+                    "resume_text":resume_format,
                     "content":document_parsed,
                 },
                 indent=2,

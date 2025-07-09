@@ -85,7 +85,7 @@ Guidelines:
    - Infuse genuine enthusiasm—especially in the Summary—without exclamation points or clichés.
 2. **Strategic Keyword Integration**  
    - Identify 6–10 essential keywords from the Target Role.  
-   - Seamlessly weave them into the résumé where they fit organically; bold each keyword on first use.  
+   - Seamlessly weave them into the résumé where they fit organically;**bold**each keyword on first use.  
    - Do **not** simply dump a keyword list, ensure each term supports a real accomplishment.
 3. **Human-Centered Summary**  
    - Rewrite the Summary as a 2–3 sentence intro that highlights the candidate’s passion, core strengths, and alignment with the role.  
@@ -169,11 +169,9 @@ RESUME TEXT:
 
 IMPORTANT FORMATTING REQUIREMENTS:
 - Use only standard characters (letters, numbers, basic punctuation: . , - @ | • )
-- Remove ALL special symbols, markdown formatting, and decorative characters
 - Convert any special phone/email symbols to plain text
 - Use standard bullet points (•) for lists
 - Use standard dashes (-) for date ranges
-- Do NOT use bold formatting (**text**), italics, or other markdown
 - Keep phone numbers in standard format: 123-456-7890
 - Keep email addresses clean: email@domain.com
 
@@ -253,31 +251,38 @@ CRITICAL: You MUST process the ENTIRE resume content without truncation or omiss
 
 Act as an expert recruiter and Microsoft Word power user. Using the available tools, create a formatted document with the formatted resume: {formatted_resume}
 
-IMPORTANT: Extract the user_id from the Firebase/authentication context and pass it to the create_formatted_resume function. If a resume URL is available in the context, also pass the resume_url parameter to enable user_id extraction from the URL as a fallback.
+🚨 CRITICAL USER_ID INSTRUCTIONS 🚨
+YOU MUST EXTRACT THE ACTUAL USER_ID VALUE - NEVER USE THE LITERAL STRING "user_id"
 
-When calling create_formatted_resume, use these parameters:
-- text: the formatted resume text
-- job_position_title: the position being applied for  
-- user_id: the authenticated user's ID from Firebase context (NOT the literal string "user_id")
-- resume_url: the original resume URL if available (for user_id extraction fallback)
+The user_id will be provided in one of these ways:
+1. From Firebase authentication context: {user_id}
+2. From the resume URL path: https://storage.googleapis.com/[project].firebasestorage.app/resumes/[USER_ID]/[filename]
 
-CRITICAL: Look for the user_id in the context object provided. It will be under context.user_id or context.firebase_uid. Use the actual ID value, not placeholder text.
+REAL EXAMPLE:
+From URL: https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/Gn8mXRcszzOPvGIYomUmHWMxA0E2/resume_AI_Research_Engineer_20250708_210856_992270fc.docx
+The user_id is: Gn8mXRcszzOPvGIYomUmHWMxA0E2
 
-You should return the URLs to the resume that was uploaded to Firebase Storage and the resume text as a JSON Object with the following structure:
+CORRECT USAGE:
+✅ user_id=" Gn8mXRcszzOPvGIYomUmHWMxA0E2" (actual Firebase user ID)
+❌ user_id="user_id" (literal string - WRONG!)
+❌ user_id="[USER_ID]" (placeholder - WRONG!)
+
+When calling create_formatted_resume:
+create_formatted_resume(
+    text={formatted_resume},
+    job_position_title={job_title},
+    user_id={user_id},
+    resume_url={resume_url}
+)
+
+Expected return format with REAL values:
 {
-  "public_url": "",
-  "signed_url": "download_url", 
+  "public_url": "https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/....",
+  "signed_url": "[long signed URL with authentication parameters]",
   "resume_text": {formatted_resume},
-  "filename": "resume_filename.docx",
+  "filename": "....docx",
   "status": "success"
 }
-
-NOTE: 
-- The public_url should be the direct Google Cloud Storage URL
-- The signed_url should be the same signed URL with 7-day expiration
-- Use the actual user_id in the URL path
-- The signed URL will be a long URL with authentication parameters
-- Replace ACTUAL_USER_ID with the real user_id from the context
 
 Do not return the tool code.
 """
