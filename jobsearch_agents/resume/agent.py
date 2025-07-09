@@ -27,7 +27,7 @@ experience_optimization_agent  =  Agent(
     model="gemini-2.0-flash",
     name="experience_optimization_agent",
     instruction = prompt.EXPERIENCE_OPTIMIZATION,
-    output_key='experience_optimizated_resume'
+    output_key='experience_optimized_resume'
     )
 
 ats_optimization_agent =  Agent(

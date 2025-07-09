@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
-import { getApiUrl } from '../config/environment';
+//import { getApiUrl } from '../config/environment';
+import type { ResumeTailoringContext } from '../types';
 
 // Commented out for now - will be used when implementing suggested changes feature
 // interface SuggestedChange {
@@ -16,6 +17,7 @@ interface TailoringData {
   publicUrl?: string;      // For saving to Firebase
   signedUrl?: string;       // For immediate download
   tailoredResumeText?: string;
+  resumeText?:string;
   filename?: string;
   status?: string;
 }
@@ -39,16 +41,14 @@ export const useResumeTailoring = () => {
       // }
       
       // But we're also expecting the doc object with the full details
-      const tailoredResume = response.tailored_resume as string || '';
-      const documentUrl = response.document_url as string || '';
-      const doc = response.doc as Record<string, unknown> || {};
-      
-      // Extract from doc object if available
-      const publicUrl = (doc.public_url as string) || documentUrl || '';
+      const doc = (response.content || response.doc || {}) as Record<string, unknown>;
+
+      // Only use values from doc/content, not root response
+      const resumeText = (doc.resume_text as string) || '';
+      const publicUrl = (doc.public_url as string) || '';
       const signedUrl = (doc.signed_url as string) || '';
-      const resumeText = (doc.resume_text as string) || tailoredResume || '';
       const filename = (doc.filename as string) || '';
-      const status = (doc.status as string) || response.status as string || 'unknown';
+      const status = (doc.status as string) || 'unknown';
       
       // Validate URLs - reject URLs with literal "user_id"
       const isValidUrl = (url: string) => url && !url.includes('user_id');
@@ -85,52 +85,51 @@ export const useResumeTailoring = () => {
       };
     }
   };
-
 const startAnalysis = async (
-    resumeText: string,
-    resumeUrl: string,
-    jobDescription: string,
-    context: {
-      user_id: string;
-      firebase_uid?: string;
-      is_anonymous?: boolean;
-      task: string;
-      user_name: string;
-      resume_storage_url?: string;
-      job_description: string;
-      job_title?: string;
-      job_company?: string;
-    },
-  
-  ) => {
-    if (!resumeText || !jobDescription) return;
+  resumeText: string,
+  resume_storage_url: string,
+  jobDescription: string,
+  context: ResumeTailoringContext,
+) => {
+  if (!resumeText || !jobDescription) return;
 
-    setIsAnalyzing(true);
-    try {
-       const response = await fetch(`${getApiUrl(true)}/tailor-resume`, {
-       //const response = await fetch(`http://0.0.0.0:8080/tailor-resume`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          message: `Please tailor this resume for this job description:
+  setIsAnalyzing(true);
+  try {
+    // Use the public URL in the message
+    const messageContent = resume_storage_url 
+      ? `Please tailor this resume for this job description:
 
-RESUME:
-${ resumeUrl || resumeText}
+RESUME URL: ${resume_storage_url}
 
 JOB DESCRIPTION:
 ${jobDescription}
-`,
-          context,
-          session_id: `resume-${Date.now()}`
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+`
+      : `Please tailor this resume for this job description:
+
+RESUME:
+${resumeText}
+
+JOB DESCRIPTION:
+${jobDescription}`;
+
+    const response = await fetch(`http://0.0.0.0:8080/tailor-resume`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        message: messageContent,
+        context: {
+          ...context,
+          resume_url: resume_storage_url, // Include the public URL in context too
+        },
+        session_id: `resume-${Date.now()}`
+      }),
+    });
+
+    // ... r
 
       const result = await response.json();
       console.log('🚀 Resume tailoring response received:', result);

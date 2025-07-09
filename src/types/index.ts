@@ -69,6 +69,8 @@ export type ResumeType = 'original' | 'tailored' | 'generated';
 export type ResumeUploadSource = 'manual' | 'job-application' | 'auto-generated' | 'ai_generated' | 'proxy' | 'public' | 'firebase' | 'direct' | 'base64';
 
 export interface Resume {
+  title:string;
+  storagePath:string;
   fileUrl: string;
   publicUrl?: string;  // Public URL for agent processing (without authentication)
   createdAt: string;

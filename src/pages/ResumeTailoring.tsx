@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, ArrowLeft, FileText } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
 import {
   getUserResumes,
   getResumeUrlForContext,
-  uploadResume,
+ 
   getJobListings,
   getUserData,
   saveTailoredResume
@@ -24,6 +24,7 @@ import {
 } from '../components/resume';
 import type { Resume, ResumeTailoringContext } from '../types';
 import type { JobListing } from '../types';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 interface Job {
   title?: string;
@@ -51,6 +52,7 @@ const ResumeTailoring = () => {
   const [isLoadingResumes, setIsLoadingResumes] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [resumeInputMethod, setResumeInputMethod] = useState<'manual' | 'upload' | 'saved'>('manual');
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   // Job selection state
   const [userJobs, setUserJobs] = useState<JobListing[]>([]);
@@ -58,6 +60,30 @@ const ResumeTailoring = () => {
 
   // User profile state
   const [userName, setUserName] = useState<string>('');
+
+  // Load resumes function
+  const loadResumes = useCallback(async () => {
+    if (!user?.uid) return;
+
+    try {
+      const resumesResult = await getUserResumes(user.uid);
+      if (resumesResult.success) {
+        setUserResumes(resumesResult.data || []);
+        // Auto-select the first original resume if no resume is selected
+        if (!selectedResumeId) {
+          const defaultResume = resumesResult.data?.find(r => r.metadata?.isOriginal);
+          if (defaultResume) {
+            setSelectedResumeId(defaultResume.id);
+            setSelectedResumeUrl(getResumeUrlForContext(defaultResume));
+            setResumeInputMethod('saved');
+            setResumeText(`Resume content will be processed automatically.`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error loading resumes:', err);
+    }
+  }, [user?.uid, selectedResumeId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,18 +99,8 @@ const ResumeTailoring = () => {
 
         // Load user resumes
         setIsLoadingResumes(true);
-        const resumesResult = await getUserResumes(user.uid);
-        if (resumesResult.success) {
-          setUserResumes(resumesResult.data || []);
-          // Auto-select the first original resume
-          const defaultResume = resumesResult.data?.find(r => r.metadata?.isOriginal);
-          if (defaultResume) {
-            setSelectedResumeId(defaultResume.id);
-            setSelectedResumeUrl(getResumeUrlForContext(defaultResume));
-            setResumeInputMethod('saved');
-            setResumeText(`Resume content will be processed automatically.`);
-          }
-        }
+        await loadResumes();
+        
         const jobsResult = await getJobListings(user.uid);
         if (jobsResult.success) {
           // Map the job listings to match the expected JobListing interface (fully typed)
@@ -138,7 +154,7 @@ const ResumeTailoring = () => {
     };
 
     fetchData();
-  }, [jobId, user?.uid, user?.displayName, setTailoringData]);
+  }, [jobId, user?.uid, user?.displayName, setTailoringData, loadResumes]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -146,27 +162,117 @@ const ResumeTailoring = () => {
 
     try {
       setIsUploading(true);
-
-      const result = await uploadResume(user.uid, file, {
+      
+      // Upload to Firebase Storage
+      const storage = getStorage();
+      const timestamp = Date.now();
+      const fileName = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const storagePath = `resumes/${user.uid}/${fileName}`;
+      const fileRef = storageRef(storage, storagePath);
+      await uploadBytes(fileRef, file);
+      const downloadUrl = await getDownloadURL(fileRef);
+      
+      // Add to resumes collection in Firestore
+      const resumeData = {
+        fileUrl: downloadUrl,
         title: file.name,
-        isOriginal: true,
-      });
-
-      if (result.success && result.data) {
-        const newResume = result.data;
-        setUserResumes(prev => [...prev, newResume]);
-        setSelectedResumeId(newResume.id);
-        setSelectedResumeUrl(getResumeUrlForContext(newResume));
-        setResumeInputMethod('upload');
-        setResumeText(`Resume uploaded successfully. The content will be processed automatically.`);
-      } else {
-        alert(result.error || 'Failed to upload resume');
-      }
+        documentUrl: downloadUrl,
+        storagePath: storagePath,
+        type: 'original' as const,
+        metadata: {
+          isOriginal: true,
+          uploadSource: 'manual' as const,
+          uploadedAt: new Date().toISOString(),
+          fileSize: file.size,
+          fileType: file.type
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'resumes'), resumeData);
+      
+      // Create the resume object with the ID
+      const newResume: Resume & { id: string } = {
+        ...resumeData,
+        id: docRef.id
+      };
+      
+      // Update user document with resume URL
+      await setDoc(
+        doc(db, "users", user.uid),
+        { 
+          resumeUrl: downloadUrl,
+          lastResumeUpload: new Date().toISOString(),
+          hasResume: true
+        },
+        { merge: true }
+      );
+      
+      // Update local state
+      setUserResumes(prev => [...prev, newResume]);
+      setSelectedResumeId(newResume.id);
+      setSelectedResumeUrl(downloadUrl);
+      setResumeInputMethod('upload');
+      setResumeText(`Resume uploaded successfully. The content will be processed automatically.`);
+      
+      console.log('✅ Resume uploaded:', downloadUrl);
+      
     } catch (err) {
       console.error('Error uploading resume:', err);
       alert('Failed to upload resume. Please try again.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleDeleteResume = async (resumeId: string) => {
+    if (!user?.uid) return;
+    
+    const resume = userResumes.find(r => r.id === resumeId);
+    if (!resume) return;
+    
+    // Confirm deletion
+    if (!window.confirm(`Are you sure you want to delete "${resume.title}"?`)) {
+      return;
+    }
+    
+    try {
+      setIsDeleting(resumeId);
+      
+      // Delete from Storage if there's a storage path
+      if (resume.storagePath) {
+        try {
+          const storage = getStorage();
+          const fileRef = storageRef(storage, resume.storagePath);
+          await deleteObject(fileRef);
+        } catch (storageError) {
+          console.warn('Error deleting from storage:', storageError);
+          // Continue with Firestore deletion even if storage deletion fails
+        }
+      }
+      
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'users', user.uid, 'resumes', resumeId));
+      
+      // Update local state
+      setUserResumes(prev => prev.filter(r => r.id !== resumeId));
+      
+      // If this was the selected resume, clear selection
+      if (selectedResumeId === resumeId) {
+        setSelectedResumeId('');
+        setSelectedResumeUrl('');
+        setResumeText('');
+        setResumeInputMethod('manual');
+      }
+      
+      console.log('✅ Resume deleted successfully');
+      
+    } catch (err) {
+      console.error('Error deleting resume:', err);
+      alert('Failed to delete resume. Please try again.');
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -285,7 +391,7 @@ Join our team and help build the next generation of web applications that serve 
       is_anonymous: user?.isAnonymous || false,
       task: 'resume_tailoring',
       user_name: userName || user?.displayName || '',
-      resume_storage_url: selectedResumeUrl || '',
+      resume_storage_url: selectedResumeUrl || '', // Send the download URL directly
       job_description: jobDescription,
       job_title: job?.title || '',
       job_company: job?.company || '',
@@ -303,7 +409,7 @@ Join our team and help build the next generation of web applications that serve 
     startAnalysis(resumeText, selectedResumeUrl, jobDescription, context);
   };
 
-    // Handlers for ResumeSelector component
+  // Handlers for ResumeSelector component
   const handleResumeSelect = (resumeId: string) => {
     setSelectedResumeId(resumeId);
     if (resumeId) {
@@ -416,7 +522,7 @@ Join our team and help build the next generation of web applications that serve 
         )}
       </div>
 
-      {/* Resume Selection Section */}
+      {/* Resume Selection Section - Updated with delete functionality */}
       <ResumeSelector
         userResumes={userResumes}
         selectedResumeId={selectedResumeId}
@@ -426,6 +532,8 @@ Join our team and help build the next generation of web applications that serve 
         onFileUpload={handleFileUpload}
         onResumeSelect={handleResumeSelect}
         onLoadSampleResume={loadSampleResume}
+        onDeleteResume={handleDeleteResume}
+        isDeleting={isDeleting}
       />
 
       {/* Main Tailoring Section */}
@@ -521,7 +629,7 @@ Join our team and help build the next generation of web applications that serve 
               {/* Document Viewer */}
               {(tailoringData.tailoredResumeText || getDownloadUrl()) && (
                 <UnifiedDocumentViewer
-                  resumeText={tailoringData.tailoredResumeText}
+                  resumeText={tailoringData.resumeText}
                   documentUrl={tailoringData.publicUrl}
                   authenticatedUrl={tailoringData.signedUrl}
                   job={job}

@@ -263,10 +263,10 @@ When calling create_formatted_resume, use these parameters:
 
 CRITICAL: Look for the user_id in the context object provided. It will be under context.user_id or context.firebase_uid. Use the actual ID value, not placeholder text.
 
-You should return the URLs to the resume that was uploaded to Google Cloud Storage and the resume text as a JSON Object with the following structure:
+You should return the URLs to the resume that was uploaded to Firebase Storage and the resume text as a JSON Object with the following structure:
 {
-  "public_url": "https://storage.googleapis.com/gethired-resumes/resumes/ACTUAL_USER_ID/filename.docx",
-  "signed_url": "SIGNED_URL_HERE", 
+  "public_url": "",
+  "signed_url": "download_url", 
   "resume_text": {formatted_resume},
   "filename": "resume_filename.docx",
   "status": "success"

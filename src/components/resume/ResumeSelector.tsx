@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Upload, FileText, Loader2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Upload, FileText, Loader2, ChevronDown, Trash2 } from 'lucide-react';
 import type { Resume } from '../../types';
 
 interface ResumeSelectorProps {
@@ -9,6 +9,8 @@ interface ResumeSelectorProps {
   isLoadingResumes: boolean;
   resumeInputMethod: 'manual' | 'upload' | 'saved';
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onDeleteResume?: (resumeId: string) => Promise<void>;
+  isDeleting?: string | null;
   onResumeSelect: (resumeId: string) => void;
   onLoadSampleResume: () => void;
 }
@@ -20,10 +22,15 @@ const ResumeSelector: React.FC<ResumeSelectorProps> = ({
   isLoadingResumes,
   resumeInputMethod,
   onFileUpload,
+  onDeleteResume,
+  isDeleting,
   onResumeSelect,
   onLoadSampleResume
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const selectedResume = userResumes.find(r => r.id === selectedResumeId);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
@@ -56,22 +63,88 @@ const ResumeSelector: React.FC<ResumeSelectorProps> = ({
           Upload Resume
         </button>
 
-        {/* Use Saved Resume Dropdown */}
+        {/* Custom Dropdown for Saved Resumes */}
         {userResumes.length > 0 && (
           <div className="relative">
-            <select
-              value={selectedResumeId}
-              onChange={(e) => onResumeSelect(e.target.value)}
-              className="px-4 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center justify-between px-4 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 min-w-[200px]"
             >
-              <option value="">Select a saved resume</option>
-              {userResumes.map((resume) => (
-                <option key={resume.id} value={resume.id}>
-                  {resume.metadata?.title || 'Untitled Resume'} 
-                  {resume.metadata?.isOriginal && ' (Original)'}
-                </option>
-              ))}
-            </select>
+              <span className="truncate">
+                {selectedResume 
+                  ? (selectedResume.metadata?.title || selectedResume.title || 'Untitled Resume')
+                  : 'Select a saved resume'}
+              </span>
+              <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isDropdownOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setIsDropdownOpen(false)}
+                />
+                <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                  {userResumes.map((resume) => (
+                    <div
+                      key={resume.id}
+                      className="flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-600 group"
+                    >
+                      <button
+                        onClick={() => {
+                          onResumeSelect(resume.id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className="flex-1 text-left px-4 py-2 text-gray-700 dark:text-gray-300"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="truncate">
+                            {resume.metadata?.title || resume.title || 'Untitled Resume'}
+                            {resume.metadata?.isOriginal && (
+                              <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Original)</span>
+                            )}
+                          </span>
+                          {selectedResumeId === resume.id && (
+                            <span className="ml-2 text-green-600 dark:text-green-400">✓</span>
+                          )}
+                        </div>
+                        {typeof resume.metadata?.uploadedAt === 'string' && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Uploaded: {new Date(resume.metadata.uploadedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </button>
+                      
+                      {/* Delete Button */}
+                      {onDeleteResume && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteResume(resume.id);
+                          }}
+                          disabled={isDeleting === resume.id}
+                          className="p-2 mr-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete resume"
+                        >
+                          {isDeleting === resume.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {userResumes.length === 0 && (
+                    <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm text-center">
+                      No saved resumes found
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -94,7 +167,17 @@ const ResumeSelector: React.FC<ResumeSelectorProps> = ({
       />
 
       {isLoadingResumes && (
-        <div className="text-gray-500 dark:text-gray-400">Loading your resumes...</div>
+        <div className="flex items-center text-gray-500 dark:text-gray-400">
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Loading your resumes...
+        </div>
+      )}
+
+      {/* Resume count indicator */}
+      {!isLoadingResumes && userResumes.length > 0 && (
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          {userResumes.length} resume{userResumes.length !== 1 ? 's' : ''} saved
+        </div>
       )}
     </div>
   );
