@@ -272,7 +272,7 @@ create_formatted_resume(
     text={formatted_resume},
     job_position_title=job_title,
     user_id=user_id,
-    resume_url={resume_url}
+    resume_url=resume_url
 )
 
 Expected return format with REAL values:
