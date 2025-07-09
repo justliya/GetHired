@@ -3,6 +3,7 @@ import uuid
 import tempfile
 import logging
 import re
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from docxtpl import DocxTemplate
@@ -236,7 +237,7 @@ def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> d
         storage_path = f"resumes/{user_id}/{filename}"
         logger.info("  🗂️  Storage path: %s", storage_path)
         
-                # Create blob
+        # Create blob
         blob = bucket.blob(storage_path)
         
         # Set metadata
@@ -298,6 +299,37 @@ def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> d
         }
 
 
+def create_formatted_resume(text: str, job_position_title: str = "Position", user_id: str = 'user_id', resume_url: Optional[str] = None) -> dict:
+    """Create a formatted resume document and upload to Firebase Storage
+    
+    Args:
+        text: The actual
+CORRECT USAGE EXAMPLES:
+
+1. With Firebase authenticated user:
+   result = create_formatted_resume(
+       text=resume_text,
+       job_position_title="AI Research Engineer",
+       user_id=" Gn8mXRcszzOPvGIYomUmHWMxA0E2"  # Real Firebase UID
+   )
+
+2. With URL fallback:
+   result = create_formatted_resume(
+       text=resume_text,
+       job_position_title="Software Engineer",
+       resume_url="https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/ Gn8mXRcszzOPvGIYomUmHWMxA0E2/original.pdf"
+   )
+
+3. Testing functions:
+   # Test URL extraction
+   test_firebase_url_extraction()
+   
+   # Test user ID validation
+   validate_user_id_handling()
+   
+   # Test Firebase connectivity
+   test_firebase_connectivity()
+"""
 def create_formatted_resume(text: str, job_position_title: str = "Position", user_id: str = 'user_id', resume_url: Optional[str] = None) -> dict:
     """Create a formatted resume document and upload to Firebase Storage
     
@@ -396,7 +428,14 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         logger.info("  - Phone: %s", candidate.get("phone"))
         logger.info("  - Education entries: %d", len(candidate.get("education", [])))
         logger.info("  - Experience entries: %d", len(candidate.get("experience_section", [])))
-        logger.info("  - Skills count: %d", len(candidate.get("skills", [])))
+        
+        # Log skills structure for debugging
+        skills_data = candidate.get("skills", {})
+        if isinstance(skills_data, dict):
+            logger.info("  - Technical skills: %d", len(skills_data.get("technical", [])))
+            logger.info("  - Soft skills: %d", len(skills_data.get("soft_skills", [])))
+        else:
+            logger.info("  - Skills count: %d", len(skills_data) if isinstance(skills_data, list) else 0)
         
         # Find template file
         possible_paths = [
@@ -420,37 +459,49 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         logger.info("🔧 Loading DocxTemplate...")
         doc = DocxTemplate(str(template_path))
         
-        template_context = candidate_data["candidate"].copy()
-        template_context["candidate"] = candidate_data["candidate"]
+        # The template expects everything under 'candidate'
+        # Don't modify the structure - just pass it through
+        template_context = {
+            "candidate": candidate_data["candidate"]
+        }
         
-        # Handle skills properly
-        skills_data = candidate.get("skills", {})
-        if hasattr(skills_data, 'technical'):
-            technical_skills = skills_data.technical or []
-            soft_skills = skills_data.soft_skills or []
-        elif isinstance(skills_data, dict):
-            technical_skills = skills_data.get("technical", [])
-            soft_skills = skills_data.get("soft_skills", [])
-        elif isinstance(skills_data, list):
-            technical_skills = skills_data
-            soft_skills = []
-        else:
-            technical_skills = []
-            soft_skills = []
-
-        template_context.update({
-            "full_name": candidate.get("name", ""),
-            "contact_email": candidate.get("email", ""),
-            "contact_phone": candidate.get("phone", ""),
-            "summary": candidate.get("professional_summary", ""),
-            "work_experience": candidate.get("experience_section", []),
-            "education_list": candidate.get("education", []),
-            "project_list": candidate.get("projects", []),
-            "certification_list": candidate.get("certifications", []),
-            "technical_skills": technical_skills,
-            "soft_skills": soft_skills,
-            "volunteer_work": candidate.get("volunteer_experience", [])
-        })
+        # Handle skills structure for the template
+        # The template expects either technical_skills/soft_skills or skills_flat
+        if "skills" in candidate:
+            skills = candidate["skills"]
+            if isinstance(skills, dict):
+                # If skills is a dict with technical/soft_skills keys
+                if "technical" in skills:
+                    candidate["technical_skills"] = skills["technical"]
+                if "soft_skills" in skills:
+                    candidate["soft_skills"] = skills["soft_skills"]
+            elif isinstance(skills, list):
+                # If skills is just a flat list
+                candidate["skills_flat"] = skills
+        
+        # Debug: Check if the data structure matches template expectations
+        logger.info("=== TEMPLATE CONTEXT VALIDATION ===")
+        expected_fields = [
+            "name", "email", "phone", "professional_summary", 
+            "education", "experience_section", "projects", 
+            "certifications", "volunteer_experience"
+        ]
+        
+        for field in expected_fields:
+            if field in candidate:
+                field_value = candidate[field]
+                if isinstance(field_value, list):
+                    logger.info("✓ Field '%s' present: list with %d items", field, len(field_value))
+                elif isinstance(field_value, str):
+                    logger.info("✓ Field '%s' present: string (%d chars)", field, len(field_value))
+                else:
+                    logger.info("✓ Field '%s' present: %s", field, type(field_value).__name__)
+            else:
+                logger.warning("✗ Field '%s' missing", field)
+        
+        # Log the final context being sent
+        logger.info("📋 Final template context being sent:")
+        logger.info(json.dumps(template_context, indent=2, default=str))
         
         logger.info("🎨 Rendering template with context...")
         try:
@@ -458,6 +509,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
             logger.info("✅ Template rendered successfully")
         except Exception as render_error:
             logger.error("❌ Template rendering failed: %s", render_error)
+            logger.error("Context that failed: %s", json.dumps(template_context, indent=2, default=str))
             raise
         
         # Create filename
@@ -597,7 +649,7 @@ def download_and_extract_resume_text(resume_url: str) -> str:
         # Extract text based on file type
         if file_extension == '.docx':
             if DocxDocument is None:
-                raise ValueError("error proccessing please try again")
+                raise ValueError("error processing please try again")
                 
             doc = DocxDocument(temp_file_path)
             text_content = []
@@ -733,8 +785,8 @@ def test_firebase_url_extraction():
     """Test extraction from the specific Firebase Storage URL format"""
     test_cases = [
         (
-            "https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/cOzco6wwhCOHFlUDMY3pRJig1uE2/resume_AI_Research_Engineer_20250708_210856_992270fc.docx",
-            "cOzco6wwhCOHFlUDMY3pRJig1uE2",
+            "https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/Gn8mXRcszzOPvGIYomUmHWMxA0E2/resume_AI_Research_Engineer_20250708_210856_992270fc.docx",
+            "n8mXRcszzOPvGIYomUmHWMxA0E2",
             "Standard Firebase Storage URL"
         ),
         (
@@ -767,7 +819,7 @@ def validate_user_id_handling():
     """Test function to validate user_id handling"""
     test_cases = [
         # (user_id_input, expected_valid, description)
-        ("cOzco6wwhCOHFlUDMY3pRJig1uE2", True, "Valid Firebase user ID"),
+        ("Gn8mXRcszzOPvGIYomUmHWMxA0E2", True, "Valid Firebase user ID"),
         ("5f4dcc3b5aa765d61d8327deb882", True, "Valid Firebase user ID (28 chars)"),
         ("john_doe_123", True, "Valid username format"),
         ("abc123def456", True, "Valid alphanumeric ID"),
@@ -789,29 +841,20 @@ def validate_user_id_handling():
 
 # Example usage documentation
 """
-CORRECT USAGE EXAMPLES:
+# Example 1: Create resume with valid user ID
+result = create_formatted_resume(
+    text="John Doe\nSoftware Engineer\n...",
+    job_position_title="Senior Software Engineer",
+    user_id="Gn8mXRcszzOPvGIYomUmHWMxA0E2"  
 
-1. With Firebase authenticated user:
-   result = create_formatted_resume(
-       text=resume_text,
-       job_position_title="AI Research Engineer",
-       user_id=" Gn8mXRcszzOPvGIYomUmHWMxA0E2"  # Real Firebase UID
-   )
+# Example 2: Create resume with URL fallback for user ID extraction
+result = create_formatted_resume(
+    text="Jane Smith\nData Scientist\n...",
+    job_position_title="Data Scientist",
+    user_id="user_id",  # Invalid placeholder
+    resume_url="https://storage.googleapis.com/gethired.firebasestorage.app/resumes/abc123def456/resume.docx"
+)
 
-2. With URL fallback:
-   result = create_formatted_resume(
-       text=resume_text,
-       job_position_title="Software Engineer",
-       resume_url="https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/ Gn8mXRcszzOPvGIYomUmHWMxA0E2/original.pdf"
-   )
-
-3. Testing functions:
-   # Test URL extraction
-   test_firebase_url_extraction()
-   
-   # Test user ID validation
-   validate_user_id_handling()
-   
-   # Test Firebase connectivity
-   test_firebase_connectivity()
+# Example 3: Test Firebase connectivity
+test_result = test_firebase_connectivity()
 """
