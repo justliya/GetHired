@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, ArrowLeft, FileText } from 'lucide-react';
-import { doc, getDoc, setDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { db, auth } from '../firebase';
 import {
@@ -190,7 +190,8 @@ const ResumeTailoring = () => {
         updatedAt: new Date().toISOString()
       };
       
-      const docRef = await addDoc(collection(db, 'users', user.uid, 'resumes'), resumeData);
+      const docRef = doc(db, 'users', user.uid);
+      await setDoc(docRef, { resume: resumeData }, { merge: true });
       
       // Create the resume object with the ID
       const newResume: Resume & { id: string } = {
