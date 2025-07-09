@@ -8,6 +8,7 @@ ENV PYTHONUNBUFFERED=1
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
 ENV TIMEOUT=300
 ENV GCS_RESUME_BUCKET=gethired-resumes
+ENV FIREBASE_STORAGE_BUCKET=gethired-6c623.firebasestorage.app
 
 RUN apt-get update && apt-get install -y \
     curl \
