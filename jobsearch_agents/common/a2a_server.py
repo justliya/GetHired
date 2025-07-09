@@ -269,15 +269,14 @@ def create_agent_server(
         resume_format = current_session.state.get("formatted_resume")
         document = current_session.state.get("doc")
 
-        # Parse the outputs
-        resume_format_parsed = unwrap_json_string(resume_format)
+    
         document_parsed = unwrap_json_string( document)
 
         print(
             json.dumps(
                 {
-                    "job_listings": resume_format_parsed,
-                    "company_research":document_parsed,
+                    "resume_text":  resume_format,
+                    "content":document_parsed,
                 },
                 indent=2,
             )
@@ -286,7 +285,6 @@ def create_agent_server(
         # Return the parsed results directly
         return JSONResponse(
             content={
-                "resume_text": resume_format_parsed,
                 "content": document_parsed,
             },
             headers={

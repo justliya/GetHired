@@ -2,14 +2,13 @@ import os
 import uuid
 import tempfile
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from docxtpl import DocxTemplate
 from .parse import ParsedResume
-
+from typing import Optional
 import firebase_admin
 from firebase_admin import credentials, storage
-from google.cloud import storage as gcs
 
 try:
     import requests
@@ -36,18 +35,21 @@ def initialize_firebase():
         logger.debug("Firebase already initialized")
     except ValueError:
         # No app initialized yet
-        service_account_path = os.getenv('')
+        SERVICE_ACCOUNT_KEY_PATH = os.getenv('SERVICE_ACCOUNT_KEY_PATH')
         storage_bucket = os.getenv('FIREBASE_STORAGE_BUCKET')
-        if service_account_path and os.path.exists(service_account_path):
-            cred = credentials.Certificate(service_account_path)
-            
+        
+        if SERVICE_ACCOUNT_KEY_PATH and os.path.exists(SERVICE_ACCOUNT_KEY_PATH):
+            cred = credentials.Certificate(SERVICE_ACCOUNT_KEY_PATH)
             firebase_admin.initialize_app(cred, {
                 'storageBucket': storage_bucket
             })
             logger.info("Firebase initialized with service account for bucket: %s", storage_bucket)
         else:
-            firebase_admin.initialize_app()
-            logger.info("Firebase initialized with default credentials")
+            # Initialize with default credentials
+            firebase_admin.initialize_app(options={
+                'storageBucket': storage_bucket
+            })
+            logger.info("Firebase initialized with default credentials for bucket: %s", storage_bucket)
 
 
 def create_unique_filename(job_position_title: str, user_id: str) -> str:
@@ -63,11 +65,11 @@ def create_unique_filename(job_position_title: str, user_id: str) -> str:
     
     return filename
 
-def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
-    """Direct Google Cloud Storage upload with multiple URL formats"""
+
+def upload_to_firebase_storage(file_path: str, filename: str, user_id: str) -> dict:
+    """Upload file to Firebase Storage and return download URL"""
     try:
-        # Log detailed upload start information
-        logger.info("🚀 Starting GCS upload process")
+        logger.info("🚀 Starting Firebase Storage upload process")
         logger.info("  📁 File path: %s", file_path)
         logger.info("  📄 Filename: %s", filename)
         logger.info("  👤 User ID: %s", user_id)
@@ -82,193 +84,92 @@ def upload_to_gcs_direct(file_path: str, filename: str, user_id: str) -> dict:
         if file_size == 0:
             raise ValueError(f"Source file is empty: {file_path}")
         
-        # Get bucket configuration
-        bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
-        logger.info("  🪣 Target bucket: %s", bucket_name)
-        
-        # Initialize GCS client
-        logger.info("  🔗 Initializing GCS client...")
-        try:
-            client = gcs.Client()
-            logger.info("  ✅ GCS client initialized successfully")
-            
-            # Get project info to verify authentication
-            project_id = client.project
-            logger.info("  🆔 GCS project ID: %s", project_id)
-        except Exception as client_error:
-            logger.error("  ❌ Failed to initialize GCS client: %s", client_error)
-            raise
+        # Initialize Firebase if not already done
+        initialize_firebase()
         
         # Get bucket
-        logger.info("  🪣 Getting bucket: %s", bucket_name)
-        try:
-            bucket = client.bucket(bucket_name)
-            # Test bucket access by checking if it exists
-            if bucket.exists():
-                logger.info("  ✅ Bucket exists and is accessible")
-            else:
-                logger.error("  ❌ Bucket does not exist: %s", bucket_name)
-                raise RuntimeError(f"Bucket does not exist: {bucket_name}")
-        except Exception as bucket_error:
-            logger.error("  ❌ Failed to access bucket: %s", bucket_error)
-            raise
+        bucket = storage.bucket()
+        logger.info("  🪣 Using Firebase Storage bucket: %s", bucket.name)
         
-        # Create storage path
+        # Create storage path similar to JavaScript example
         storage_path = f"resumes/{user_id}/{filename}"
         logger.info("  🗂️  Storage path: %s", storage_path)
         
-        # Create blob with metadata
-        logger.info("  📦 Creating blob with metadata...")
+        # Create blob
         blob = bucket.blob(storage_path)
+        
+        # Set metadata
         blob.metadata = {
             'uploadedBy': user_id,
             'uploadTime': datetime.now().isoformat(),
             'fileType': 'tailored_resume',
-            'originalSize': str(file_size)
+            'originalSize': str(file_size),
+            'contentType': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         }
         
-        # Perform the upload
+        # Upload file
         logger.info("  ⬆️  Starting file upload...")
-        blob.upload_from_filename(file_path)
+        blob.upload_from_filename(file_path, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         logger.info("  ✅ File upload completed successfully")
         
-        # Verify the upload by checking if blob exists and getting its size
-        logger.info("  🔍 Verifying upload...")
-        blob.reload()  # Refresh blob properties from GCS
-        uploaded_size = blob.size
-        logger.info("  📊 Uploaded file size: %d bytes", uploaded_size)
-        
-        if uploaded_size != file_size:
-            logger.warning("  ⚠️  Size mismatch! Original: %d bytes, Uploaded: %d bytes", file_size, uploaded_size)
-        else:
-            logger.info("  ✅ Size verification passed")
-        
-        # Check if blob exists
-        if not blob.exists():
-            raise RuntimeError(f"Upload verification failed - blob does not exist: {storage_path}")
-        
-        logger.info("  ✅ Upload verification completed successfully")
-        
-        # Try to make public (should work now that bucket is public)
+        # Make the blob publicly accessible
         logger.info("  🌐 Setting blob to public access...")
-        try:
-            blob.make_public()
-            logger.info("  ✅ Successfully made blob public using ACL")
-            
-            # Get public URL and ensure HTTPS
-            public_url = blob.public_url
-            if public_url.startswith('http://'):
-                public_url = public_url.replace('http://', 'https://')
-            
-            logger.info("  🌐 Public URL: %s", public_url)
-            use_public_urls = True
-        except Exception as e:
-            logger.warning("  ⚠️  Cannot use make_public() (may still work due to bucket-level access): %s", e)
-            # Even if make_public fails, the file should still be accessible due to bucket-level public access
-            public_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
-            logger.info("  🌐 Using direct public URL: %s", public_url)
-            use_public_urls = True
+        blob.make_public()
         
-        # Generate signed URL for authenticated access (valid for 24 hours)  
-        from datetime import timedelta
-        signed_url = blob.generate_signed_url(expiration=timedelta(hours=24), method='GET')
+        # Get the public download URL (similar to getDownloadURL in JavaScript)
+        download_url = blob.public_url
         
-        # Generate cloud console compatible authenticated URL
-        # Format: https://storage.cloud.google.com/bucket/path?authuser=X
-        cloud_console_url = f"https://storage.cloud.google.com/{bucket_name}/{storage_path}?authuser=3"
+        # Generate a signed URL for authenticated access (24 hours validity)
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(hours=24),
+            method="GET"
+        )
         
-        # For authenticated access, prefer the cloud console format, but keep signed URL as backup
-        authenticated_url = cloud_console_url
+        # Firebase Storage URL format
+        firebase_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{storage_path.replace('/', '%2F')}?alt=media"
         
-        # Since bucket is now public, prioritize public URLs over signed URLs
-        if use_public_urls:
-            primary_url = public_url
-            logger.info("  ✅ Using public URL as primary: %s", primary_url)
-        else:
-            primary_url = signed_url
-            logger.info("  ✅ Using signed URL as primary: %s", primary_url)
-        
-        # Generate additional URL formats for compatibility
-        direct_url = f"https://storage.googleapis.com/{bucket_name}/{storage_path}"
-        firebase_compatible_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/{storage_path.replace('/', '%2F')}?alt=media"
-        
-        logger.info("Successfully uploaded resume to GCS: %s", storage_path)
-        logger.info("Primary URL: %s", primary_url)
-        logger.info("Public URL: %s", public_url if use_public_urls else "Not available")
-        logger.info("Direct URL: %s", direct_url)
-        logger.info("Firebase compatible URL: %s", firebase_compatible_url)
-        logger.info("Authenticated URL (cloud console): %s", cloud_console_url)
-        logger.info("Signed URL (backup): %s", signed_url)
+        logger.info("✅ Successfully uploaded resume to Firebase Storage")
+        logger.info("  📥 Download URL: %s", download_url)
+        logger.info("  🔗 Firebase URL: %s", firebase_url)
+        logger.info("  🔐 Signed URL: %s", signed_url)
         
         return {
             "success": True,
-            "public_url": primary_url,  # Use public URL as primary since bucket is public
-            "firebase_url": firebase_compatible_url,
-            "gcs_url": direct_url,
-            "authenticated_url": authenticated_url,  # Use cloud console format
-            "signed_url": signed_url,  # Keep signed URL for fallback
+            "download_url": download_url,  # Primary download URL
+            "public_url": download_url,
+            "firebase_url": firebase_url,
+            "signed_url": signed_url,
             "storage_path": storage_path,
-            "bucket": bucket_name
+            "bucket": bucket.name
         }
         
-    except (OSError, IOError) as e:
-        logger.error("❌ IO error during GCS upload:")
-        logger.error("  📁 File path: %s", file_path)
-        logger.error("  📄 Filename: %s", filename)
-        logger.error("  👤 User ID: %s", user_id)
-        logger.error("  🚨 Error details: %s", e)
-        logger.error("  📂 File exists: %s", os.path.exists(file_path) if file_path else "N/A")
-        if file_path and os.path.exists(file_path):
-            logger.error("  📊 File size: %d bytes", os.path.getsize(file_path))
-        return {
-            "success": False,
-            "error": f"IO error: {str(e)}",
-            "public_url": "",
-            "firebase_url": "",
-            "gcs_url": "",
-            "authenticated_url": ""
-        }
     except Exception as e:
-        logger.error("❌ Unexpected error during GCS upload:")
-        logger.error("  📁 File path: %s", file_path)
-        logger.error("  📄 Filename: %s", filename)
-        logger.error("  👤 User ID: %s", user_id)
+        logger.error("❌ Error during Firebase Storage upload:")
         logger.error("  🚨 Error type: %s", type(e).__name__)
         logger.error("  🚨 Error details: %s", e)
         logger.exception("  📋 Full stack trace:")
+        
         return {
             "success": False,
             "error": f"Upload error: {str(e)}",
+            "download_url": "",
             "public_url": "",
             "firebase_url": "",
-            "gcs_url": "",
-            "authenticated_url": ""
+            "signed_url": ""
         }
 
-from typing import Optional
 
 def extract_user_id_from_url(resume_url: str) -> str:
-    """Extract user_id from Firebase Storage or GCS URL"""
+    """Extract user_id from Firebase Storage URL"""
     try:
         import re
         
         # Pattern to match user_id in Firebase Storage URLs
         # Example: /resumes/user123/filename.pdf
-        firebase_pattern = r'/resumes/([^/]+)/'
+        pattern = r'/resumes/([^/]+)/'
         
-        # Pattern to match user_id in direct GCS URLs  
-        # Example: https://storage.googleapis.com/bucket/resumes/user123/filename.pdf
-        gcs_pattern = r'/resumes/([^/]+)/'
-        
-        # Try Firebase pattern first
-        match = re.search(firebase_pattern, resume_url)
-        if match:
-            user_id = match.group(1)
-            logger.debug("Extracted user_id from URL: %s", user_id)
-            return user_id
-            
-        # Try GCS pattern
-        match = re.search(gcs_pattern, resume_url)
+        match = re.search(pattern, resume_url)
         if match:
             user_id = match.group(1)
             logger.debug("Extracted user_id from URL: %s", user_id)
@@ -280,6 +181,7 @@ def extract_user_id_from_url(resume_url: str) -> str:
     except Exception as e:
         logger.warning("Error extracting user_id from URL %s: %s", resume_url, e)
         return ""
+
 
 def create_formatted_resume(text: str, job_position_title: str = "Position", user_id: Optional[str] = None, resume_url: Optional[str] = None) -> dict:
     """Create a formatted resume document and upload to Firebase Storage"""
@@ -334,6 +236,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
                 "status": "error",
                 "message": f"Failed to parse resume: {str(parse_error)}"
             }
+        
         # Log the candidate data for debugging template issues
         candidate = candidate_data.get("candidate", {})
         logger.info("📋 Parsed candidate info:")
@@ -348,42 +251,10 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         logger.info("  - Certifications: %d", len(candidate.get("certifications", [])))
         logger.info("  - Skills count: %d", len(candidate.get("skills", [])))
         
-        # Log detailed candidate data for debugging
-        logger.debug("🔍 Detailed candidate info:")
-        if candidate.get("education"):
-            for i, edu in enumerate(candidate.get("education", [])):
-                logger.debug("  Education %d: %s at %s (%s)", i+1, edu.get("degree"), edu.get("school"), edu.get("year"))
-        
-        if candidate.get("experience_section"):
-            for i, exp in enumerate(candidate.get("experience_section", [])):
-                logger.debug("  Experience %d: %s at %s (%s)", i+1, exp.get("role"), exp.get("company"), exp.get("dates"))
-        
-        if candidate.get("skills"):
-            skills_data = candidate.get("skills", {})
-            if hasattr(skills_data, 'technical'):
-                # SkillSet object
-                technical_count = len(skills_data.technical) if skills_data.technical else 0
-                soft_count = len(skills_data.soft_skills) if skills_data.soft_skills else 0
-                logger.debug("  Skills: %d technical, %d soft skills", technical_count, soft_count)
-            elif isinstance(skills_data, dict):
-                # Dictionary format
-                technical_skills = skills_data.get("technical", [])
-                soft_skills = skills_data.get("soft_skills", [])
-                logger.debug("  Skills: %d technical, %d soft skills", len(technical_skills), len(soft_skills))
-            elif isinstance(skills_data, list):
-                # List format (legacy)
-                logger.debug("  Skills: %d total skills", len(skills_data))
-            else:
-                logger.debug("  Skills: Unknown format - %s", type(skills_data))
-        
         # Use templateResumeDocV2.docx from the template directory
-        # Try multiple possible paths for different environments
         possible_paths = [
-            # Docker container path
             Path(__file__).parent.parent / "template" / "templateResumeDocV2.docx",
-            # Local development path
             Path(__file__).parent.parent.parent / "template" / "templateResumeDocV2.docx",
-            # Absolute path in Docker
             Path("/app/template/templateResumeDocV2.docx")
         ]
         
@@ -405,21 +276,17 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         doc = DocxTemplate(str(template_path))
         
         template_context = candidate_data["candidate"].copy()
-        # Add the candidate object itself for templates that expect {{ candidate.name }}
         template_context["candidate"] = candidate_data["candidate"]
         
-        # Handle skills properly - extract from SkillSet structure
-        candidate = candidate_data["candidate"]  # Define candidate for easier access
+               # Handle skills properly
         skills_data = candidate.get("skills", {})
         if hasattr(skills_data, 'technical'):
             technical_skills = skills_data.technical or []
             soft_skills = skills_data.soft_skills or []
         elif isinstance(skills_data, dict):
-            # Dictionary format
             technical_skills = skills_data.get("technical", [])
             soft_skills = skills_data.get("soft_skills", [])
         elif isinstance(skills_data, list):
-            # List format (all skills as technical)
             technical_skills = skills_data
             soft_skills = []
         else:
@@ -441,7 +308,7 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         })
         
         # Create a flat skills list for template compatibility
-        all_skills_list: list[str] = []
+        all_skills_list = []
         all_skills_list.extend(technical_skills)
         all_skills_list.extend(soft_skills)
         
@@ -481,9 +348,9 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
             file_size = os.path.getsize(temp_file_path)
             logger.info("📊 Generated document size: %d bytes", file_size)
             
-            if file_size < 1000:  # Very small file might indicate rendering issues
+            if file_size < 1000:
                 logger.warning("⚠️  Generated document is very small (%d bytes), check template rendering", file_size)
-            elif file_size > 1024 * 1024:  # File larger than 1MB
+            elif file_size > 1024 * 1024:
                 logger.info("📈 Large document generated (%d bytes), this is good", file_size)
             else:
                 logger.info("✅ Document size looks reasonable (%d bytes)", file_size)
@@ -501,32 +368,13 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
         else:
             raise FileNotFoundError(f"Temporary document file was not created: {temp_file_path}")
         
-        logger.info("☁️  Uploading to Google Cloud Storage...")
+        # Upload to Firebase Storage
+        logger.info("☁️  Uploading to Firebase Storage...")
         logger.info("🔧 Environment check:")
-        logger.info("  GCS_RESUME_BUCKET: %s", os.getenv('GCS_RESUME_BUCKET', 'NOT_SET'))
-        logger.info("  GOOGLE_APPLICATION_CREDENTIALS: %s", os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'NOT_SET'))
+        logger.info("  FIREBASE_STORAGE_BUCKET: %s", os.getenv('FIREBASE_STORAGE_BUCKET', 'NOT_SET'))
+        logger.info("  FIREBASE_SERVICE_ACCOUNT_KEY_PATH: %s", os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY_PATH', 'NOT_SET'))
         
-        # Test GCS connectivity before attempting upload
-        connectivity_test = test_gcs_connectivity()
-        if not connectivity_test.get("success", False):
-            logger.error("❌ GCS connectivity test failed: %s", connectivity_test.get("error"))
-            return {
-                "resume_text": text,
-                "document_url": f"local://{filename}",
-                "download_url": f"local://{filename}",
-                "public_url": f"local://{filename}",
-                "firebase_url": f"local://{filename}",
-                "gcs_url": f"local://{filename}",
-                "authenticated_url": f"local://{filename}",
-                "filename": filename,
-                "status": "error",
-                "message": f"GCS connectivity failed: {connectivity_test.get('error')}",
-                "upload_error": connectivity_test.get("error")
-            }
-        else:
-            logger.info("✅ GCS connectivity test passed")
-        
-        upload_result = upload_to_gcs_direct(temp_file_path, filename, user_id)
+        upload_result = upload_to_firebase_storage(temp_file_path, filename, user_id)
         
         if not upload_result.get("success", False):
             logger.warning("⚠️  Failed to upload to storage, returning local file info")
@@ -536,26 +384,22 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
                 "download_url": f"local://{filename}",
                 "public_url": f"local://{filename}",
                 "firebase_url": f"local://{filename}",
-                "gcs_url": f"local://{filename}",
-                "authenticated_url": f"local://{filename}",
                 "filename": filename,
                 "status": "partial_success",
                 "message": f"Resume created but upload failed for {job_position_title}",
                 "upload_error": upload_result.get("error", "Unknown upload error")
             }
         else:
-            logger.info("✅ Upload successful: %s", upload_result.get("public_url"))
+            logger.info("✅ Upload successful: %s", upload_result.get("download_url"))
         
         logger.info("🎉 Resume created successfully for %s (user: %s)", job_position_title, user_id)
         
         return {
             "resume_text": text,
-            "document_url": upload_result.get("public_url", ""),
-            "download_url": upload_result.get("firebase_url", ""),
+            "document_url": upload_result.get("download_url", ""),
+            "download_url": upload_result.get("download_url", ""),
             "public_url": upload_result.get("public_url", ""),
             "firebase_url": upload_result.get("firebase_url", ""),
-            "gcs_url": upload_result.get("gcs_url", ""),
-            "authenticated_url": upload_result.get("authenticated_url", ""),
             "filename": filename,
             "storage_path": upload_result.get("storage_path", ""),
             "bucket": upload_result.get("bucket", ""),
@@ -597,12 +441,13 @@ def create_formatted_resume(text: str, job_position_title: str = "Position", use
             except OSError as e:
                 logger.warning("⚠️  Failed to delete temporary file %s: %s", temp_file_path, e)
 
+
 def download_and_extract_resume_text(storage_url: str) -> str:
     """
     Download a resume file from Firebase Storage, extract text content, and clean up
     
     Args:
-        storage_url: Firebase Storage URL or GCS public URL
+        storage_url: Firebase Storage URL
         
     Returns:
         str: Extracted text content from the resume file
@@ -730,50 +575,26 @@ def download_and_extract_resume_text(storage_url: str) -> str:
             except OSError as e:
                 logger.warning("Failed to delete temporary download file %s: %s", temp_file_path, e)
 
+
 from typing import Optional
 
-def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
-    """Test Google Cloud Storage connectivity and bucket access"""
+def test_firebase_connectivity(bucket_name: Optional[str] = None) -> dict:
+    """Test Firebase Storage connectivity and bucket access"""
     try:
         if not bucket_name:
-            bucket_name = os.getenv('GCS_RESUME_BUCKET', 'gethired-resumes')
+            bucket_name = os.getenv('FIREBASE_STORAGE_BUCKET')
         
-        logger.info("🧪 Testing GCS connectivity...")
+        logger.info("🧪 Testing Firebase Storage connectivity...")
         logger.info("  🪣 Target bucket: %s", bucket_name)
         
-        # Check environment variables
-        logger.info("  🔧 Environment variables:")
-        logger.info("    GOOGLE_APPLICATION_CREDENTIALS: %s", os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'NOT_SET'))
-        logger.info("    GOOGLE_CLOUD_PROJECT: %s", os.getenv('GOOGLE_CLOUD_PROJECT', 'NOT_SET'))
-        logger.info("    GCS_RESUME_BUCKET: %s", os.getenv('GCS_RESUME_BUCKET', 'NOT_SET'))
+        # Initialize Firebase
+        initialize_firebase()
         
-        # Initialize client
-        logger.info("  🔗 Initializing GCS client...")
-        client = gcs.Client()
-        project_id = client.project
-        logger.info("  🆔 Project ID: %s", project_id)
+        # Get bucket
+        bucket = storage.bucket()
+        logger.info("  🪣 Got bucket: %s", bucket.name)
         
-        # Test bucket access
-        logger.info("  🪣 Accessing bucket...")
-        bucket = client.bucket(bucket_name)
-        
-        # Check if bucket exists
-        logger.info("  🔍 Checking bucket existence...")
-        if not bucket.exists():
-            return {
-                "success": False,
-                "error": f"Bucket {bucket_name} does not exist",
-                "project_id": project_id
-            }
-        
-        logger.info("  ✅ Bucket exists and is accessible")
-        
-        # Try to list some objects (limited to 5)
-        logger.info("  📂 Listing bucket objects...")
-        blobs = list(bucket.list_blobs(max_results=5))
-        logger.info("  📁 Found %d objects in bucket", len(blobs))
-        
-        # Test write permission with a small test file
+        # Test bucket access by creating a test file
         test_blob_name = f"test_connectivity_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         test_blob = bucket.blob(test_blob_name)
         test_content = f"Test connectivity at {datetime.now().isoformat()}"
@@ -783,13 +604,18 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
         
         # Verify the test file was uploaded
         logger.info("  🔍 Verifying test file upload...")
-        test_blob.reload()  # Refresh to get latest properties
         if test_blob.exists():
-            logger.info("  ✅ Write test successful - file size: %d bytes", test_blob.size)
+            logger.info("  ✅ Write test successful - file exists")
             
-            # Test public access since bucket is now public
-            public_url = test_blob.public_url
-            logger.info("  🌐 Public URL: %s", public_url)
+            # Test public access
+            try:
+                test_blob.make_public()
+                public_url = test_blob.public_url
+                logger.info("  🌐 Public URL: %s", public_url)
+                public_access = True
+            except Exception as e:
+                logger.warning("  ⚠️  Could not make blob public: %s", e)
+                public_access = False
             
             # Clean up test file
             test_blob.delete()
@@ -797,27 +623,22 @@ def test_gcs_connectivity(bucket_name: Optional[str] = None) -> dict:
             
             return {
                 "success": True,
-                "message": "GCS connectivity test passed - bucket is accessible and writable",
-                "project_id": project_id,
-                "bucket_name": bucket_name,
-                "objects_count": len(blobs),
-                "public_access": True
+                "message": "Firebase Storage connectivity test passed",
+                "bucket_name": bucket.name,
+                "public_access": public_access
             }
         else:
             return {
                 "success": False,
                 "error": "Test file was not created successfully",
-                "project_id": project_id
+                "bucket_name": bucket.name
             }
             
     except Exception as e:
-        logger.error("❌ GCS connectivity test failed: %s", e)
+        logger.error("❌ Firebase Storage connectivity test failed: %s", e)
         logger.exception("Full error details:")
         return {
             "success": False,
             "error": str(e),
-            "error_type": type(e).__name__,
-            "project_id": getattr(client, 'project', 'unknown') if 'client' in locals() else 'unknown'
-
+            "error_type": type(e).__name__
         }
-
