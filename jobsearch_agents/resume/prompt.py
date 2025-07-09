@@ -255,7 +255,7 @@ Act as an expert recruiter and Microsoft Word power user. Using the available to
 YOU MUST EXTRACT THE ACTUAL USER_ID VALUE - NEVER USE THE LITERAL STRING "user_id"
 
 The user_id will be provided in one of these ways:
-1. From Firebase authentication context: {user_id}
+1. From Firebase authentication context: user_id
 2. From the resume URL path: https://storage.googleapis.com/[project].firebasestorage.app/resumes/[USER_ID]/[filename]
 
 REAL EXAMPLE:
@@ -271,7 +271,7 @@ When calling create_formatted_resume:
 create_formatted_resume(
     text={formatted_resume},
     job_position_title={job_title},
-    user_id={user_id},
+    user_id=user_id,
     resume_url={resume_url}
 )
 
