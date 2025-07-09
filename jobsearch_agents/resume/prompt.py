@@ -275,7 +275,7 @@ create_formatted_resume(
     resume_url=resume_url
 )
 
-Expected return format with REAL values:
+Expected return format with REAL values: NO TEXT BEFORE OR AFTER JUST THE JSON OBJECT ONLY
 {
   "public_url": "https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/....",
   "signed_url": "[long signed URL with authentication parameters]",
