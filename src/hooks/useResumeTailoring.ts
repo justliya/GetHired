@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import axios from 'axios';
 import { getApiUrl } from '../config/environment';
 import type { ResumeTailoringContext } from '../types';
 
@@ -113,25 +114,16 @@ ${resumeText}
 JOB DESCRIPTION:
 ${jobDescription}`;
 
-    const response = await fetch(`${getApiUrl(true)}/tailor-resume`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+    const response = await axios.post(`${getApiUrl(true)}/tailor-resume`, {
+      message: messageContent,
+      context: {
+        ...context,
+        resume_url: resume_storage_url, 
       },
-      body: JSON.stringify({
-        message: messageContent,
-        context: {
-          ...context,
-          resume_url: resume_storage_url, // Include the public URL in context too
-        },
-        session_id: `resume-${Date.now()}`
-      }),
+      session_id: `resume-${Date.now()}`
     });
 
-    // ... r
-
-      const result = await response.json();
+      const result = response.data;
       console.log('🚀 Resume tailoring response received:', result);
       
       // Parse the AI response to extract tailoring data

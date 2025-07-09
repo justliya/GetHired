@@ -391,7 +391,7 @@ Join our team and help build the next generation of web applications that serve 
       is_anonymous: user?.isAnonymous || false,
       task: 'resume_tailoring',
       user_name: userName || user?.displayName || '',
-      resume_storage_url: selectedResumeUrl || '', // Send the download URL directly
+      resume_storage_url: selectedResumeUrl || '', 
       job_description: jobDescription,
       job_title: job?.title || '',
       job_company: job?.company || '',
@@ -401,7 +401,7 @@ Join our team and help build the next generation of web applications that serve 
       user_agent: navigator.userAgent
     };
 
-    console.log('🚀 Starting analysis with context:', {
+    console.log('Starting analysis with context:', {
       ...context,
       resume_url_provided: !!selectedResumeUrl
     });
