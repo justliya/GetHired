@@ -20,9 +20,9 @@ interface Job {
 }
 
 interface UnifiedDocumentViewerProps {
-  resumeText?: string;
-  documentUrl?: string; // This will be publicUrl from tailoringData
-  authenticatedUrl?: string; // This will be signedUrl from tailoringData
+  resumeText?: string;           // from AI: resume_text
+  documentUrl?: string;          // from AI: public_url
+  authenticatedUrl?: string;     // from AI: signed_url
   job?: Job | null;
   onCopyText?: (text: string) => void;
   onDownload?: () => void;
@@ -51,20 +51,18 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
     if (!url) return false;
     try {
       new URL(url);
-      return !url.includes('user_id'); // Reject URLs with literal "user_id"
+      return !url.includes('user_id');
     } catch {
       return false;
     }
   };
 
-  // Select the best available URL - prefer signed URL for downloads
+  // Select the best available URL - prefer signed_url (authenticatedUrl) over public_url (documentUrl)
   const selectCurrentUrl = useCallback(() => {
     if (urlFallback === 0) {
-      // First try: authenticated/signed URL, then public URL
       if (isValidUrl(authenticatedUrl)) return authenticatedUrl;
       if (isValidUrl(documentUrl)) return documentUrl;
     } else {
-      // Fallback: public URL, then authenticated/signed URL
       if (isValidUrl(documentUrl)) return documentUrl;
       if (isValidUrl(authenticatedUrl)) return authenticatedUrl;
     }
@@ -73,7 +71,7 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
 
   const currentUrl = selectCurrentUrl();
 
-  // Debug logging
+  // Debug logging: Only log fields present in the AI response format
   React.useEffect(() => {
     console.log('🔗 UnifiedDocumentViewer URLs:', {
       documentUrl: documentUrl || 'None',
@@ -99,7 +97,6 @@ const UnifiedDocumentViewer: React.FC<UnifiedDocumentViewerProps> = ({
 
   const handleUrlFallback = useCallback(() => {
     if (urlFallback === 0 && (documentUrl || authenticatedUrl)) {
-      // Try the secondary URL (whichever one we're not currently using)
       setUrlFallback(1);
       setError(null);
       setIsLoading(true);
