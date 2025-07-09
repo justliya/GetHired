@@ -30,8 +30,7 @@ RUN npm install
 
 RUN npm install @gannonh/firebase-mcp
 
-# Copy the template directory from project root
-COPY template/ ./template/
+
 
 # Copy the jobsearch_agents source code
 COPY jobsearch_agents/ .
