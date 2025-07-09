@@ -36,20 +36,20 @@ def initialize_firebase():
     except ValueError:
         # No app initialized yet
         SERVICE_ACCOUNT_KEY_PATH = os.getenv('SERVICE_ACCOUNT_KEY_PATH')
-        storage_bucket = os.getenv('FIREBASE_STORAGE_BUCKET')
+        FIREBASE_STORAGE_BUCKET = os.getenv('FIREBASE_STORAGE_BUCKET')
         
         if SERVICE_ACCOUNT_KEY_PATH and os.path.exists(SERVICE_ACCOUNT_KEY_PATH):
             cred = credentials.Certificate(SERVICE_ACCOUNT_KEY_PATH)
             firebase_admin.initialize_app(cred, {
-                'storageBucket': storage_bucket
+                'storageBucket': FIREBASE_STORAGE_BUCKET
             })
-            logger.info("Firebase initialized with service account for bucket: %s", storage_bucket)
+            logger.info("Firebase initialized with service account for bucket: %s", FIREBASE_STORAGE_BUCKET)
         else:
             # Initialize with default credentials
             firebase_admin.initialize_app(options={
-                'storageBucket': storage_bucket
+                'storageBucket': FIREBASE_STORAGE_BUCKET
             })
-            logger.info("Firebase initialized with default credentials for bucket: %s", storage_bucket)
+            logger.info("Firebase initialized with default credentials for bucket: %s", FIREBASE_STORAGE_BUCKET)
 
 
 def create_unique_filename(job_position_title: str, user_id: str) -> str:
