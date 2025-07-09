@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-//import { getApiUrl } from '../config/environment';
+import { getApiUrl } from '../config/environment';
 import type { ResumeTailoringContext } from '../types';
 
 // Commented out for now - will be used when implementing suggested changes feature
@@ -113,7 +113,7 @@ ${resumeText}
 JOB DESCRIPTION:
 ${jobDescription}`;
 
-    const response = await fetch(`http://0.0.0.0:8080/tailor-resume`, {
+    const response = await fetch(`${getApiUrl(true)}/tailor-resume`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
