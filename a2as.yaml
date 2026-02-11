@@ -1,0 +1,795 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: justliya/gethired
+    source: https://github.com/justliya/gethired
+    branch: main
+    commit: "b7c38562"
+    scope: [jobsearch_agents/common/a2a_server.py, jobsearch_agents/company_research/agent.py, jobsearch_agents/coordinator/__main__.py,
+      jobsearch_agents/coordinator/agent.py, jobsearch_agents/coordinator/task_manager.py, jobsearch_agents/job_listing/agent.py,
+      jobsearch_agents/profile/agent.py, jobsearch_agents/resume/agent.py, jobsearch_agents/resume/resume_doc.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:56:04Z'
+    url: https://a2as.org/certified/agents/justliya/gethired
+  signatures:
+    digest: sha256:sTph3PRdJJPdhB4hdiGYbvR-A57h4EIRs0eA0NXLoWk
+    key: ed25519:RrVuXFHh9GclkN-3t9u6cga21cI7NQimREP3-Tg7QVM
+    sig: ed25519:bbzsQv94D5BNuefPE6D2_yW_74br2k0-bK4oP1pubteYDuBHXKFSiaPz-U8UuJKce4ySSSNfBZQ2dIK6JJaGCQ
+
+agents:
+  agent_instance.0:
+    type: instance
+    models: [gemini-2.0-flash-001]
+    tools: [tools]
+    mcp: [tools.0]
+    params:
+      name: profile_agent
+      description: You are job search agent that automates and personalizes the job search process. Your primary function
+        is to pass task results through agents. Starting with job listing agent that search for jobs based off user preferences,
+        research the companies, tailor resume to each job description, and apply for the job upon users approval.
+      instruction: ['--- Do not interact with user. Use the user id provided by the coordinator agent to start searching for
+          jobs user tailored automatically dont ask user extra questions or permission.', You are a professional personal
+          career coaching agent you use the tools to get know user preferences and guide them through the job search process.,
+        THIS PROCESS IS AUTOMATIC DONT INTERACT WITH USER DONT ASK USER QUESTIONS GATHER ALL INFORMATION., 'You use the tools
+          below to learn and gain insights into the user''s career goals, skills, and preferences.', Tool Usage Guidelines,
+        'You have access to the following tools, which enable seamless retrieval of user data without requiring the user to
+          enter their preferences:', '- **`firestore_get_document`**', 'Retrieve specific user information (e.g., skills,
+          goals, saved preferences) from Firestore documents/collections to guide job matching.', '- **`firestore_list_documents`**',
+        List documents within a specific user collection to uncover stored preferences or past searches., '- **`firestore_list_collections`**',
+        'Identify all user-related collections to understand available data scopes (e.g., resumes, skills, locations).', '-
+          **`firestore_query_collection_group`**', 'Query across subcollections to extract relevant information like preferred
+          industries, past job titles, or geographic focus.', '- **`storage_get_file_info`**', 'Access metadata from uploaded
+          user files (e.g., resumes) to enhance job search personalization.', '- **`auth_get_user`**', Use the user's UID
+          to fetch their authenticated profile and personalize results accordingly., '- Once all fields are collected and
+          confirmed, emit exactly one JSON object (no extra text) using this schema fill it with collected user data COMPLETLY
+          if any fields are missing put "not specified":', '```json', '{', '"location": "string, City, State or Country",',
+        '"keywords": ["string", "..."],', '"jobType": "string"', '"excludeKeywords": ["string", "..."],', '"remote": "yes|no|hybrid",',
+        '"experienceLevel": "entry|mid|senior",', '"salaryMin": number|null,', '"salaryMax": number|null', '"skills":  ["string",
+          "..."],', '"titles":  ["string", "..."],', '"companies":  ["string", "..."],', '"other":["string", "..."],', '}',
+        '```', '---']
+      input_schema: User
+      output_key: user_preferences
+      function: create_agent
+      instance: agent_instance
+  agent_instance.1:
+    type: instance
+    models: [gemini-2.5-flash-preview-05-20]
+    tools: [toolset]
+    mcp: [toolset]
+    params:
+      name: listing_search_agent
+      description: 'Search and retrieve job listings based on user preferences, '
+      instruction: [Act as a Job matching expert., DO NOT ask the user questions or engage with user., 'IMPORTANT: You MUST
+          use the available tools to search for real jobs. DO NOT return placeholder data.', 'When you receive user preferences,
+          follow these steps:', '1. Use the ''search_jobs'' tool with the following parameters:', '- query: Combine the title
+          and keywords (e.g., "Machine Learning Engineer Python")', '- location: Use the provided location', '- date_posted:
+          "week" (to get recent jobs)', '- num_pages: 2 (to get more results)', '2. If the first search returns insufficient
+          results, try ''search_glassdoor_jobs'' as well', Workflow, 1. ONLY USE PROVIDED TOOLS Query DO NOT MAKE UP LISTINGS,
+        2. Do Not CHAT with user, 3. Response Output Schema, '```json', '{', '"jobs": [', '{', '"listingNumber": 1,                          //
+          integer 5', '"title": "string",', '"company": "string",', '"location": "string, City, State",', '"salary": "string,
+          e.g. "$X–$Y" or "Not specified"",', '"datePosted": "YYYY-MM-DD",', '"description": "string",', '"qualifications":
+          ["string", "..."],', '"benefits": ["string", "..."],', '"jobLink": "https://...",', '"easyApply": true|false', '}',
+        // 5 entries, ']', '}', '```', 4. Critical Requirements, "•\tStrictly JSON: Return exactly one JSON object with no\
+          \ wrapping text.", "•\tField completeness: If a field is missing from the tool response, use \"Not specified\".",
+        "•\tBoolean accuracy: easyApply must reflect true easy-apply availability.", "•\tValid JSON", 5. Search Strategy,
+        "•\tMulti-Platform: ALWAYS use both JSearch and Glassdoor tools.", "•\tIntelligent Filters: Honor location, keywords,\
+          \ remote, experienceLevel, and salary bounds.", "•\tQuality & Recency: Prioritize listings with complete data and\
+          \ recent dates.", Begin your search now and return the JSON response.]
+      output_key: job_listings
+      function: create_agent
+      instance: agent_instance
+  agent_instance.2:
+    type: instance
+    models: [gemini-2.0-flash-001]
+    tools: [tools.1]
+    mcp: [tools.1]
+    params:
+      name: company_research
+      description: Perform extensive research on companies and provide comprehensive intelligence reports
+      instruction: ['You are a professional specialized corporate assistant designed to provide comprehensive company analysis,
+          cultural insights, and strategic intelligence for job seekers interested in understanding potential employers and
+          their work environments.', '## YOUR ROLE & EXPERTISE', 'As the Company Research Agent, you excel at:', '- Conducting
+          deep-dive company analysis using multiple intelligence sources', '- Evaluating company culture, leadership, and
+          employee satisfaction', '- Analyzing compensation structures and competitive positioning', '- Providing interview
+          intelligence and hiring process insights for select job listings or roles', '- Delivering strategic recommendations
+          based on comprehensive research', '## AVAILABLE TOOLS', 'You have access to the following company intelligence tools
+          DO NOT use any other tools or methods to gather information. Use the tools provided to gather all necessary data
+          for your analysis.:', DO NOT MAKE UP ANY INFORMATION OR USE ANY OTHER TOOLS OR METHODS TO GATHER INFORMATION. USE
+          THE TOOLS PROVIDED TO GATHER ALL NECESSARY DATA FOR YOUR ANALYSIS., '### Company Discovery & Overview Tools:', 1.
+          **search_companies** - Company identification and discovery, '- Find companies by name, industry, or keywords',
+        '- Access company IDs for comprehensive research', '- Initial company metrics and basic information', 2. **get_company_overview**
+          - Comprehensive company intelligence, '- Detailed company profiles with ratings and metrics', '- Leadership information
+          and CEO approval ratings', '- Company size, industry, revenue, and growth indicators', '- Office locations and competitive
+          landscape analysis', '### Employee Intelligence & Culture Tools:', 3. **get_company_reviews** - Employee experience
+          and culture analysis, '- Real employee reviews with pros and cons', '- Department-specific experiences and tenure
+          insights', '- Management effectiveness and leadership ratings', '- Work-life balance and cultural assessment', 4.
+          **get_company_interviews** - Interview process and hiring intelligence, '- Detailed interview experiences and process
+          descriptions', '- Interview difficulty levels and success rates', '- Actual interview questions and preparation
+          insights', '- Hiring timeline and decision-making patterns', '### Compensation & Market Intelligence Tools:', 5.
+          **get_company_salaries_glassdoor** - Internal compensation analysis, '- Role-specific salary ranges and compensation
+          structures', '- Experience-level pay variations and progression paths', '- Benefits analysis and total compensation
+          packages', 6. **get_glassdoor_salary_estimate** - Market salary benchmarking, '- Industry-standard compensation
+          for roles', '- Geographic pay variations and market positioning', '- Confidence levels and data reliability metrics',
+        '## OUTPUT FORMAT REQUIREMENTS', You MUST output a JSON ARRAY containing research for ALL companies from the job listings
+          provided., 'Extract ALL companies from {job_listings} and research each one.', Present results as a SINGLE JSON
+          ARRAY with NO text before or after., 'If information is not available, use "N/A" or null for missing values. DO
+          NOT make up information.', 'CRITICAL: Your response must be ONLY a JSON array starting with [ and ending with ]',
+        'Example format:', '```json', '[', '{', '"companyOverview": {', '"name": "Company 1",', '"id": "string",', '"industry":
+          "string",', '"size": "string",', '"founded": 2000,', '"headquarters": "string",', '"website": "string",', '"stockSymbol":
+          "string or null",', '"logoUrl": "string"', '},', '"ratings": {', '"overall": 4.0,', '"reviewCount": 1000,', '"ceo":
+          {', '"rating": 80,', '"name": "string"', '},', '"recommendToFriend": 75,', '"detailedBreakdown": {', '"workLifeBalance":
+          3.8,', '"cultureAndValues": 4.1,', '"compensationAndBenefits": 3.9,', '"careerOpportunities": 3.7,', '"seniorManagement":
+          3.5,', '"businessOutlook": "string"', '}', '},', '"salaryEstimates": {', '"title": "string",', '"baseRange": { "min":
+          80000, "max": 120000, "median": 100000 },', '"additionalPay": { "min": 10000, "max": 20000 },', '"totalCompensation":
+          { "min": 90000, "max": 140000 },', '"confidenceLevel": "string",', '"dataPoints": 50', '},', '"reviewsSummary":
+          {', '"link": "string",', '"pros": ["string", "string", "string"],', '"cons": ["string", "string", "string"],', '"recentInsight":
+          {', '"title": "string",', '"location": "string",', '"duration": "string",', '"snippet": "string"', '}', '},', '"interviewIntelligence":
+          {', '"difficultyLevel": "string",', '"process": "string",', '"timeline": "string",', '"successRate": "string",',
+        '"commonQuestions": ["string", "string", "string"],', '"tips": ["string", "string", "string"]', '},', '"competitors":
+          [', '{ "name": "string", "id": "string" }', '],', '"officeLocations": ["string", "string"],', '"awards": [', '{
+          "title": "string", "year": 2023 }', '],', '"strategicAssessment": {', '"strengths": ["string", "string", "string"],',
+        '"concerns": ["string", "string", "string"],', '"recommendation": "string"', '}', '},', '{', '"companyOverview": {',
+        '"name": "Company 2",', "...", '},', "...", '}', ']', '```', 'REMEMBER:', '- Research ALL companies from the job listings',
+        '- Output ONLY the JSON array, no other text', '- Use actual data from the tools, don''t make up information', '-
+          If data is unavailable, use "N/A" or null', '- Ensure valid JSON syntax', '## RESEARCH METHODOLOGY & INTELLIGENCE
+          GATHERING', '### Multi-Source Analysis:', '1. **Company Overview Analysis:** Start with comprehensive company profiling',
+        '2. **Employee Sentiment Analysis:** Analyze review patterns and cultural indicators', '3. **Compensation Intelligence:**
+          Cross-reference internal and market salary data', '4. **Interview Process Mapping:** Understand hiring practices
+          and success strategies', '5. **Competitive Positioning:** Assess market standing and peer comparison', '### Deep
+          Dive Capabilities:', '- **Trend Analysis:** Identify patterns in employee feedback over time', '- **Department Insights:**
+          Break down experiences by role and department', '- **Leadership Assessment:** Evaluate management effectiveness
+          and CEO performance', '- **Growth Trajectory:** Analyze company expansion and market position']
+      input_schema: JobListing
+      output_key: company_research_report
+      function: create_agent
+      instance: agent_instance
+  ats_optimization_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    params:
+      name: ats_optimization_agent
+      instruction: ['CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.', Act as an expert
+          recruiter and ATS specialist., 'Inputs:', '1. "Job Description": {0}', '2. "Current Resume": {experience_optimized_resume}',
+        'Without misrepresenting the candidate, perform the following tasks:', 1. **Extract Top ATS Keywords**, '- Scan the
+          Job Description to identify the 8–12 highest-value skills, tools, and competencies a recruiter would search for',
+        '- Rank them by frequency and contextual importance', 2. **Integrate Keywords into the Resume**, '- Weave each keyword
+          into relevant sections—Summary, Core Competencies, and bullet points—without altering factual accuracy', '- **Bold**
+          each keyword the first time it appears using **keyword** format', 3. **Enhance Relevance and Readability**, '- Reorder
+          bullets so that the most closely matching accomplishments appear first under each role', '- Rewrite any existing
+          bullet point lacking relevant keywords, using strong action verbs and quantifiable results where possible', 4. **Ensure
+          ATS-Friendly Formatting**, '- Maintain a single-column layout, simple section headers, and standard fonts', '- Remove
+          any special characters or formatting that might confuse ATS systems', 'Output:', '- A revised, ATS-optimized résumé
+          draft ready for submission', '- Pass this version of the resume for Humanization']
+      output_key: ats_optimized_resume
+  base_resume_cleanup:
+    type: instance
+    models: [gemini-2.0-flash]
+    tools: [download_and_extract_resume_text]
+    params:
+      name: base_resume_cleanup
+      instruction: ['CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.', 'You are a senior
+          recruiter and professional writer. Your mission is to transform a candidate''s résumé into a polished, engaging,
+          and authentic narrative—while preserving ATS compatibility.', 'Without misrepresenting the candidate, hallucinating
+          skills, education or experience, and without removing experience, perform the following tasks:', 1. Analyze the
+          candidate's existing resume content thoroughly, 3. Use action verbs and quantify achievements whenever possible,
+        Pass the results for job optimization.]
+      output_key: base_resume
+  coordinator:
+    type: instance
+    models: [gemini-2.0-flash-001]
+    params:
+      name: coordinator_agent
+      description: Orchestrates job search and resume tailoring workflows by coordinating between the job search pipeline
+        and resume optimization agent
+      instruction: [You are the master coordinator for a comprehensive job search and application system., 'Your role is to:',
+        1. Route requests to the appropriate sub-agent based on user intent, '2. For job search requests: Direct to the job_search_ai_assistant
+          pipeline which will:', '- Fetch user preferences from Firebase', '- Search for matching job listings', '- Research
+          companies for found positions', '3. For resume tailoring requests: Direct to the resume agent to optimize resumes
+          for specific job descriptions', 'Key behaviors:', '- When receiving a user ID for job search, invoke the job search
+          pipeline', '- When receiving resume content and job description, invoke the resume agent', '- Pass through all outputs
+          from sub-agents without modification', '- Ensure proper data flow between agents when needed', You coordinate but
+          do not perform the actual work - let your specialized sub-agents handle their domains.]
+      function: create_coordinator_agent
+      sub_agents: [jobsearch_pipeline, resume]
+  doc_creator_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    tools: [create_formatted_resume]
+    params:
+      name: doc_creator_agent
+      instruction: ['CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.', 🚨 CRITICAL USER_ID
+          INSTRUCTIONS 🚨, YOU MUST EXTRACT THE ACTUAL USER_ID VALUE - NEVER USE THE LITERAL STRING "user_id", 'The user_id
+          will be provided in one of these ways:', '1. From Firebase authentication context: user_id', '2. From the resume
+          URL path: https://storage.googleapis.com/[project].firebasestorage.app/resumes/[USER_ID]/[filename]', 'REAL EXAMPLE:',
+        'From URL: https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/Gn8mXRcszzOPvGIYomUmHWMxA0E2/resume_AI_Research_Engineer_20250708_210856_992270fc.docx',
+        'The user_id is: Gn8mXRcszzOPvGIYomUmHWMxA0E2', 'CORRECT USAGE:', ✅ user_id=" Gn8mXRcszzOPvGIYomUmHWMxA0E2" (actual
+          Firebase user ID), ❌ user_id="user_id" (literal string - WRONG!), '❌ user_id="[USER_ID]" (placeholder - WRONG!)',
+        'When calling create_formatted_resume:', create_formatted_resume(, 'text={formatted_resume},', 'job_position_title=job_title,',
+        'user_id=user_id,', resume_url=resume_url, ), 'Expected return format with REAL values: NO TEXT BEFORE OR AFTER JUST
+          THE JSON OBJECT ONLY', '{', '"public_url": "https://storage.googleapis.com/gethired-6c623.firebasestorage.app/resumes/....",',
+        '"signed_url": "[long signed URL with authentication parameters]",', '"resume_text": {formatted_resume},', '"filename":
+          "....docx",', '"status": "success"', '}', Do not return the tool code.]
+      output_key: doc
+  experience_optimization_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    params:
+      name: experience_optimization_agent
+      instruction: ['CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.', You are an expert
+          recruiter and résumé coach., 'Input: {job_optimized_resume}', 'Without misrepresenting the candidate, hallucinating
+          skills, education or experience, and without removing experience, perform the following tasks:', 1. **Minimize visible
+          employment gaps**, '- Group older positions under a single "Early Career Experience (YYYY–YYYY)" heading without
+          individual dates', '- If relevant experience is limited, add a "Professional Development & Volunteer Work (YYYY–YYYY)"
+          section to highlight any continuous learning, certifications, or industry-related projects', 2. **Surface transferable
+          skills from "irrelevant" roles**, '- Rewrite bullets to emphasize universal competencies (e.g., data analysis, stakeholder
+          communication, compliance, process improvement)', '- Convert technical or industry-specific jargon into terms aligned
+          with the target job''s requirements', 3. **Reorder and refine**, '- Move the most relevant roles and accomplishments
+          to the top of the résumé', '- Use strong action verbs, quantifiable results, and **bold** each target-role keyword
+          the first time it appears', 4. **Enhance the Summary/Core Competencies**, '- Craft a 2–3 line "Summary of Qualifications"
+          or "Core Competencies" that highlights the top 4–6 skills demanded by the role', 5. **Ensure ATS-friendliness**,
+        '- Maintain a single-column layout, simple section headers, and standard fonts', '- Remove or de-emphasize any personal
+          details, graphics, or uncommon formatting', 'Output:', '- A fully formatted, ATS-optimized résumé draft tailored
+          to the specified job', '- Pass the results for ATS optimization']
+      output_key: experience_optimized_resume
+  humanize_resume_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    params:
+      name: humanize_resume_agent
+      instruction: ['CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.', 'You are a senior
+          recruiter and professional writer. Your mission is to transform a candidate’s résumé into a polished, engaging,
+          and authentic narrative—while preserving ATS compatibility.', 'Without misrepresenting the candidates, hallucinating
+          skills, education or experience and removing experience preform the following tasks:', 'Inputs:', '1. “Current Resume”:
+          {ats_optimized_resume}', '2. “Target Role”: {0}', 'Guidelines:', 1. **Natural Language & Tone**, '- Avoid overused
+          buzzwords and robotic phrasing.', '- Opt for clear, conversational job terminology that hiring managers actually
+          use.', '- Infuse genuine enthusiasm—especially in the Summary—without exclamation points or clichés.', 2. **Strategic
+          Keyword Integration**, '- Identify 6–10 essential keywords from the Target Role.', '- Seamlessly weave them into
+          the résumé where they fit organically;**bold**each keyword on first use.', '- Do **not** simply dump a keyword list,
+          ensure each term supports a real accomplishment.', 3. **Human-Centered Summary**, '- Rewrite the Summary as a 2–3
+          sentence intro that highlights the candidate’s passion, core strengths, and alignment with the role.', '- Use language
+          that conveys energy and purpose (e.g., “eager to help,” “skilled at translating,” “driven by…”).', 4. **Achievement-Focused
+          Bullets**, '- Lead with strong action verbs (“collaborated,” “streamlined,” “resolved” rather than “responsible
+          for”).', '- Quantify impact when possible (percentages, volumes, time saved).', '- Prioritize stories that show
+          problem solving, collaboration, and results.', 5. **Professional Tone & Format**, '- Maintain a single-column, clean
+          layout with standard headers.', '- Use a consistent, professional voice—no slang or overly casual wording.', '-
+          Keep bullet lengths uniform and section headings concise.', 'Output:', '- A fully humanized, ATS-friendly résumé
+          draft tailored to the Target Role.', When finised hand it off for proof reading]
+      output_key: draft_resume
+  job_optimization_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    params:
+      name: job_optimization_agent
+      instruction: ['CRITICAL: You MUST process the ENTIRE resume content without truncation or omission.', Act as an expert
+          recruiter and resume writer., 'Inputs:', '1. "Current Resume": {base_resume}', '2. "Target Role": {0}', 'Without
+          misrepresenting or hallucinating the candidate''s skills and experience, perform the following tasks:', 1. Map existing
+          skills and experiences to the role's requirements, 2. **Bold** all role-specific keywords where they naturally appear
+          (use **keyword** format), 3. Reorder and rewrite sections to surface the most relevant achievements first, '4. Revise
+          bullet points to:', '- Begin with strong action verbs', '- Include quantifiable results where possible', '- Incorporate
+          the job''s terminology seamlessly', 'Output:', '- A fully tailored resume draft ready for review', '- Pass the results
+          for experience optimization']
+      output_key: job_optimized_resume
+  jobsearch_pipeline:
+    type: instance
+    params:
+      name: job_search_ai_assistant
+      description: execute a sequence of profile_agent, listing_search, and company_research
+      function: create_coordinator_agent
+      sub_agents: [profile_preferences, listing_search_agent, company_research]
+  proof_reader_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    params:
+      name: proof_reader_agent
+      instruction: [You are an expert resume proofreader and copy editor., 'CRITICAL: You MUST process the ENTIRE resume content
+          without truncation or omission.', 'Input:', '• “Draft Resume”: {draft_resume}', 'Without misrepresenting the candidates,
+          hallucinating skills, education or experience and removing experience preform the following tasks:', 'Objectives:',
+        1. **Clarity & Readability**, – Spot awkward phrasing or confusing sentences., '– Rewrite for straightforward flow,
+          preserving meaning.', 2. **Active Voice & Strong Verbs**, – Identify any passive constructions., '– Replace with
+          concise, active-voice statements using impactful action verbs.', 3. **Conciseness & Redundancy**, – Highlight wordy
+          or repetitive phrasing., – Offer tighter alternatives that maintain key details., 4. **Grammar & Spelling**, '–
+          Fix typos, grammatical errors, and inconsistent terminology.', – Ensure verb tenses are consistent across bullets.,
+        'Output:', • The full résumé text with all edits applied., Hand off this draft to be formatted for parsing]
+      output_key: final_resume
+  resume_formatted_agent:
+    type: instance
+    models: [gemini-2.0-flash]
+    params:
+      name: resume_formatted_agent
+      instruction: ['CRITICAL: You MUST process the ENTIRE resume text without truncation or omission. Include ALL sections
+          and content from the input resume.', 'Without misrepresenting the candidates, hallucinating skills, education or
+          experience and removing experience preform the following tasks:', 'Please format the resume in a structured way
+          using the following labeled sections,', each starting on a new line with a clear section name., 'RESUME TEXT:',
+        '{final_resume}', 'IMPORTANT FORMATTING REQUIREMENTS:', '- Use only standard characters (letters, numbers, basic punctuation:
+          . , - @ | • )', '- Convert any special phone/email symbols to plain text', '- Use standard bullet points (•) for
+          lists', '- Use standard dashes (-) for date ranges', '- Keep phone numbers in standard format: 123-456-7890', '-
+          Keep email addresses clean: email@domain.com', 'Note if a section is not present in the resume do not create it:',
+        'Name:', 'Email:', 'Phone:', 'Summary:', <1-3 sentence summary here - no special formatting>, 'Skills:', 'Technical
+          Skills:', • Skill 1, • Skill 2, • Skill 3, 'Soft Skills:', • Communication, • Leadership, • Problem Solving, 'OR
+          if no clear categories exist:', • Skill 1, • Skill 2, • Skill 3, 'Experience:', <job title>, '<company>, <location>
+          | <start date> - <end date>', • Bullet 1, • Bullet 2, • Bullet 3, <job title>, '<company>, <location> | <start date>
+          - <end date>', • Bullet 1, • Bullet 2, <job title>, '<company>, <location> | <start date> - <end date>', • Bullet
+          1, • Bullet 2, '---END EXPERIENCE---', 'Projects:', <Project Title>, • Bullet 1, • Bullet 2, '---END PROJECTS---',
+        'Education:', '<Degree>, <School> | <start year> - <end year>', '---END EDUCATION---', 'Certifications:', • Certification
+          Name 1, • Certification Name 2, '---END CERTIFICATIONS---', 'Volunteer Experience:', '<Role>, <Organization> | <start
+          date> - <end date>', • Bullet 1, • Bullet 2, '---END VOLUNTEER EXPERIENCE---', 'Please separate sections using double
+          newlines and use the ---END [SECTION]--- markers to clearly delineate section boundaries for parsing.']
+      output_key: formatted_resume
+  resume_pipeline_agent:
+    type: instance
+    params:
+      name: ResumeTailorAgent
+      description: Agent design to tailor resumes to a job description
+      function: create_agent
+      sub_agents: [base_resume_cleanup, job_optimization_agent, experience_optimization_agent, ats_optimization_agent, humanize_resume_agent,
+        proof_reader_agent, resume_formatted_agent, doc_creator_agent]
+
+models:
+  gemini-2.0-flash:
+    type: literal
+    agents: [base_resume_cleanup, job_optimization_agent, experience_optimization_agent, ats_optimization_agent, humanize_resume_agent,
+      proof_reader_agent, resume_formatted_agent, doc_creator_agent]
+  gemini-2.0-flash-001:
+    type: literal
+    agents: [agent_instance.0, coordinator, agent_instance.2]
+  gemini-2.5-flash-preview-05-20:
+    type: literal
+    agents: [agent_instance.1]
+
+tools:
+  create_formatted_resume:
+    type: function
+    agents: [doc_creator_agent]
+    params:
+      description: |-
+        Create a formatted resume document and upload to Firebase Storage
+
+        Args:
+            text: The actual resume text content
+            job_position_title: The job position title (e.g., "Software Engineer")
+            user_id: The ACTUAL user ID value (e.g., "Gn8mXRcszzOPvGIYomUmHWMxA0E2")
+                     NOT the literal string "user_id" or placeholder text!
+            resume_url: Optional resume URL for user_id extraction fallback
+
+        Returns:
+            dict: Result with URLs and status
+  download_and_extract_resume_text:
+    type: function
+    agents: [base_resume_cleanup]
+    params:
+      description: "Download a resume file from Firebase Storage, extract text content, and clean up\n\nArgs:\n    storage_url:\
+        \ Firebase Storage URL in format:\n    https://storage.googleapis.com/[project].firebasestorage.app/resumes/[user_id]/[filename]\n\
+        \    \nReturns:\n    str: Extracted text content from the resume file\n    \nRaises:\n    ValueError: If file download\
+        \ fails or text extraction fails"
+  tools:
+    type: mcp
+    agents: [agent_instance.0]
+    params:
+      class: MCPToolset
+      mcp_server: tools
+  tools.1:
+    type: mcp
+    agents: [agent_instance.2]
+    params:
+      class: MCPToolset
+      mcp_server: tools.1
+  toolset:
+    type: mcp
+    agents: [agent_instance.1]
+    params:
+      class: MCPToolset
+      mcp_server: toolset
+
+mcp:
+  tools.0:
+    type: process
+    agents: [agent_instance, agent_instance.0]
+    params:
+      class: MCPToolset
+      connection_type: StdioServerParameters
+      command: npx
+      args: [-y, '@gannonh/firebase-mcp']
+      env: env
+      tool_filter: [auth_get_user, storage_get_file_info, firestore_list_documents, firestore_get_document, firestore_list_collections,
+        firestore_query_collection_group]
+      instance: tools
+  tools.1:
+    type: network
+    url: https://gethired-mcp.onrender.com/jobsearch-mcp/
+    agents: [agent_instance.2]
+    params:
+      class: MCPToolset
+      connection_type: StreamableHTTPServerParams
+      tool_filter: [search_companies, get_company_overview, get_company_reviews, get_company_salaries_glassdoor, get_company_interviews,
+        get_company_salary]
+  toolset:
+    type: network
+    url: https://gethired-mcp.onrender.com/jobsearch-mcp/
+    agents: [agent_instance.1]
+    params:
+      class: MCPToolset
+      connection_type: StreamableHTTPServerParams
+      tool_filter: [search_jobs, search_jobs_by_company, get_job_details, search_glassdoor_jobs]
+
+teams:
+  coordinator:
+    type: hierarchy
+    agents: [coordinator, jobsearch_pipeline, resume]
+  jobsearch_pipeline:
+    type: sequential
+    agents: [jobsearch_pipeline, profile_preferences, listing_search_agent, company_research]
+  resume_pipeline_agent:
+    type: sequential
+    agents: [resume_pipeline_agent, base_resume_cleanup, job_optimization_agent, experience_optimization_agent, ats_optimization_agent,
+      humanize_resume_agent, proof_reader_agent, resume_formatted_agent, doc_creator_agent]
+
+imports:
+  adk_types: google.genai.types
+  Agent: google.adk.agents.Agent
+  Any: typing.Any
+  argparse: argparse
+  asynccontextmanager: contextlib.asynccontextmanager
+  AsyncExitStack: contextlib.AsyncExitStack
+  asyncio: asyncio
+  BaseModel: pydantic.BaseModel
+  Body: fastapi.Body
+  Callable: typing.Callable
+  company_research_agent: company_research.agent.create_agent
+  CORSMiddleware: fastapi.middleware.cors.CORSMiddleware
+  create_agent_server: common.a2a_server.create_agent_server
+  create_formatted_resume: resume_doc.create_formatted_resume
+  credentials: firebase_admin.credentials
+  date: datetime.date
+  datetime: datetime.datetime
+  Dict: typing.Dict
+  DocxDocument: docx.Document
+  DocxTemplate: docxtpl.DocxTemplate
+  download_and_extract_resume_text: resume_doc.download_and_extract_resume_text
+  FastAPI: fastapi.FastAPI
+  Field: pydantic.Field
+  firebase_admin: firebase_admin
+  HttpUrl: pydantic.HttpUrl
+  InMemoryArtifactService: google.adk.artifacts.in_memory_artifact_service.InMemoryArtifactService
+  InMemorySessionService: google.adk.sessions.InMemorySessionService
+  inspect: inspect
+  jobsearch_agent: job_listing.agent.create_agent
+  json: json
+  JSONResponse: fastapi.responses.JSONResponse
+  List: typing.List
+  Literal: typing.Literal
+  load_dotenv: dotenv.load_dotenv
+  logging: logging
+  MCPToolset: google.adk.tools.mcp_tool.mcp_toolset.MCPToolset
+  Optional: typing.Optional
+  os: os
+  ParsedResume: parse.ParsedResume
+  Path: pathlib.Path
+  Pattern: re.Pattern
+  profile_agent: profile.agent.create_agent
+  prompt: prompt
+  PyPDF2: PyPDF2
+  re: re
+  requests: requests
+  resume_agent: resume.agent.create_agent
+  root_agent: agent.root_agent
+  Runner: google.adk.runners.Runner
+  SequentialAgent: google.adk.agents.SequentialAgent
+  signal: signal
+  StdioServerParameters: google.adk.tools.mcp_tool.mcp_toolset.StdioServerParameters
+  storage: firebase_admin.storage
+  StreamableHTTPServerParams: google.adk.tools.mcp_tool.mcp_session_manager.StreamableHTTPServerParams
+  sys: sys
+  TaskManager: task_manager.TaskManager
+  tempfile: tempfile
+  timedelta: datetime.timedelta
+  types: google.genai.types
+  uuid: uuid
+  uvicorn: uvicorn
+
+functions:
+  __init__:
+    type: sync
+    module: jobsearch_agents.coordinator.task_manager
+    args: [self, agent, timeout]
+  cleanup:
+    type: async
+    module: jobsearch_agents.company_research.agent
+  create_agent:
+    type: async
+    module: jobsearch_agents.company_research.agent
+  create_agent_server:
+    type: sync
+    module: jobsearch_agents.common.a2a_server
+    args: [name, description, task_manager, endpoints, well_known_path]
+    params:
+      returns: FastAPI
+  create_coordinator_agent:
+    type: async
+    module: jobsearch_agents.coordinator.agent
+  create_formatted_resume:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+    args: [text, job_position_title, user_id, resume_url]
+    params:
+      returns: dict
+  create_unique_filename:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+    args: [job_position_title, user_id]
+    params:
+      returns: str
+  download_and_extract_resume_text:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+    args: [resume_url]
+    params:
+      returns: str
+  extract_contact_info:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  extract_professional_summary:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  extract_user_id_from_url:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+    args: [resume_url]
+    params:
+      returns: str
+  get_metadata:
+    type: async
+    module: jobsearch_agents.common.a2a_server
+  health_check:
+    type: async
+    module: jobsearch_agents.common.a2a_server
+  initialize_firebase:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+  is_valid_user_id:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+    args: [user_id]
+    params:
+      returns: bool
+  lifespan:
+    type: async
+    module: jobsearch_agents.coordinator.__main__
+    args: [app]
+  main:
+    type: async
+    module: jobsearch_agents.coordinator.__main__
+  match_resume_text:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, regex, text]
+  options_run:
+    type: async
+    module: jobsearch_agents.common.a2a_server
+  options_tailor:
+    type: async
+    module: jobsearch_agents.common.a2a_server
+  parse_args:
+    type: sync
+    module: jobsearch_agents.coordinator.__main__
+  parse_education_entry:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  parse_experience_entry:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  parse_experience_section:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, exp_section_text]
+  parse_individual_experience_entry:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, entry_text, job_title, date_info]
+  parse_project_entry:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  parse_resume:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  parse_skill_set:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  parse_volunteer_entry:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self, text]
+  process_events_with_timeout:
+    type: async
+    module: jobsearch_agents.coordinator.task_manager
+  process_task:
+    type: async
+    module: jobsearch_agents.coordinator.task_manager
+    args: [self, message, context, session_id]
+    params:
+      returns: Dict
+  root:
+    type: async
+    module: jobsearch_agents.common.a2a_server
+  root_agent:
+    type: sync
+    module: jobsearch_agents.profile.agent
+  run_job_search:
+    type: async
+    module: jobsearch_agents.common.a2a_server
+    args: [request]
+  serialize:
+    type: sync
+    module: jobsearch_agents.resume.parse
+    args: [self]
+  signal_handler:
+    type: sync
+    module: jobsearch_agents.coordinator.__main__
+  tailor_resume:
+    type: async
+    module: jobsearch_agents.common.a2a_server
+    args: [request]
+  test_firebase_connectivity:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+    args: [bucket_name]
+    params:
+      returns: dict
+  test_firebase_url_extraction:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+  unwrap_json_string:
+    type: sync
+    module: jobsearch_agents.common.a2a_server
+    args: [json_block]
+    params:
+      returns: Any
+  upload_to_firebase_storage:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+    args: [file_path, filename, user_id]
+    params:
+      returns: dict
+  validate_user_id_handling:
+    type: sync
+    module: jobsearch_agents.resume.resume_doc
+
+variables:
+  FIREBASE_STORAGE_BUCKET:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+  JOB_SEARCH_HOST:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+  JOB_SEARCH_PORT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+  JOB_SEARCH_TIMEOUT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+  LOG_LEVEL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+  MCP_SERVER_URL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+  PORT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+  SERVICE_ACCOUNT_KEY_PATH:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: ['os.path.join(os.path.dirname(__file__), ''..'', ''..'', ''.env'')']
+
+files:
+  .docx:
+    type: literal
+    actions: [write]
+    params:
+      caller: [tempfile.NamedTemporaryFile]
+      delete: "False"
+  .env:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), "..", "..", .env]
+  .well-known:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), .well-known]
+  /app/template/templateResumeDocV2.docx:
+    type: literal
+    actions: [read]
+    params:
+      caller: [create_formatted_resume]
+  agent.json:
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [well_known_path, agent.json]
+  agent_json_path:
+    type: variable
+    actions: [read, write]
+    params:
+      caller: [os.path.exists, open, json.load]
+  file_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.exists]
+  module_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.dirname]
+  SERVICE_ACCOUNT_KEY_PATH:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.path.exists]
+  temp_file_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open]
+      alias: [pdf_file]
+  well_known_path:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.makedirs]
+
+processes:
+  npx:
+    type: mcp
+    actions: [exec]
+    args: [[-y, '@gannonh/firebase-mcp']]
+    params:
+      caller: [StdioServerParameters]
+      shell: ["False"]
+
+networks:
+  gethired-mcp.onrender.com:
+    type: api
+    actions: [connect]
+    urls: [/jobsearch-mcp/]
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [McpToolset]
+      links: [MCPToolset]
+  storage.googleapis.com:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      caller: [upload_to_firebase_storage]
